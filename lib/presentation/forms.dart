@@ -279,7 +279,7 @@ class SettingsScreen extends StatelessWidget {
       }),
     ])),const SizedBox(height:22),const SectionTitle('About'),
     const SoftCard(child:Column(children:[InfoLabel(label:'App',value:'LonyoGang Heritage'),
-      InfoLabel(label:'Prototype version',value:'0.2.0'),
+      InfoLabel(label:'Prototype version',value:'0.3.0'),
       InfoLabel(label:'Default currency',value:'UGX'),
       InfoLabel(label:'Cloud synchronization',value:'Unavailable'),
       InfoLabel(label:'Encrypted local storage',value:'Not implemented'),
