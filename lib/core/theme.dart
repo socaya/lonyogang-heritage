@@ -48,7 +48,7 @@ abstract final class LG {
       ),
       textTheme: const TextTheme(
         headlineLarge: TextStyle(color: navy, fontSize: 30, height: 1.17, fontWeight: FontWeight.w800, letterSpacing: -0.8),
-        headlineMedium: TextStyle(color: navy, fontSize: 25, height: 1.2, fontWeight: FontWeight.w750, letterSpacing: -0.6),
+        headlineMedium: TextStyle(color: navy, fontSize: 25, height: 1.2, fontWeight: FontWeight.w700, letterSpacing: -0.6),
         titleLarge: TextStyle(color: navy, fontSize: 20, fontWeight: FontWeight.w700),
         titleMedium: TextStyle(color: navy, fontSize: 16, fontWeight: FontWeight.w700),
         bodyLarge: TextStyle(color: ink, fontSize: 16, height: 1.42),
