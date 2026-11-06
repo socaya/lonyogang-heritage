@@ -1,71 +1,46 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:lonyogang_heritage/domain/models.dart';
 import 'package:lonyogang_heritage/domain/finance.dart';
+import 'package:lonyogang_heritage/domain/models.dart';
 
-WealthAsset asset(String id, AssetKind kind, int value, {int ownership = 10000, bool archived = false}) =>
-  WealthAsset(id: id, kind: kind, name: id, valueUgx: value, costUgx: value,
-    ownershipBps: ownership, valuedAt: DateTime.utc(2026, 10, 1),
-    valuationSource: ValuationSource.ownerEstimate,
-    acquiredAt: DateTime.utc(2024), archived: archived);
-
-void main() {
-  final a = asset('plot', AssetKind.property, 240000000, ownership: 5000);
-  final b = asset('shares', AssetKind.investment, 18000000);
-  final debt = WealthDebt(id: 'm', name: 'Mortgage', balanceUgx: 40000000,
-    lender: 'Lender', linkedAssetId: a.id);
-
-  test('partial ownership influences net worth', () {
-    expect(ownedValue(a), 120000000);
-    expect(grossOwnedAssets([a, b]), 138000000);
-    expect(netWorth([a, b], [debt]), 98000000);
+void main(){
+  final date=DateTime(2026,11,1);
+  test('SRS golden fixture: 390m assets and 70m debts => 320m net worth',(){
+    final a=[
+      WealthAsset(id:'i1',name:'Unit Trust',kind:AssetKind.investment,valueUgx:70000000,valuedAt:date),
+      WealthAsset(id:'s1',name:'Bank/NSSF',kind:AssetKind.savings,valueUgx:45000000,valuedAt:date),
+      WealthAsset(id:'i2',name:'Govt bonds',kind:AssetKind.investment,valueUgx:35000000,valuedAt:date),
+      WealthAsset(id:'p1',name:'Rental',kind:AssetKind.property,valueUgx:300000000,ownershipBps:8000,valuedAt:date),
+    ];
+    final d=[Liability(id:'mortgage',name:'Mortgage',outstandingUgx:60000000,propertyId:'p1',asOf:date),
+      Liability(id:'sacco',name:'SACCO',outstandingUgx:10000000,asOf:date)];
+    final totals=computeTotals(a,d);
+    expect(totals.grossAssets,390000000);
+    expect(totals.liabilities,70000000);
+    expect(totals.netWorth,320000000);
+    expect(propertyEquity(a.last,d),180000000);
   });
-  test('mortgage is deducted only once', () {
-    expect(propertyEquity(a, [debt]), 80000000);
-    expect(netWorth([a, b], [debt]), 98000000);
+  test('archived assets and liabilities are not included',(){
+    final assets=[WealthAsset(id:'a',name:'Archived',kind:AssetKind.savings,valueUgx:100,valuedAt:date,archived:true)];
+    final debts=[Liability(id:'d',name:'Archived debt',outstandingUgx:20,asOf:date,archived:true)];
+    expect(computeTotals(assets,debts).netWorth,0);
   });
-  test('archived asset omitted', () {
-    expect(grossOwnedAssets([a, b.copyWith(archived: true)]), 120000000);
+  test('reversal cancels original income; transfers are not deposits',(){
+    final event=LedgerEvent(id:'one',description:'Dividend',kind:EventKind.dividend,amountUgx:3000,occurredAt:date);
+    final reverse=LedgerEvent(id:'two',description:'Reversal',kind:EventKind.reversal,amountUgx:3000,occurredAt:date,reversalOf:'one');
+    final transfer=LedgerEvent(id:'three',description:'Between own accounts',kind:EventKind.transfer,amountUgx:20000,occurredAt:date);
+    expect(realizedIncome([event,reverse,transfer]),0);
+    expect(externalContributions([transfer]),0);
   });
-  test('ownership bounds validated', () {
-    expect(() => ownedValue(a.copyWith(ownershipBps: 11000)), throwsArgumentError);
-  });
-  test('allocation totals reconcile', () {
-    expect(allocation([a, b]).values.reduce((x, y) => x + y), 138000000);
-  });
-  test('cash flow records do not change assets', () {
-    final entry = WealthEntry(id: 'x', type: EntryType.income,
-      amountUgx: 1500000, category: 'Rent', occurredAt: DateTime.utc(2026));
-    expect(netOperatingCashFlow([entry]), 1500000);
-    expect(ownedValue(a), 120000000);
-  });
-  test('date window excludes later entries', () {
-    final now = WealthEntry(id: 'a', type: EntryType.expense,
-      amountUgx: 3000, category: 'A', occurredAt: DateTime.utc(2026, 1, 2));
-    final later = WealthEntry(id: 'b', type: EntryType.expense,
-      amountUgx: 5000, category: 'B', occurredAt: DateTime.utc(2027));
-    expect(amountFor([now, later], EntryType.expense, to: DateTime.utc(2027)), 3000);
-  });
-  test('property value freshness separately from investment', () {
-    final now = DateTime.utc(2026, 12, 10);
-    expect(valuationIsStale(a, now), false);
-    expect(valuationIsStale(b, now), true);
-  });
-  test('xirr simple annual growth', () {
-    final r = xirr([
-      (date: DateTime.utc(2024, 1, 1), amount: -1000),
-      (date: DateTime.utc(2025, 1, 1), amount: 1100),
-    ]);
-    expect(r, isNotNull);
-    expect(r!, closeTo(0.10, 0.002));
-  });
-  test('xirr returns null without opposite sign cash flow', () {
-    expect(xirr([(date: DateTime.utc(2024), amount: -1000)]), isNull);
-  });
-  test('asset database roundtrip', () {
-    expect(WealthAsset.fromDb(a.toDb()).valueUgx, a.valueUgx);
-    expect(WealthAsset.fromDb(a.toDb()).ownershipBps, a.ownershipBps);
-  });
-  test('debt database roundtrip', () {
-    expect(WealthDebt.fromDb(debt.toDb()).linkedAssetId, a.id);
+  test('round-trips all persisted portfolio records',(){
+    final asset=WealthAsset(id:'x',name:'House',kind:AssetKind.property,valueUgx:10000,ownershipBps:5000,valuedAt:date);
+    final p=PortfolioState(ownerName:'Test',onboardingDone:true,assets:[asset],
+      contacts:[const LegacyContact(id:'c',name:'Contact',relationship:'Sibling')],
+      goals:[const WealthGoal(id:'g',name:'School',targetUgx:10000)],
+      reminders:[ReminderRecord(id:'r',title:'Pay rates',dueAt:date)]);
+    final restored=PortfolioState.fromJson(p.toJson());
+    expect(restored.ownerName,'Test');
+    expect(restored.assets.single.attributableUgx,5000);
+    expect(restored.contacts.single.relationship,'Sibling');
+    expect(restored.reminders.single.title,'Pay rates');
   });
 }

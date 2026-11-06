@@ -1,45 +1,31 @@
-name: Flutter Android CI
+name: Flutter quality checks
 on:
   push:
     branches: [main]
-    paths:
-      - 'lib/**'
-      - 'test/**'
-      - 'pubspec.yaml'
-      - 'analysis_options.yaml'
-      - 'tool/**'
-      - '.github/workflows/flutter-ci.yml'
   pull_request:
-    paths:
-      - 'lib/**'
-      - 'test/**'
-      - 'pubspec.yaml'
-      - 'tool/**'
+
 jobs:
-  test-and-build:
+  verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
-      - name: Install Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.47.9'
           channel: stable
           cache: true
-      - name: Materialize Android/iOS platform projects
-        run: bash tool/setup_platform.sh
-      - name: Resolve dependencies
+      - name: Generate native Android and iOS project wrappers
+        run: flutter create --platforms=android,ios --org com.lonyogang .
+      - name: Dependencies
         run: flutter pub get
-      - name: Flutter analysis
-        run: flutter analyze
-      - name: Unit and widget tests
-        run: flutter test
-      - name: Build Android debug APK
-        run: flutter build apk --debug
-      - name: Upload build artifact
+      - name: Analyze Dart source
+        run: flutter analyze --no-pub
+      - name: Domain tests
+        run: flutter test --no-pub
+      - name: Android debug APK
+        run: flutter build apk --debug --no-pub
+      - name: APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: lonyogang-android-debug-apk
+          name: lonyogang-android-debug
           path: build/app/outputs/flutter-apk/app-debug.apk
-          if-no-files-found: error

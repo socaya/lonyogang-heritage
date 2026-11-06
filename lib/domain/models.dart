@@ -1,178 +1,149 @@
-/// Pure Dart finance records. All monetary values are integer UGX (no floating money).
-enum AssetKind { investment, property, saving, other }
-enum EntryType { income, expense, contribution, withdrawal }
-enum ValuationSource { ownerEstimate, statement, licensedValuation, other }
+import 'dart:convert';
 
-extension AssetKindLabel on AssetKind {
-  String get label => switch (this) {
-    AssetKind.investment => 'Investments',
-    AssetKind.property => 'Properties',
-    AssetKind.saving => 'Savings',
-    AssetKind.other => 'Other assets',
-  };
-}
+/// Values are stored in integer UGX units: never binary floating-point currency.
+/// Native-currency holdings require a separately implemented sourced FX policy.
+enum AssetKind { investment, property, savings, other }
+enum RecordStatus { estimated, userEntered, verified, stale }
+enum EventKind { contribution, withdrawal, dividend, interest, rent, expense, fee, tax, transfer, adjustment, reversal }
 
-T enumValue<T extends Enum>(Iterable<T> values, String name, T fallback) {
-  for (final item in values) {
-    if (item.name == name) return item;
-  }
-  return fallback;
-}
+typedef Json = Map<String, dynamic>;
 
-int _n(Object? value) => (value as num?)?.toInt() ?? 0;
-String _s(Object? value) => value?.toString() ?? '';
-DateTime _dt(Object? value) => (DateTime.tryParse(_s(value)) ?? DateTime.now()).toLocal();
+int asInt(Object? value, [int fallback = 0]) => switch (value) {
+      int v => v,
+      num v => v.toInt(),
+      String v => int.tryParse(v) ?? fallback,
+      _ => fallback,
+    };
+String asString(Object? value, [String fallback = '']) => value is String ? value : fallback;
+DateTime readDate(Object? v) => DateTime.tryParse(asString(v)) ?? DateTime(2020);
+String makeId() => '${DateTime.now().microsecondsSinceEpoch}-${_idCounter++}';
+int _idCounter = 0;
 
 class WealthAsset {
-  const WealthAsset({
-    required this.id, required this.kind, required this.name,
-    required this.valueUgx, required this.costUgx,
-    required this.ownershipBps, required this.valuedAt,
-    required this.valuationSource, required this.acquiredAt,
-    this.institution = '', this.location = '', this.notes = '', this.archived = false,
-  });
-  final String id, name, institution, location, notes;
+  final String id;
+  final String name;
   final AssetKind kind;
-  final int valueUgx, costUgx, ownershipBps;
-  final DateTime valuedAt, acquiredAt;
-  final ValuationSource valuationSource;
+  final String category;
+  final int valueUgx;
+  final int ownershipBps; // 10,000 means 100 percent.
+  final int costUgx;
+  final String institution;
+  final String location;
+  final RecordStatus status;
+  final DateTime valuedAt;
+  final String notes;
   final bool archived;
 
-  WealthAsset copyWith({String? name, AssetKind? kind, int? valueUgx, int? costUgx,
-    int? ownershipBps, DateTime? valuedAt, ValuationSource? valuationSource,
-    DateTime? acquiredAt, String? institution, String? location, String? notes, bool? archived}) =>
-    WealthAsset(id: id, name: name ?? this.name, kind: kind ?? this.kind,
-      valueUgx: valueUgx ?? this.valueUgx, costUgx: costUgx ?? this.costUgx,
-      ownershipBps: ownershipBps ?? this.ownershipBps, valuedAt: valuedAt ?? this.valuedAt,
-      valuationSource: valuationSource ?? this.valuationSource, acquiredAt: acquiredAt ?? this.acquiredAt,
-      institution: institution ?? this.institution, location: location ?? this.location,
-      notes: notes ?? this.notes, archived: archived ?? this.archived);
+  const WealthAsset({required this.id, required this.name, required this.kind, this.category = '', required this.valueUgx,
+    this.ownershipBps = 10000, this.costUgx = 0, this.institution = '', this.location = '',
+    this.status = RecordStatus.userEntered, required this.valuedAt, this.notes = '', this.archived = false});
 
-  Map<String, Object?> toDb() => {
-    'id': id, 'kind': kind.name, 'name': name, 'value_ugx': valueUgx,
-    'cost_ugx': costUgx, 'ownership_bps': ownershipBps,
-    'valued_at': valuedAt.toUtc().toIso8601String(), 'source': valuationSource.name,
-    'acquired_at': acquiredAt.toUtc().toIso8601String(), 'institution': institution,
-    'location': location, 'notes': notes, 'archived': archived ? 1 : 0,
-  };
-  factory WealthAsset.fromDb(Map<String, Object?> m) => WealthAsset(
-    id: _s(m['id']), kind: enumValue(AssetKind.values, _s(m['kind']), AssetKind.other),
-    name: _s(m['name']), valueUgx: _n(m['value_ugx']), costUgx: _n(m['cost_ugx']),
-    ownershipBps: _n(m['ownership_bps']), valuedAt: _dt(m['valued_at']),
-    valuationSource: enumValue(ValuationSource.values, _s(m['source']), ValuationSource.ownerEstimate),
-    acquiredAt: _dt(m['acquired_at']), institution: _s(m['institution']),
-    location: _s(m['location']), notes: _s(m['notes']), archived: _n(m['archived']) == 1,
-  );
+  int get attributableUgx => (valueUgx * ownershipBps) ~/ 10000;
+  Json toJson() => {'id':id,'name':name,'kind':kind.name,'category':category,'valueUgx':valueUgx,
+    'ownershipBps':ownershipBps,'costUgx':costUgx,'institution':institution,'location':location,
+    'status':status.name,'valuedAt':valuedAt.toIso8601String(),'notes':notes,'archived':archived};
+  factory WealthAsset.fromJson(Json j) => WealthAsset(
+    id:asString(j['id']),name:asString(j['name']),
+    kind:AssetKind.values.firstWhere((x)=>x.name==j['kind'],orElse:()=>AssetKind.other),
+    category:asString(j['category']),valueUgx:asInt(j['valueUgx']),
+    ownershipBps:asInt(j['ownershipBps'],10000).clamp(0,10000).toInt(),costUgx:asInt(j['costUgx']),
+    institution:asString(j['institution']),location:asString(j['location']),
+    status:RecordStatus.values.firstWhere((x)=>x.name==j['status'],orElse:()=>RecordStatus.userEntered),
+    valuedAt:readDate(j['valuedAt']),notes:asString(j['notes']),archived:j['archived']==true);
+  WealthAsset copyWith({bool? archived}) => WealthAsset(id:id,name:name,kind:kind,category:category,valueUgx:valueUgx,
+    ownershipBps:ownershipBps,costUgx:costUgx,institution:institution,location:location,status:status,
+    valuedAt:valuedAt,notes:notes,archived:archived??this.archived);
 }
 
-class WealthDebt {
-  const WealthDebt({required this.id, required this.name, required this.balanceUgx,
-    required this.lender, this.linkedAssetId = '', this.interestBps = 0, this.dueAt, this.notes = ''});
-  final String id, name, lender, linkedAssetId, notes;
-  final int balanceUgx, interestBps;
+class Liability {
+  final String id;
+  final String name;
+  final String lender;
+  final int outstandingUgx;
+  final int principalUgx;
+  final String? propertyId;
+  final DateTime asOf;
   final DateTime? dueAt;
-  Map<String, Object?> toDb() => {
-    'id': id, 'name': name, 'balance_ugx': balanceUgx, 'lender': lender,
-    'linked_asset_id': linkedAssetId, 'interest_bps': interestBps,
-    'due_at': dueAt?.toUtc().toIso8601String(), 'notes': notes,
-  };
-  factory WealthDebt.fromDb(Map<String, Object?> m) => WealthDebt(
-    id: _s(m['id']), name: _s(m['name']), balanceUgx: _n(m['balance_ugx']),
-    lender: _s(m['lender']), linkedAssetId: _s(m['linked_asset_id']),
-    interestBps: _n(m['interest_bps']),
-    dueAt: m['due_at'] == null ? null : DateTime.tryParse(_s(m['due_at'])),
-    notes: _s(m['notes']),
-  );
+  final String notes;
+  final bool archived;
+  const Liability({required this.id,required this.name,this.lender='',required this.outstandingUgx,
+    this.principalUgx=0,this.propertyId,required this.asOf,this.dueAt,this.notes='',this.archived=false});
+  Json toJson()=>{'id':id,'name':name,'lender':lender,'outstandingUgx':outstandingUgx,'principalUgx':principalUgx,
+    'propertyId':propertyId,'asOf':asOf.toIso8601String(),'dueAt':dueAt?.toIso8601String(),'notes':notes,'archived':archived};
+  factory Liability.fromJson(Json j)=>Liability(id:asString(j['id']),name:asString(j['name']),lender:asString(j['lender']),
+    outstandingUgx:asInt(j['outstandingUgx']),principalUgx:asInt(j['principalUgx']),propertyId:j['propertyId'] as String?,
+    asOf:readDate(j['asOf']),dueAt:j['dueAt']==null?null:readDate(j['dueAt']),notes:asString(j['notes']),archived:j['archived']==true);
+  Liability copyWith({bool? archived})=>Liability(id:id,name:name,lender:lender,outstandingUgx:outstandingUgx,
+    principalUgx:principalUgx,propertyId:propertyId,asOf:asOf,dueAt:dueAt,notes:notes,archived:archived??this.archived);
 }
 
-class WealthEntry {
-  const WealthEntry({required this.id, required this.type, required this.amountUgx,
-    required this.category, required this.occurredAt, this.assetId = '', this.notes = ''});
-  final String id, category, assetId, notes;
-  final EntryType type;
+class LedgerEvent {
+  final String id;
+  final String description;
+  final EventKind kind;
   final int amountUgx;
   final DateTime occurredAt;
-  Map<String, Object?> toDb() => {
-    'id': id, 'kind': type.name, 'amount_ugx': amountUgx,
-    'category': category, 'occurred_at': occurredAt.toUtc().toIso8601String(),
-    'asset_id': assetId, 'notes': notes,
-  };
-  factory WealthEntry.fromDb(Map<String, Object?> m) => WealthEntry(
-    id: _s(m['id']), type: enumValue(EntryType.values, _s(m['kind']), EntryType.expense),
-    amountUgx: _n(m['amount_ugx']), category: _s(m['category']),
-    occurredAt: _dt(m['occurred_at']), assetId: _s(m['asset_id']), notes: _s(m['notes']),
-  );
+  final String? assetId;
+  final String? reversalOf;
+  final String notes;
+  const LedgerEvent({required this.id,required this.description,required this.kind,required this.amountUgx,
+    required this.occurredAt,this.assetId,this.reversalOf,this.notes=''});
+  Json toJson()=>{'id':id,'description':description,'kind':kind.name,'amountUgx':amountUgx,
+    'occurredAt':occurredAt.toIso8601String(),'assetId':assetId,'reversalOf':reversalOf,'notes':notes};
+  factory LedgerEvent.fromJson(Json j)=>LedgerEvent(id:asString(j['id']),description:asString(j['description']),
+    kind:EventKind.values.firstWhere((x)=>x.name==j['kind'],orElse:()=>EventKind.adjustment),
+    amountUgx:asInt(j['amountUgx']),occurredAt:readDate(j['occurredAt']),assetId:j['assetId'] as String?,
+    reversalOf:j['reversalOf'] as String?,notes:asString(j['notes']));
 }
 
-class WealthValuation {
-  const WealthValuation({required this.id, required this.assetId, required this.valueUgx,
-    required this.source, required this.recordedAt, this.note = ''});
-  final String id, assetId, note;
-  final int valueUgx;
-  final ValuationSource source;
-  final DateTime recordedAt;
-  Map<String, Object?> toDb() => {
-    'id': id, 'asset_id': assetId, 'value_ugx': valueUgx,
-    'source': source.name, 'recorded_at': recordedAt.toUtc().toIso8601String(), 'note': note,
-  };
-  factory WealthValuation.fromDb(Map<String, Object?> m) => WealthValuation(
-    id: _s(m['id']), assetId: _s(m['asset_id']), valueUgx: _n(m['value_ugx']),
-    source: enumValue(ValuationSource.values, _s(m['source']), ValuationSource.ownerEstimate),
-    recordedAt: _dt(m['recorded_at']), note: _s(m['note']),
-  );
+class WealthGoal {
+  final String id;final String name;final int targetUgx;final int savedUgx;final DateTime? targetDate;
+  const WealthGoal({required this.id,required this.name,required this.targetUgx,this.savedUgx=0,this.targetDate});
+  Json toJson()=>{'id':id,'name':name,'targetUgx':targetUgx,'savedUgx':savedUgx,'targetDate':targetDate?.toIso8601String()};
+  factory WealthGoal.fromJson(Json j)=>WealthGoal(id:asString(j['id']),name:asString(j['name']),targetUgx:asInt(j['targetUgx']),
+    savedUgx:asInt(j['savedUgx']),targetDate:j['targetDate']==null?null:readDate(j['targetDate']));
 }
 
-class WealthBeneficiary {
-  const WealthBeneficiary({required this.id, required this.name, required this.relationship,
-    required this.contact, this.notes = '', this.nominationConfirmed = false});
-  final String id, name, relationship, contact, notes;
-  final bool nominationConfirmed;
-  Map<String, Object?> toDb() => {
-    'id': id, 'name': name, 'relationship': relationship, 'contact': contact,
-    'notes': notes, 'nomination_confirmed': nominationConfirmed ? 1 : 0,
-  };
-  factory WealthBeneficiary.fromDb(Map<String, Object?> m) => WealthBeneficiary(
-    id: _s(m['id']), name: _s(m['name']), relationship: _s(m['relationship']),
-    contact: _s(m['contact']), notes: _s(m['notes']),
-    nominationConfirmed: _n(m['nomination_confirmed']) == 1,
-  );
+class LegacyContact {
+  final String id;final String name;final String relationship;final String instructions;
+  const LegacyContact({required this.id,required this.name,required this.relationship,this.instructions=''});
+  Json toJson()=>{'id':id,'name':name,'relationship':relationship,'instructions':instructions};
+  factory LegacyContact.fromJson(Json j)=>LegacyContact(id:asString(j['id']),name:asString(j['name']),
+    relationship:asString(j['relationship']),instructions:asString(j['instructions']));
 }
 
-class WealthReminder {
-  const WealthReminder({required this.id, required this.title, required this.dueAt,
-    this.assetId = '', this.details = '', this.done = false});
-  final String id, title, assetId, details;
-  final DateTime dueAt;
-  final bool done;
-  Map<String, Object?> toDb() => {
-    'id': id, 'title': title, 'due_at': dueAt.toUtc().toIso8601String(),
-    'asset_id': assetId, 'details': details, 'done': done ? 1 : 0,
-  };
-  factory WealthReminder.fromDb(Map<String, Object?> m) => WealthReminder(
-    id: _s(m['id']), title: _s(m['title']), dueAt: _dt(m['due_at']),
-    assetId: _s(m['asset_id']), details: _s(m['details']), done: _n(m['done']) == 1,
-  );
+class ReminderRecord {
+  final String id;final String title;final DateTime dueAt;final bool completed;
+  const ReminderRecord({required this.id,required this.title,required this.dueAt,this.completed=false});
+  Json toJson()=>{'id':id,'title':title,'dueAt':dueAt.toIso8601String(),'completed':completed};
+  factory ReminderRecord.fromJson(Json j)=>ReminderRecord(id:asString(j['id']),title:asString(j['title']),
+    dueAt:readDate(j['dueAt']),completed:j['completed']==true);
+  ReminderRecord toggle()=>ReminderRecord(id:id,title:title,dueAt:dueAt,completed:!completed);
 }
 
-class WealthDocument {
-  const WealthDocument({required this.id, required this.name, required this.mime,
-    required this.assetId, required this.addedAt, required this.byteCount});
-  final String id, name, mime, assetId;
-  final DateTime addedAt;
-  final int byteCount;
-  Map<String, Object?> toDb() => {
-    'id': id, 'name': name, 'mime': mime, 'asset_id': assetId,
-    'added_at': addedAt.toUtc().toIso8601String(), 'byte_count': byteCount,
-  };
-  factory WealthDocument.fromDb(Map<String, Object?> m) => WealthDocument(
-    id: _s(m['id']), name: _s(m['name']), mime: _s(m['mime']),
-    assetId: _s(m['asset_id']), addedAt: _dt(m['added_at']),
-    byteCount: _n(m['byte_count']),
-  );
-}
-
-class WealthProfile {
-  const WealthProfile({required this.name, required this.email, required this.createdAt});
-  final String name, email;
-  final DateTime createdAt;
+class PortfolioState {
+  final String ownerName;
+  final bool onboardingDone;
+  final List<WealthAsset> assets;
+  final List<Liability> liabilities;
+  final List<LedgerEvent> events;
+  final List<WealthGoal> goals;
+  final List<LegacyContact> contacts;
+  final List<ReminderRecord> reminders;
+  const PortfolioState({this.ownerName='',this.onboardingDone=false,this.assets=const [],this.liabilities=const [],
+    this.events=const [],this.goals=const [],this.contacts=const [],this.reminders=const []});
+  Json toJson()=>{'schemaVersion':1,'ownerName':ownerName,'onboardingDone':onboardingDone,
+    'assets':assets.map((x)=>x.toJson()).toList(),'liabilities':liabilities.map((x)=>x.toJson()).toList(),
+    'events':events.map((x)=>x.toJson()).toList(),'goals':goals.map((x)=>x.toJson()).toList(),
+    'contacts':contacts.map((x)=>x.toJson()).toList(),'reminders':reminders.map((x)=>x.toJson()).toList()};
+  factory PortfolioState.fromJson(Json j) {
+    if (asInt(j['schemaVersion'])!=1) throw const FormatException('Unsupported portfolio data schema');
+    List<T> read<T>(String key,T Function(Json) parse)=>(j[key] as List<dynamic>? ?? const [])
+      .map((x)=>parse(Map<String,dynamic>.from(x as Map))).toList();
+    return PortfolioState(ownerName:asString(j['ownerName']),onboardingDone:j['onboardingDone']==true,
+      assets:read('assets',WealthAsset.fromJson),liabilities:read('liabilities',Liability.fromJson),
+      events:read('events',LedgerEvent.fromJson),goals:read('goals',WealthGoal.fromJson),
+      contacts:read('contacts',LegacyContact.fromJson),reminders:read('reminders',ReminderRecord.fromJson));
+  }
+  String encode()=>jsonEncode(toJson());
 }
