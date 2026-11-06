@@ -37,9 +37,9 @@ class LG {
       elevatedButtonTheme:ElevatedButtonThemeData(style:ElevatedButton.styleFrom(
         backgroundColor:navy,foregroundColor:white,elevation:0,minimumSize:const Size.fromHeight(52),
         shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(12)),
-        textStyle:const TextStyle(fontSize:16,fontWeight:FontWeight.w700))),
+        textStyle:const TextStyle(fontFamily:'Roboto',fontSize:16,fontWeight:FontWeight.w700))),
       navigationBarTheme:NavigationBarThemeData(backgroundColor:white,indicatorColor:sageSoft,height:72,
-        labelTextStyle:WidgetStateProperty.all(const TextStyle(fontSize:11,fontWeight:FontWeight.w600,color:navy))),
+        labelTextStyle:WidgetStateProperty.all(const TextStyle(fontFamily:'Roboto',fontSize:11,fontWeight:FontWeight.w600,color:navy))),
       dividerTheme:const DividerThemeData(color:line,space:1,thickness:1),
     );
   }
