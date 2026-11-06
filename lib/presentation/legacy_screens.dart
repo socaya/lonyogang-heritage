@@ -1,0 +1,445 @@
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+
+import '../core/design.dart';
+import '../data/portfolio_store.dart';
+import '../domain/models.dart';
+import 'screens.dart';
+import 'widgets.dart';
+import 'wealth_screens.dart';
+
+class DocumentsScreen extends StatefulWidget {
+  final PortfolioStore store;
+  const DocumentsScreen({super.key,required this.store});
+  @override State<DocumentsScreen> createState()=>_DocumentsScreenState();
+}
+class _DocumentsScreenState extends State<DocumentsScreen> {
+  final query=TextEditingController();
+  String category='All';
+  @override void dispose(){query.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:widget.store,builder:(context,_){
+    final docs=widget.store.state.documents.where((d)=>!d.archived &&
+        (category=='All'||d.category==category)&&
+        (d.title.toLowerCase().contains(query.text.toLowerCase())||
+         d.category.toLowerCase().contains(query.text.toLowerCase()))).toList()
+       ..sort((a,b)=>a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    return WealthPage(title:'Documents & records',subtitle:'A private catalog of important financial and property records.',children:[
+      const SoftCard(color:LG.sageSoft,child:Row(children:[
+        Icon(Icons.info_outline,color:LG.sage),SizedBox(width:12),
+        Expanded(child:Text('Metadata index only. No files are uploaded, scanned, encrypted or stored in this preview.',
+          style:TextStyle(color:LG.muted,fontSize:12,height:1.5)))])),
+      const SizedBox(height:18),
+      TextField(controller:query,onChanged:(_)=>setState((){}),
+        decoration:const InputDecoration(prefixIcon:Icon(Icons.search,color:LG.sage),hintText:'Find a document record')),
+      const SizedBox(height:14),SizedBox(height:38,child:ListView(scrollDirection:Axis.horizontal,children:[
+        for(final item in ['All','Property','Investment','Insurance','Identity','Other'])
+          Padding(padding:const EdgeInsets.only(right:8),child:ChoiceChip(label:Text(item),selected:category==item,
+            onSelected:(_)=>setState(()=>category=item),backgroundColor:LG.white,
+            selectedColor:LG.sageSoft,side:BorderSide.none)),
+      ])),
+      const SizedBox(height:20),
+      if(docs.isEmpty)const EmptySection(title:'No document records',detail:'Create a record for a deed, policy, contract or statement.')
+      else ...docs.map((d){
+        final overdue=d.expiresAt!=null&&d.expiresAt!.isBefore(DateTime.now());
+        return Padding(padding:const EdgeInsets.only(bottom:10),child:SoftCard(
+          onTap:()=>openWealthPage(context,DocumentFormScreen(store:widget.store,existing:d)),
+          child:Row(children:[
+            Container(width:44,height:44,decoration:BoxDecoration(color:LG.sageSoft,borderRadius:BorderRadius.circular(12)),
+              child:const Icon(Icons.description_outlined,color:LG.sage)),
+            const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text(d.title,style:const TextStyle(fontWeight:FontWeight.w700)),
+              const SizedBox(height:5),Text(d.category+(d.expiresAt==null?'':' · Expires '+LG.date(d.expiresAt!)),
+                style:TextStyle(color:overdue?LG.negative:LG.muted,fontSize:12)),
+            ])),const Icon(Icons.chevron_right,color:LG.muted),
+          ])));
+      }),
+      const SizedBox(height:14),
+      ElevatedButton.icon(onPressed:()=>openWealthPage(context,DocumentFormScreen(store:widget.store)),
+        icon:const Icon(Icons.add),label:const Text('Add document record')),
+    ]);
+  });
+}
+
+class DocumentFormScreen extends StatefulWidget {
+  final PortfolioStore store; final DocumentRecord? existing;
+  const DocumentFormScreen({super.key,required this.store,this.existing});
+  @override State<DocumentFormScreen> createState()=>_DocumentFormScreenState();
+}
+class _DocumentFormScreenState extends State<DocumentFormScreen> {
+  final key=GlobalKey<FormState>();
+  late final title=TextEditingController(text:widget.existing?.title??'');
+  late final notes=TextEditingController(text:widget.existing?.notes??'');
+  late String category=widget.existing?.category??'Property';
+  late String? linkedAssetId=widget.existing?.linkedAssetId;
+  late DateTime? issued=widget.existing?.issuedAt;
+  late DateTime? expires=widget.existing?.expiresAt;
+  bool saving=false;
+  @override void dispose(){title.dispose();notes.dispose();super.dispose();}
+  @override Widget build(BuildContext context) {
+    final assets=widget.store.state.assets.where((x)=>!x.archived).toList();
+    if(linkedAssetId!=null && !assets.any((a)=>a.id==linkedAssetId))linkedAssetId=null;
+    return Scaffold(appBar:AppBar(title:const BrandMark(height:28)),body:SafeArea(
+      child:Form(key:key,child:ListView(padding:const EdgeInsets.all(24),children:[
+      PageHeading(widget.existing==null?'New document record':'Edit document record',
+        subtitle:'Capture references and renewal dates, not the underlying files.'),
+      FormFieldBlock(title:'Document name',child:TextFormField(controller:title,
+        validator:(v)=>v==null||v.trim().isEmpty?'Required':null,
+        decoration:const InputDecoration(hintText:'e.g. Property insurance certificate'))),
+      FormFieldBlock(title:'Category',child:DropdownButtonFormField<String>(initialValue:category,
+        items:['Property','Investment','Insurance','Identity','Other']
+          .map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
+        onChanged:(v)=>setState(()=>category=v??category))),
+      FormFieldBlock(title:'Related asset (optional)',child:DropdownButtonFormField<String?>(initialValue:linkedAssetId,
+        items:[const DropdownMenuItem(value:null,child:Text('No linked asset')),
+          ...assets.map((a)=>DropdownMenuItem(value:a.id,child:Text(a.name,maxLines:1,overflow:TextOverflow.ellipsis)))],
+        onChanged:(v)=>setState(()=>linkedAssetId=v))),
+      FormFieldBlock(title:'Issue date',child:SoftCard(onTap:()async{
+        final v=await showDatePicker(context:context,initialDate:issued??DateTime.now(),
+          firstDate:DateTime(1950),lastDate:DateTime(2100));
+        if(v!=null)setState(()=>issued=v);
+      },child:Row(children:[const Icon(Icons.event_outlined,color:LG.sage),const SizedBox(width:10),
+        Text(issued==null?'Choose issue date':LG.date(issued!))]))),
+      FormFieldBlock(title:'Expiry or renewal date',child:SoftCard(onTap:()async{
+        final v=await showDatePicker(context:context,initialDate:expires??DateTime.now(),
+          firstDate:DateTime(1950),lastDate:DateTime(2100));
+        if(v!=null)setState(()=>expires=v);
+      },child:Row(children:[const Icon(Icons.event_available_outlined,color:LG.sage),const SizedBox(width:10),
+        Text(expires==null?'No expiry set':LG.date(expires!)),
+        const Spacer(),if(expires!=null)IconButton(onPressed:()=>setState(()=>expires=null),
+          icon:const Icon(Icons.close,color:LG.muted,size:18))]))),
+      FormFieldBlock(title:'Notes (optional)',child:TextFormField(controller:notes,maxLines:3,
+        decoration:const InputDecoration(hintText:'Storage location or renewal instructions (no secrets)'))),
+      const SizedBox(height:10),ElevatedButton(onPressed:saving?null:()async{
+        if(!key.currentState!.validate())return;
+        if(issued!=null&&expires!=null&&expires!.isBefore(issued!)){
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Expiry cannot precede issue date')));return;
+        }
+        setState(()=>saving=true);
+        try{await widget.store.upsertDocument(DocumentRecord(id:widget.existing?.id??makeId(),
+          title:title.text.trim(),category:category,linkedAssetId:linkedAssetId,
+          issuedAt:issued,expiresAt:expires,notes:notes.text.trim()));
+          if(context.mounted)Navigator.pop(context);
+        }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
+        finally{if(mounted)setState(()=>saving=false);}
+      },child:Text(saving?'Saving...':'Save document record')),
+      if(widget.existing!=null)...[
+        const SizedBox(height:12),TextButton(onPressed:()async{
+          await widget.store.archiveDocument(widget.existing!);
+          if(context.mounted)Navigator.pop(context);
+        },child:const Text('Archive record',style:TextStyle(color:LG.negative))),
+      ],
+      const SizedBox(height:18),const Text('No document image or content is uploaded. Avoid entering title numbers, identity numbers or credentials until the encrypted vault is delivered.',
+        style:TextStyle(fontSize:12,color:LG.muted,height:1.5)),
+    ]))));
+  }
+}
+
+class BeneficiariesScreen extends StatelessWidget {
+  final PortfolioStore store;
+  const BeneficiariesScreen({super.key,required this.store});
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:store,builder:(context,_){
+    final people=store.state.beneficiaries;
+    final total=people.fold<int>(0,(s,p)=>s+p.intendedShareBps);
+    return WealthPage(title:'Legacy planning',subtitle:'Organise intended beneficiaries and trusted contacts.',children:[
+      const SoftCard(color:LG.sageSoft,child:Row(children:[
+        Icon(Icons.shield_outlined,color:LG.sage,size:26),SizedBox(width:12),
+        Expanded(child:Text('Planning notes only. These records do not grant access, transfer property or replace a valid will or formal beneficiary nomination.',
+          style:TextStyle(color:LG.muted,fontSize:12,height:1.5)))])),
+      const SizedBox(height:22),
+      SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        const Text('INTENDED ALLOCATION',style:TextStyle(color:LG.sage,fontWeight:FontWeight.w800,fontSize:11,letterSpacing:1.1)),
+        const SizedBox(height:8),Text((total/100).toStringAsFixed(0)+'% planned',
+          style:Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height:12),LinearProgressIndicator(value:(total/10000).clamp(0.0,1.0).toDouble(),
+          color:LG.gold,backgroundColor:LG.sageSoft,minHeight:8,borderRadius:BorderRadius.circular(8)),
+        const SizedBox(height:8),const Text('Percentages are non-binding intentions, not a legal division of assets.',
+          style:TextStyle(color:LG.muted,fontSize:11)),
+      ])),const SizedBox(height:22),SectionTitle('Beneficiaries ('+people.length.toString()+')'),
+      if(people.isEmpty)const EmptySection(title:'No intended beneficiaries',detail:'Create a planning entry. Avoid sensitive identification numbers in this preview.')
+      else ...people.map((p)=>Padding(padding:const EdgeInsets.only(bottom:9),
+        child:SoftCard(onTap:()=>openWealthPage(context,BeneficiaryFormScreen(store:store,existing:p)),child:Row(children:[
+          const CircleAvatar(backgroundColor:LG.sageSoft,child:Icon(Icons.person_outline,color:LG.sage)),
+          const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Text(p.name,style:const TextStyle(fontWeight:FontWeight.w800)),
+            Text(p.relationship,style:const TextStyle(color:LG.muted,fontSize:12)),
+          ])),
+          Text((p.intendedShareBps/100).toStringAsFixed(0)+'%',
+            style:const TextStyle(color:LG.sage,fontWeight:FontWeight.w800)),
+          const Icon(Icons.chevron_right,color:LG.muted),
+        ])))),
+      const SizedBox(height:14),
+      ElevatedButton.icon(onPressed:()=>openWealthPage(context,BeneficiaryFormScreen(store:store)),
+        icon:const Icon(Icons.add),label:const Text('Add planning entry')),
+      const SizedBox(height:20),const SectionTitle('Other continuity records'),
+      SoftCard(onTap:()=>openWealthPage(context,LegacyScreen(store:store)),child:const Row(children:[
+        Icon(Icons.people_outline,color:LG.sage),SizedBox(width:12),
+        Expanded(child:Text('Trusted contacts',style:TextStyle(fontWeight:FontWeight.w700))),
+        Icon(Icons.chevron_right,color:LG.muted),
+      ])),
+      const SizedBox(height:10),
+      SoftCard(onTap:()=>openWealthPage(context,DocumentsScreen(store:store)),child:const Row(children:[
+        Icon(Icons.folder_outlined,color:LG.sage),SizedBox(width:12),
+        Expanded(child:Text('Document records',style:TextStyle(fontWeight:FontWeight.w700))),
+        Icon(Icons.chevron_right,color:LG.muted),
+      ])),
+    ]);
+  });
+}
+
+class BeneficiaryFormScreen extends StatefulWidget {
+  final PortfolioStore store; final BeneficiaryRecord? existing;
+  const BeneficiaryFormScreen({super.key,required this.store,this.existing});
+  @override State<BeneficiaryFormScreen> createState()=>_BeneficiaryFormScreenState();
+}
+class _BeneficiaryFormScreenState extends State<BeneficiaryFormScreen> {
+  final key=GlobalKey<FormState>();
+  late final name=TextEditingController(text:widget.existing?.name??'');
+  late final relation=TextEditingController(text:widget.existing?.relationship??'');
+  late final share=TextEditingController(text:((widget.existing?.intendedShareBps??0)/100).toStringAsFixed(0));
+  late final notes=TextEditingController(text:widget.existing?.notes??'');
+  @override void dispose(){for(final c in [name,relation,share,notes]){c.dispose();}super.dispose();}
+  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const BrandMark(height:28)),
+    body:SafeArea(child:Form(key:key,child:ListView(padding:const EdgeInsets.all(24),children:[
+      PageHeading(widget.existing==null?'New legacy note':'Edit legacy note',
+        subtitle:'Record an intention without granting anyone account access.'),
+      FormFieldBlock(title:'Name',child:TextFormField(controller:name,validator:(v)=>v==null||v.trim().isEmpty?'Required':null)),
+      FormFieldBlock(title:'Relationship',child:TextFormField(controller:relation,validator:(v)=>v==null||v.trim().isEmpty?'Required':null)),
+      FormFieldBlock(title:'Intended share (%)',help:'All planned beneficiary shares combined must not exceed 100%.',
+        child:TextFormField(controller:share,keyboardType:const TextInputType.numberWithOptions(decimal:true),
+          validator:(v){final n=double.tryParse(v??'');return n==null||n<0||n>100?'Enter 0–100%':null;})),
+      FormFieldBlock(title:'Planning notes',child:TextFormField(controller:notes,maxLines:3)),
+      const SizedBox(height:10),
+      ElevatedButton(onPressed:()async{
+        if(!key.currentState!.validate())return;
+        try{
+          await widget.store.upsertBeneficiary(BeneficiaryRecord(id:widget.existing?.id??makeId(),
+            name:name.text.trim(),relationship:relation.text.trim(),
+            intendedShareBps:(double.parse(share.text)*100).round(),notes:notes.text.trim()));
+          if(context.mounted)Navigator.pop(context);
+        }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
+      },child:const Text('Save planning note')),
+      if(widget.existing!=null)...[const SizedBox(height:12),
+        TextButton(onPressed:()async{
+          await widget.store.deleteBeneficiary(widget.existing!.id);
+          if(context.mounted)Navigator.pop(context);
+        },child:const Text('Remove planning note',style:TextStyle(color:LG.negative)))],
+      const SizedBox(height:14),const Text('Consult a qualified adviser for enforceable nominations or succession documents.',
+        style:TextStyle(color:LG.muted,fontSize:12,height:1.5)),
+    ]))));
+}
+
+class NotificationsCenterScreen extends StatelessWidget {
+  final PortfolioStore store;
+  const NotificationsCenterScreen({super.key,required this.store});
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:store,builder:(context,_){
+    final now=DateTime.now();
+    final preferences=store.state.notificationOptions;
+    final alerts=<_LocalAlert>[];
+    if(preferences.upcomingReminders){
+      for(final r in store.state.reminders.where((x)=>!x.completed)){
+        final delta=r.dueAt.difference(now).inDays;
+        if(delta<=30) alerts.add(_LocalAlert(r.title,delta<0?'Overdue · '+LG.date(r.dueAt):'Due '+LG.date(r.dueAt),
+          Icons.notifications_none_rounded,delta<0,()=>openWealthPage(context,RemindersScreen(store:store))));
+      }
+    }
+    if(preferences.expiringDocuments){
+      for(final d in store.state.documents.where((x)=>!x.archived&&x.expiresAt!=null)){
+        final delta=d.expiresAt!.difference(now).inDays;
+        if(delta<=60)alerts.add(_LocalAlert(d.title,delta<0?'Record expired':'Renew by '+LG.date(d.expiresAt!),
+          Icons.description_outlined,delta<0,()=>openWealthPage(context,DocumentsScreen(store:store))));
+      }
+    }
+    if(preferences.staleValuations){
+      for(final a in store.state.assets.where((x)=>!x.archived)){
+        if(now.difference(a.valuedAt).inDays>365)alerts.add(_LocalAlert(a.name,
+          'Recorded value is more than 12 months old',Icons.update_rounded,false,
+          ()=>openWealthPage(context,ValuationHistoryScreen(store:store,asset:a))));
+      }
+    }
+    return WealthPage(title:'Notifications',subtitle:'Useful reminders from your local wealth records.',children:[
+      Row(children:[Expanded(child:Text(alerts.length.toString()+' items',
+        style:Theme.of(context).textTheme.titleMedium)),
+        TextButton.icon(onPressed:()=>openWealthPage(context,NotificationPreferencesScreen(store:store)),
+          icon:const Icon(Icons.tune,size:18),label:const Text('Preferences'))]),
+      const SizedBox(height:12),
+      if(alerts.isEmpty)const EmptySection(title:'You are up to date',
+        detail:'Upcoming reminders, document renewals and stale valuations will appear here.')
+      else ...alerts.map((a)=>Padding(padding:const EdgeInsets.only(bottom:10),
+        child:SoftCard(onTap:a.action,child:Row(children:[
+          Container(width:44,height:44,decoration:BoxDecoration(color:a.urgent?const Color(0xFFF8EAE7):LG.sageSoft,
+            borderRadius:BorderRadius.circular(12)),
+            child:Icon(a.icon,color:a.urgent?LG.negative:LG.sage)),
+          const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+            Text(a.title,style:const TextStyle(fontWeight:FontWeight.w700)),
+            const SizedBox(height:4),Text(a.detail,style:const TextStyle(color:LG.muted,fontSize:12)),
+          ])),const Icon(Icons.chevron_right,color:LG.muted),
+        ])))),
+      const SizedBox(height:22),const Text('In-app notices only. Push notifications, email delivery and background scheduling are not connected.',
+        style:TextStyle(color:LG.muted,fontSize:12,height:1.5)),
+    ]);
+  });
+}
+class _LocalAlert {
+  final String title;final String detail;final IconData icon;final bool urgent;final VoidCallback action;
+  const _LocalAlert(this.title,this.detail,this.icon,this.urgent,this.action);
+}
+
+class NotificationPreferencesScreen extends StatelessWidget {
+  final PortfolioStore store;
+  const NotificationPreferencesScreen({super.key,required this.store});
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:store,builder:(context,_){
+    final options=store.state.notificationOptions;
+    return WealthPage(title:'Alert preferences',subtitle:'Choose which local reminders appear in your inbox.',children:[
+      SoftCard(child:Column(children:[
+        SwitchListTile.adaptive(contentPadding:EdgeInsets.zero,title:const Text('Upcoming reminders'),
+          subtitle:const Text('Tasks due in the next 30 days'),
+          value:options.upcomingReminders,activeTrackColor:LG.sageSoft,
+          onChanged:(v)=>store.updateNotificationOptions(options.copyWith(upcomingReminders:v))),
+        const Divider(),
+        SwitchListTile.adaptive(contentPadding:EdgeInsets.zero,title:const Text('Document expirations'),
+          subtitle:const Text('Renewals due within 60 days'),
+          value:options.expiringDocuments,activeTrackColor:LG.sageSoft,
+          onChanged:(v)=>store.updateNotificationOptions(options.copyWith(expiringDocuments:v))),
+        const Divider(),
+        SwitchListTile.adaptive(contentPadding:EdgeInsets.zero,title:const Text('Stale asset values'),
+          subtitle:const Text('Valuations older than one year'),
+          value:options.staleValuations,activeTrackColor:LG.sageSoft,
+          onChanged:(v)=>store.updateNotificationOptions(options.copyWith(staleValuations:v))),
+      ])),const SizedBox(height:18),
+      const SoftCard(color:LG.sageSoft,child:Text(
+        'Preferences apply only to the on-screen notification center. No system notifications, SMS or email are sent.',
+        style:TextStyle(color:LG.muted,fontSize:12,height:1.5))),
+    ]);
+  });
+}
+
+class ProfileScreen extends StatefulWidget {
+  final PortfolioStore store;
+  const ProfileScreen({super.key,required this.store});
+  @override State<ProfileScreen> createState()=>_ProfileScreenState();
+}
+class _ProfileScreenState extends State<ProfileScreen> {
+  late final name=TextEditingController(text:widget.store.state.ownerName);
+  final key=GlobalKey<FormState>();
+  @override void dispose(){name.dispose();super.dispose();}
+  @override Widget build(BuildContext context)=>WealthPage(title:'Portfolio profile',
+    subtitle:'The local profile name shown on your device.',children:[
+    const SoftCard(color:LG.sageSoft,child:Text(
+      'This is not an authenticated online identity. Do not enter official identity numbers or sensitive credentials.',
+      style:TextStyle(color:LG.muted,fontSize:12,height:1.5))),
+    const SizedBox(height:26),Form(key:key,child:Column(children:[
+      FormFieldBlock(title:'Portfolio owner / display name',child:TextFormField(controller:name,
+        validator:(v)=>v==null||v.trim().length<2?'Enter at least 2 characters':null)),
+      const SizedBox(height:8),ElevatedButton(onPressed:()async{
+        if(!key.currentState!.validate())return;
+        await widget.store.setOwner(name.text);
+        if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Profile updated')));
+      },child:const Text('Save profile')),
+    ])),const SizedBox(height:24),
+    const SectionTitle('Account status'),
+    const SoftCard(child:Column(children:[
+      InfoLabel(label:'Account mode',value:'On-device preview'),
+      InfoLabel(label:'Email verification',value:'Not connected'),
+      InfoLabel(label:'Cloud sync',value:'Not available'),
+    ])),
+  ]);
+}
+
+class SecurityCenterScreen extends StatelessWidget {
+  final PortfolioStore store;
+  const SecurityCenterScreen({super.key,required this.store});
+  @override Widget build(BuildContext context)=>WealthPage(
+    title:'Security & privacy',subtitle:'A transparent view of the protection currently available.',children:[
+    const SoftCard(color:LG.sageSoft,child:Row(children:[
+      Icon(Icons.shield_outlined,color:LG.sage,size:30),SizedBox(width:14),
+      Expanded(child:Text('Preview mode: do not enter real financial credentials, title references or identity numbers.',
+        style:TextStyle(fontSize:12,color:LG.muted,height:1.5)))])),
+    const SizedBox(height:22),const SectionTitle('Security readiness'),
+    const SoftCard(child:Column(children:[
+      InfoLabel(label:'Passkey sign-in',value:'Not connected'),
+      InfoLabel(label:'Biometric access',value:'Not enabled'),
+      InfoLabel(label:'Encrypted local vault',value:'Not implemented'),
+      InfoLabel(label:'Cloud backup',value:'Not connected'),
+      InfoLabel(label:'Session management',value:'Not connected'),
+      InfoLabel(label:'Data import / export',value:'Manual JSON'),
+    ])),
+    const SizedBox(height:18),
+    OutlinedButton.icon(onPressed:()=>openWealthPage(context,SettingsScreen(store:store)),
+      icon:const Icon(Icons.settings_backup_restore),label:const Text('Data management settings')),
+    const SizedBox(height:18),const Text(
+      'No passkeys, biometrics, backend account or secure storage is simulated. A dedicated authentication and encryption implementation is required before handling sensitive data.',
+      style:TextStyle(color:LG.muted,fontSize:12,height:1.55)),
+  ]);
+}
+
+class SubscriptionScreen extends StatelessWidget {
+  const SubscriptionScreen({super.key});
+  @override Widget build(BuildContext context)=>const WealthPage(
+    title:'Subscription & billing',subtitle:'How LonyoGang will offer ongoing access.',children:[
+      SoftCard(color:LG.sageSoft,child:Row(children:[
+        Icon(Icons.info_outline,color:LG.sage),SizedBox(width:12),
+        Expanded(child:Text('Payments are not connected in this preview. No subscription or charge has been created.',
+          style:TextStyle(color:LG.muted,fontSize:12,height:1.5)))])),
+      SizedBox(height:22),SectionTitle('Planned personal portfolio access'),
+      SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('Personal wealth tracking',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
+        SizedBox(height:12),InfoLabel(label:'Owner',value:'One personal portfolio'),
+        InfoLabel(label:'Assets & net worth',value:'Included in design'),
+        InfoLabel(label:'Properties & savings',value:'Included in design'),
+        InfoLabel(label:'Legacy planning',value:'Included in design'),
+        InfoLabel(label:'Billing price',value:'Not finalized'),
+        InfoLabel(label:'Payment service',value:'Not available'),
+      ])),SizedBox(height:22),
+      Text('Prices, billing cycles, eligibility and cancellation terms must be approved before paid subscriptions can be offered.',
+        style:TextStyle(color:LG.muted,fontSize:12,height:1.5)),
+    ]);
+}
+
+class HelpCenterScreen extends StatefulWidget {
+  const HelpCenterScreen({super.key});
+  @override State<HelpCenterScreen> createState()=>_HelpCenterScreenState();
+}
+class _HelpCenterScreenState extends State<HelpCenterScreen> {
+  @override Widget build(BuildContext context)=>WealthPage(title:'Help & guidance',
+    subtitle:'Answers to common questions about the portfolio.',children:[
+    SoftCard(child:Column(children:[
+      for(final qa in <(String,String)>[
+        ('How is net worth calculated?','Net worth equals your attributable recorded assets minus all active liabilities, including any linked mortgage just once.'),
+        ('Are property values verified?','No. Values are manually entered and tagged with dates and source information.'),
+        ('Does LonyoGang hold my money?','No. It is a tracking and personal record-keeping application, not a bank or broker.'),
+        ('Are documents uploaded?','No. The document screen currently stores descriptive metadata only.'),
+        ('Can I transfer assets to beneficiaries?','No. Legacy planning entries are non-binding notes and cannot transfer ownership.'),
+        ('Where are preview records stored?','On this device in unencrypted app preferences. Use sample data only until a secure vault is implemented.'),
+      ])ExpansionTile(title:Text(qa.$1,style:const TextStyle(fontWeight:FontWeight.w700,fontSize:14)),
+        iconColor:LG.sage,collapsedIconColor:LG.muted,tilePadding:EdgeInsets.zero,
+        childrenPadding:const EdgeInsets.only(bottom:16),
+        children:[Align(alignment:Alignment.centerLeft,child:Text(qa.$2,
+          style:const TextStyle(color:LG.muted,fontSize:13,height:1.5)))]),
+    ])),const SizedBox(height:20),
+    OutlinedButton.icon(onPressed:()async{
+      await Clipboard.setData(const ClipboardData(text:'LonyoGang Heritage preview feedback'));
+      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('Feedback subject copied. Use your preferred support channel.')));
+    },icon:const Icon(Icons.copy_outlined),label:const Text('Copy feedback subject')),
+  ]);
+}
+
+class AboutScreen extends StatelessWidget {
+  const AboutScreen({super.key});
+  @override Widget build(BuildContext context)=>const WealthPage(title:'About LonyoGang',
+    subtitle:'Your wealth and what it means for tomorrow.',children:[
+    Center(child:BrandMark(height:58)),SizedBox(height:26),
+    SoftCard(child:Text(
+      'LonyoGang combines the Acholi words Lonyo (wealth) and Gang (home). The traditional granary symbolizes stewardship, family assets and lasting heritage.',
+      style:TextStyle(fontSize:14,height:1.65))),
+    SizedBox(height:18),SectionTitle('Product purpose'),
+    SoftCard(child:Column(children:[
+      InfoLabel(label:'Product',value:'LonyoGang Heritage'),
+      InfoLabel(label:'Version',value:'0.3.0 preview'),
+      InfoLabel(label:'Financial reporting',value:'UGX'),
+      InfoLabel(label:'Main use',value:'Personal wealth records'),
+    ])),SizedBox(height:18),
+    Text('The app does not provide custody, investments, financial advice, property conveyancing or legal estate services.',
+      style:TextStyle(color:LG.muted,fontSize:12,height:1.5)),
+  ]);
+}
