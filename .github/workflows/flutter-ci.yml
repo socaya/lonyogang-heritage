@@ -1,0 +1,45 @@
+name: Flutter Android CI
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - 'analysis_options.yaml'
+      - 'tool/**'
+      - '.github/workflows/flutter-ci.yml'
+  pull_request:
+    paths:
+      - 'lib/**'
+      - 'test/**'
+      - 'pubspec.yaml'
+      - 'tool/**'
+jobs:
+  test-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.9'
+          channel: stable
+          cache: true
+      - name: Materialize Android/iOS platform projects
+        run: bash tool/setup_platform.sh
+      - name: Resolve dependencies
+        run: flutter pub get
+      - name: Flutter analysis
+        run: flutter analyze --fatal-infos
+      - name: Unit and widget tests
+        run: flutter test
+      - name: Build Android debug APK
+        run: flutter build apk --debug
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lonyogang-android-debug-apk
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
