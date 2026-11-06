@@ -21,7 +21,7 @@ T enumValue<T extends Enum>(Iterable<T> values, String name, T fallback) {
 
 int _n(Object? value) => (value as num?)?.toInt() ?? 0;
 String _s(Object? value) => value?.toString() ?? '';
-DateTime _dt(Object? value) => DateTime.tryParse(_s(value)) ?? DateTime.now();
+DateTime _dt(Object? value) => (DateTime.tryParse(_s(value)) ?? DateTime.now()).toLocal();
 
 class WealthAsset {
   const WealthAsset({

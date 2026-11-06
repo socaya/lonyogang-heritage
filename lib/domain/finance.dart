@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'models.dart';
 
 /// Ownership is measured in basis points, 10,000 = 100%.
@@ -69,7 +70,7 @@ double? xirr(List<({DateTime date, double amount})> cashFlows) {
     var sum = 0.0;
     for (final f in flows) {
       final years = f.date.difference(first).inDays / 365.25;
-      sum += f.amount / _pow(1 + rate, years);
+      sum += f.amount / math.pow(1 + rate, years);
     }
     return sum;
   }
@@ -88,39 +89,4 @@ double? xirr(List<({DateTime date, double amount})> cashFlows) {
   return (low + high) / 2;
 }
 
-double _pow(double base, double exponent) {
-  // Avoid dependency on UI or platform libraries for deterministic finance tests.
-  return _exp(exponent * _ln(base));
-}
 
-double _ln(double n) {
-  // Natural log via atanh series after range scaling; adequate for positive rates.
-  var x = n;
-  var shifts = 0;
-  while (x > 2) { x /= 2; shifts++; }
-  while (x < 1) { x *= 2; shifts--; }
-  final y = (x - 1) / (x + 1);
-  var power = y;
-  var sum = 0.0;
-  for (var k = 1; k < 120; k += 2) {
-    sum += power / k;
-    power *= y * y;
-  }
-  return 2 * sum + shifts * 0.6931471805599453;
-}
-
-double _exp(double x) {
-  // Taylor expansion with repeated squaring for stable value ranges.
-  var v = x;
-  var n = 0;
-  while (v.abs() > 0.4) { v /= 2; n++; }
-  var sum = 1.0;
-  var term = 1.0;
-  for (var k = 1; k < 100; k++) {
-    term *= v / k;
-    sum += term;
-    if (term.abs() < 1e-15) break;
-  }
-  for (var i = 0; i < n; i++) { sum *= sum; }
-  return sum;
-}

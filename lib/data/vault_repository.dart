@@ -254,7 +254,13 @@ CREATE TABLE documents (
     }
     await db.transaction((txn) async {
       final old = await txn.query('assets', where: 'id=?', whereArgs: [asset.id]);
-      await txn.insert('assets', asset.toDb(), conflictAlgorithm: ConflictAlgorithm.replace);
+      // DO NOT use INSERT OR REPLACE: SQLite deletes the old parent row, and
+      // ON DELETE CASCADE would silently erase its complete valuation journal.
+      if (old.isEmpty) {
+        await txn.insert('assets', asset.toDb());
+      } else {
+        await txn.update('assets', asset.toDb(), where: 'id=?', whereArgs: [asset.id]);
+      }
       if (old.isEmpty ||
           (old.first['value_ugx'] as int) != asset.valueUgx ||
           old.first['valued_at'] != asset.valuedAt.toUtc().toIso8601String()) {
