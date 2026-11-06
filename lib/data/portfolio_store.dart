@@ -41,7 +41,9 @@ class PortfolioStore extends ChangeNotifier {
   Future<void> setOwner(String name) async {
     _state=PortfolioState(ownerName:name.trim(),onboardingDone:true,assets:_state.assets,
       liabilities:_state.liabilities,events:_state.events,goals:_state.goals,
-      contacts:_state.contacts,reminders:_state.reminders);
+      contacts:_state.contacts,reminders:_state.reminders,
+      documents:_state.documents,beneficiaries:_state.beneficiaries,
+      valuations:_state.valuations,notificationOptions:_state.notificationOptions);
     await _save();
   }
 
@@ -52,9 +54,16 @@ class PortfolioStore extends ChangeNotifier {
     final list=[..._state.assets];
     final i=list.indexWhere((x)=>x.id==asset.id);
     if (i<0) {list.add(asset);} else {list[i]=asset;}
-    _state=_replace(assets:list);await _save();
+    var history=_state.valuations;
+    if(!asset.archived && (i<0 || list[i].valueUgx!=_state.assets[i].valueUgx ||
+        list[i].valuedAt!=_state.assets[i].valuedAt)){
+      history=[...history,ValuationRecord(id:makeId(),assetId:asset.id,
+        fullValueUgx:asset.valueUgx,asOf:asset.valuedAt,source:asset.status.name)];
+    }
+    _state=_replace(assets:list,valuations:history);await _save();
   }
   Future<void> archiveAsset(WealthAsset asset) async => upsertAsset(asset.copyWith(archived:true));
+  Future<void> restoreAsset(WealthAsset asset) async => upsertAsset(asset.copyWith(archived:false));
   Future<void> upsertLiability(Liability liability) async {
     if(liability.name.trim().isEmpty||liability.outstandingUgx<0)throw ArgumentError('Invalid debt');
     final list=[..._state.liabilities];final i=list.indexWhere((x)=>x.id==liability.id);
@@ -62,6 +71,7 @@ class PortfolioStore extends ChangeNotifier {
     _state=_replace(liabilities:list);await _save();
   }
   Future<void> archiveLiability(Liability debt) async=>upsertLiability(debt.copyWith(archived:true));
+  Future<void> restoreLiability(Liability debt) async=>upsertLiability(debt.copyWith(archived:false));
   Future<void> postEvent(LedgerEvent event) async {
     if(event.amountUgx<0||event.description.trim().isEmpty) throw ArgumentError('Invalid transaction');
     if(_state.events.any((x)=>x.id==event.id))return; // duplicate submission
@@ -78,6 +88,12 @@ class PortfolioStore extends ChangeNotifier {
   Future<void> addGoal(WealthGoal goal) async {
     _state=_replace(goals:[..._state.goals,goal]);await _save();
   }
+  Future<void> upsertGoal(WealthGoal goal) async {
+    if(goal.name.trim().isEmpty||goal.targetUgx<=0||goal.savedUgx<0)throw ArgumentError('Invalid goal');
+    final goals=[..._state.goals]; final i=goals.indexWhere((x)=>x.id==goal.id);
+    if(i<0){goals.add(goal);}else{goals[i]=goal;}
+    _state=_replace(goals:goals);await _save();
+  }
   Future<void> deleteGoal(String id) async {
     _state=_replace(goals:_state.goals.where((x)=>x.id!=id).toList());await _save();
   }
@@ -90,8 +106,66 @@ class PortfolioStore extends ChangeNotifier {
   Future<void> addReminder(ReminderRecord reminder) async {
     _state=_replace(reminders:[..._state.reminders,reminder]);await _save();
   }
+  Future<void> removeReminder(String id) async {
+    _state=_replace(reminders:_state.reminders.where((x)=>x.id!=id).toList());await _save();
+  }
   Future<void> toggleReminder(String id) async {
     _state=_replace(reminders:_state.reminders.map((r)=>r.id==id?r.toggle():r).toList());await _save();
+  }
+
+
+  Future<void> upsertDocument(DocumentRecord document) async {
+    if(document.title.trim().isEmpty||document.category.trim().isEmpty) {
+      throw ArgumentError('Document title and category are required');
+    }
+    if(document.expiresAt!=null && document.issuedAt!=null &&
+        document.expiresAt!.isBefore(document.issuedAt!)) {
+      throw ArgumentError('Expiry must follow issue date');
+    }
+    final docs=[..._state.documents];final i=docs.indexWhere((x)=>x.id==document.id);
+    if(i<0){docs.add(document);}else{docs[i]=document;}
+    _state=_replace(documents:docs);await _save();
+  }
+  Future<void> archiveDocument(DocumentRecord document) async=>
+      upsertDocument(document.copyWith(archived:true));
+  Future<void> restoreDocument(DocumentRecord document) async=>
+      upsertDocument(document.copyWith(archived:false));
+
+  Future<void> upsertBeneficiary(BeneficiaryRecord person) async {
+    if(person.name.trim().isEmpty||person.relationship.trim().isEmpty||
+       person.intendedShareBps<0||person.intendedShareBps>10000) {
+      throw ArgumentError('Invalid beneficiary planning note');
+    }
+    final entries=[..._state.beneficiaries];
+    final i=entries.indexWhere((x)=>x.id==person.id);
+    if(i<0){entries.add(person);}else{entries[i]=person;}
+    final total=entries.fold<int>(0,(sum,x)=>sum+x.intendedShareBps);
+    if(total>10000)throw ArgumentError('Combined planned allocation exceeds 100%');
+    _state=_replace(beneficiaries:entries);await _save();
+  }
+  Future<void> deleteBeneficiary(String id) async {
+    _state=_replace(beneficiaries:_state.beneficiaries.where((x)=>x.id!=id).toList());
+    await _save();
+  }
+
+  Future<void> recordValuation(String assetId,int fullValueUgx,DateTime asOf,
+      String source,{String notes=''}) async {
+    if(fullValueUgx<0||source.trim().isEmpty)throw ArgumentError('Invalid valuation');
+    final index=_state.assets.indexWhere((x)=>x.id==assetId&&!x.archived);
+    if(index<0)throw ArgumentError('Asset not found');
+    final asset=_state.assets[index];
+    if(asOf.isBefore(asset.valuedAt)) {
+      throw ArgumentError('Use a valuation date on or after the current valuation');
+    }
+    final updated=[..._state.assets];
+    updated[index]=asset.copyWith(valueUgx:fullValueUgx,valuedAt:asOf,
+      status:RecordStatus.userEntered);
+    final history=[..._state.valuations,ValuationRecord(id:makeId(),assetId:assetId,
+      fullValueUgx:fullValueUgx,asOf:asOf,source:source.trim(),notes:notes.trim())];
+    _state=_replace(assets:updated,valuations:history);await _save();
+  }
+  Future<void> updateNotificationOptions(NotificationOptions options) async {
+    _state=_replace(notificationOptions:options);await _save();
   }
 
   /// Portable JSON export is intentionally user-initiated and clearly warns
@@ -102,7 +176,9 @@ class PortfolioStore extends ChangeNotifier {
     // Validate all amounts before replacing the active portfolio.
     if(parsed.assets.any((x)=>x.valueUgx<0||x.ownershipBps<0||x.ownershipBps>10000)||
        parsed.liabilities.any((x)=>x.outstandingUgx<0)||
-       parsed.events.any((x)=>x.amountUgx<0)) {throw const FormatException('Negative or invalid financial amount');}
+       parsed.events.any((x)=>x.amountUgx<0)||
+       parsed.valuations.any((x)=>x.fullValueUgx<0)||
+       parsed.beneficiaries.fold<int>(0,(n,x)=>n+x.intendedShareBps)>10000) {throw const FormatException('Negative or invalid financial amount');}
     _state=parsed;await _save();
   }
 
@@ -121,8 +197,13 @@ class PortfolioStore extends ChangeNotifier {
   }
 
   PortfolioState _replace({List<WealthAsset>? assets,List<Liability>? liabilities,List<LedgerEvent>? events,
-    List<WealthGoal>? goals,List<LegacyContact>? contacts,List<ReminderRecord>? reminders})=>PortfolioState(
+    List<WealthGoal>? goals,List<LegacyContact>? contacts,List<ReminderRecord>? reminders,
+    List<DocumentRecord>? documents,List<BeneficiaryRecord>? beneficiaries,
+    List<ValuationRecord>? valuations,NotificationOptions? notificationOptions})=>PortfolioState(
       ownerName:_state.ownerName,onboardingDone:_state.onboardingDone,assets:assets??_state.assets,
       liabilities:liabilities??_state.liabilities,events:events??_state.events,goals:goals??_state.goals,
-      contacts:contacts??_state.contacts,reminders:reminders??_state.reminders);
+      contacts:contacts??_state.contacts,reminders:reminders??_state.reminders,
+      documents:documents??_state.documents,beneficiaries:beneficiaries??_state.beneficiaries,
+      valuations:valuations??_state.valuations,
+      notificationOptions:notificationOptions??_state.notificationOptions);
 }
