@@ -63,14 +63,16 @@ void main(){
         MaterialApp(theme:LG.theme,debugShowCheckedModeBanner:false,home:page.$2)));
       await tester.pumpAndSettle();
       final boundary=tester.renderObject<RenderRepaintBoundary>(find.byKey(repaintKey));
-      final image=await boundary.toImage(pixelRatio:3);
-      try{
-        final bytes=await image.toByteData(format:ui.ImageByteFormat.png);
-        expect(bytes,isNotNull);
-        final destination='${dir.path}/${page.$1}.png';
-        await File(destination).writeAsBytes(bytes!.buffer.asUint8List());
-      }finally{image.dispose();}
+      await tester.runAsync(()async{
+        final image=await boundary.toImage(pixelRatio:3);
+        try{
+          final bytes=await image.toByteData(format:ui.ImageByteFormat.png);
+          expect(bytes,isNotNull);
+          final destination='${dir.path}/${page.$1}.png';
+          await File(destination).writeAsBytes(bytes!.buffer.asUint8List());
+        }finally{image.dispose();}
+      });
     }
     expect(dir.listSync().whereType<File>().length,pages.length);
-  },timeout:const Timeout(Duration(minutes:8)));
+  },timeout:const Timeout(Duration(minutes:8)),tags:'visual-export');
 }
