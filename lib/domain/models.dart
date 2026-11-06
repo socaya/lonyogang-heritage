@@ -134,22 +134,37 @@ class PortfolioState {
   final List<BeneficiaryRecord> beneficiaries;
   final List<ValuationRecord> valuations;
   final NotificationOptions notificationOptions;
+  final List<FxRate> fxRates;
+  final List<ScheduledContribution> scheduled;
+  /// Target weights by asset id, stored as basis points (10,000 = 100%).
+  final Map<String,int> targetWeightsBps;
   const PortfolioState({this.ownerName='',this.onboardingDone=false,this.assets=const [],this.liabilities=const [],
     this.events=const [],this.goals=const [],this.contacts=const [],this.reminders=const [],
     this.documents=const [],this.beneficiaries=const [],this.valuations=const [],
-    this.notificationOptions=const NotificationOptions()});
-  Json toJson()=>{'schemaVersion':1,'ownerName':ownerName,'onboardingDone':onboardingDone,
+    this.notificationOptions=const NotificationOptions(),
+    this.fxRates=const [],this.scheduled=const [],
+    this.targetWeightsBps=const <String,int>{}});
+  Json toJson()=>{'schemaVersion':2,'ownerName':ownerName,'onboardingDone':onboardingDone,
     'assets':assets.map((x)=>x.toJson()).toList(),'liabilities':liabilities.map((x)=>x.toJson()).toList(),
     'events':events.map((x)=>x.toJson()).toList(),'goals':goals.map((x)=>x.toJson()).toList(),
     'contacts':contacts.map((x)=>x.toJson()).toList(),'reminders':reminders.map((x)=>x.toJson()).toList(),
     'documents':documents.map((x)=>x.toJson()).toList(),
     'beneficiaries':beneficiaries.map((x)=>x.toJson()).toList(),
     'valuations':valuations.map((x)=>x.toJson()).toList(),
-    'notificationOptions':notificationOptions.toJson()};
+    'notificationOptions':notificationOptions.toJson(),
+    'fxRates':fxRates.map((x)=>x.toJson()).toList(),
+    'scheduled':scheduled.map((x)=>x.toJson()).toList(),
+    'targetWeightsBps':targetWeightsBps};
   factory PortfolioState.fromJson(Json j) {
-    if (asInt(j['schemaVersion'])!=1) throw const FormatException('Unsupported portfolio data schema');
+    final v=asInt(j['schemaVersion']);
+    if (v!=1 && v!=2) throw const FormatException('Unsupported portfolio data schema');
     List<T> read<T>(String key,T Function(Json) parse)=>(j[key] as List<dynamic>? ?? const [])
       .map((x)=>parse(Map<String,dynamic>.from(x as Map))).toList();
+    final weightsRaw=j['targetWeightsBps'];
+    final weights=<String,int>{};
+    if (weightsRaw is Map) {
+      weightsRaw.forEach((k,x){weights[k.toString()]=asInt(x).clamp(0,10000).toInt();});
+    }
     return PortfolioState(ownerName:asString(j['ownerName']),onboardingDone:j['onboardingDone']==true,
       assets:read('assets',WealthAsset.fromJson),liabilities:read('liabilities',Liability.fromJson),
       events:read('events',LedgerEvent.fromJson),goals:read('goals',WealthGoal.fromJson),
@@ -157,14 +172,76 @@ class PortfolioState {
       documents:read('documents',DocumentRecord.fromJson),
       beneficiaries:read('beneficiaries',BeneficiaryRecord.fromJson),
       valuations:read('valuations',ValuationRecord.fromJson),
+      fxRates:read('fxRates',FxRate.fromJson),
+      scheduled:read('scheduled',ScheduledContribution.fromJson),
+      targetWeightsBps:weights,
       notificationOptions:NotificationOptions.fromJson(j['notificationOptions'] is Map ? Map<String,dynamic>.from(j['notificationOptions'] as Map) : <String,dynamic>{}));
   }
   String encode()=>jsonEncode(toJson());
 }
 
+/// A manually-recorded foreign-exchange rate expressed as integer UGX
+/// micro-units per unit of foreign currency. Keeping the quote in integers
+/// avoids the floating-point rounding that already bit the 0.3 preview.
+class FxRate {
+  final String currency;
+  final int ugxPerUnit;
+  final DateTime asOf;
+  final String source;
+  const FxRate({required this.currency,required this.ugxPerUnit,
+    required this.asOf,this.source=''});
+  Json toJson()=>{'currency':currency,'ugxPerUnit':ugxPerUnit,
+    'asOf':asOf.toIso8601String(),'source':source};
+  factory FxRate.fromJson(Json j)=>FxRate(
+    currency:asString(j['currency']).toUpperCase(),
+    ugxPerUnit:asInt(j['ugxPerUnit']),
+    asOf:readDate(j['asOf']),
+    source:asString(j['source']));
+}
 
-/// A catalog record only; the app never copies or stores the underlying evidence
-/// file until encrypted storage and access controls are available.
+enum ContributionFrequency { weekly, monthly, quarterly, annually }
+int frequencyDays(ContributionFrequency f)=>switch(f){
+  ContributionFrequency.weekly=>7,ContributionFrequency.monthly=>30,
+  ContributionFrequency.quarterly=>91,ContributionFrequency.annually=>365};
+
+/// A recurring contribution schedule. The next-fire date is a display and
+/// scheduling anchor; actual posting still produces a regular LedgerEvent.
+class ScheduledContribution {
+  final String id;
+  final String name;
+  final int amountUgx;
+  final String? assetId;
+  final ContributionFrequency frequency;
+  final DateTime nextFire;
+  final DateTime? lastFired;
+  final bool active;
+  const ScheduledContribution({required this.id,required this.name,
+    required this.amountUgx,this.assetId,required this.frequency,
+    required this.nextFire,this.lastFired,this.active=true});
+  Json toJson()=>{'id':id,'name':name,'amountUgx':amountUgx,'assetId':assetId,
+    'frequency':frequency.name,'nextFire':nextFire.toIso8601String(),
+    'lastFired':lastFired?.toIso8601String(),'active':active};
+  factory ScheduledContribution.fromJson(Json j)=>ScheduledContribution(
+    id:asString(j['id']),name:asString(j['name']),amountUgx:asInt(j['amountUgx']),
+    assetId:j['assetId'] as String?,
+    frequency:ContributionFrequency.values.firstWhere((x)=>x.name==j['frequency'],
+      orElse:()=>ContributionFrequency.monthly),
+    nextFire:readDate(j['nextFire']),
+    lastFired:j['lastFired']==null?null:readDate(j['lastFired']),
+    active:j['active']!=false);
+  ScheduledContribution advance({DateTime? firedAt})=>ScheduledContribution(
+    id:id,name:name,amountUgx:amountUgx,assetId:assetId,frequency:frequency,
+    nextFire:(firedAt??nextFire).add(Duration(days:frequencyDays(frequency))),
+    lastFired:firedAt??nextFire,active:active);
+  ScheduledContribution withActive(bool value)=>ScheduledContribution(
+    id:id,name:name,amountUgx:amountUgx,assetId:assetId,frequency:frequency,
+    nextFire:nextFire,lastFired:lastFired,active:value);
+}
+
+
+/// A catalog record plus an optional encrypted file attachment stored on the
+/// device. The attachment is referenced by relative path; its bytes are
+/// AES-GCM encrypted at rest and decrypted on demand for preview.
 class DocumentRecord {
   final String id;
   final String title;
@@ -174,20 +251,52 @@ class DocumentRecord {
   final DateTime? expiresAt;
   final String notes;
   final bool archived;
+  final AttachmentRef? attachment;
   const DocumentRecord({required this.id,required this.title,required this.category,
-    this.linkedAssetId,this.issuedAt,this.expiresAt,this.notes='',this.archived=false});
+    this.linkedAssetId,this.issuedAt,this.expiresAt,this.notes='',this.archived=false,
+    this.attachment});
   Json toJson()=>{'id':id,'title':title,'category':category,'linkedAssetId':linkedAssetId,
     'issuedAt':issuedAt?.toIso8601String(),'expiresAt':expiresAt?.toIso8601String(),
-    'notes':notes,'archived':archived};
+    'notes':notes,'archived':archived,
+    if(attachment!=null)'attachment':attachment!.toJson()};
   factory DocumentRecord.fromJson(Json j)=>DocumentRecord(id:asString(j['id']),
     title:asString(j['title']),category:asString(j['category'],'Other'),
     linkedAssetId:j['linkedAssetId'] as String?,
     issuedAt:j['issuedAt']==null?null:readDate(j['issuedAt']),
     expiresAt:j['expiresAt']==null?null:readDate(j['expiresAt']),
-    notes:asString(j['notes']),archived:j['archived']==true);
-  DocumentRecord copyWith({bool? archived})=>DocumentRecord(id:id,title:title,category:category,
-    linkedAssetId:linkedAssetId,issuedAt:issuedAt,expiresAt:expiresAt,notes:notes,
-    archived:archived??this.archived);
+    notes:asString(j['notes']),archived:j['archived']==true,
+    attachment:j['attachment'] is Map
+      ? AttachmentRef.fromJson(Map<String,dynamic>.from(j['attachment'] as Map))
+      : null);
+  DocumentRecord copyWith({bool? archived,AttachmentRef? attachment,bool clearAttachment=false})=>
+    DocumentRecord(id:id,title:title,category:category,
+      linkedAssetId:linkedAssetId,issuedAt:issuedAt,expiresAt:expiresAt,notes:notes,
+      archived:archived??this.archived,
+      attachment:clearAttachment?null:(attachment??this.attachment));
+}
+
+/// Reference to an encrypted-at-rest file in the app's private documents
+/// directory. The hash lets us verify integrity before decryption.
+class AttachmentRef {
+  final String originalFilename;
+  final String mimeType;
+  final String relativePath;
+  final int sizeBytes;
+  final String sha256Hex;
+  final DateTime addedAt;
+  const AttachmentRef({required this.originalFilename,required this.mimeType,
+    required this.relativePath,required this.sizeBytes,required this.sha256Hex,
+    required this.addedAt});
+  Json toJson()=>{'originalFilename':originalFilename,'mimeType':mimeType,
+    'relativePath':relativePath,'sizeBytes':sizeBytes,'sha256Hex':sha256Hex,
+    'addedAt':addedAt.toIso8601String()};
+  factory AttachmentRef.fromJson(Json j)=>AttachmentRef(
+    originalFilename:asString(j['originalFilename']),
+    mimeType:asString(j['mimeType'],'application/octet-stream'),
+    relativePath:asString(j['relativePath']),
+    sizeBytes:asInt(j['sizeBytes']),
+    sha256Hex:asString(j['sha256Hex']),
+    addedAt:readDate(j['addedAt']));
 }
 
 /// A planning note, NOT a registered beneficiary nomination or legal instrument.
