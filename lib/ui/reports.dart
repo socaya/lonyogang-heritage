@@ -246,7 +246,7 @@ class LiabilitiesScreen extends StatelessWidget {
             PopupMenuButton<String>(onSelected: (s) async {
               if (s == 'edit') { _edit(context, d); return; }
               if (!await askConfirm(context, 'Delete liability?',
-                  'This will remove this outstanding balance from net worth.')) return;
+                  'This will remove this outstanding balance from net worth.')) { return; }
               try { await store.deleteDebt(d.id); }
               catch (e) { if (context.mounted) showFailure(context, e); }
             }, itemBuilder: (_) => const [
@@ -338,7 +338,7 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
                 onSelected: (v) async {
                   if (v == 'edit') { _edit(context, e); return; }
                   if (!await askConfirm(context, 'Delete transaction?',
-                    'Removing this record changes your cash-flow totals.')) return;
+                    'Removing this record changes your cash-flow totals.')) { return; }
                   try { await widget.store.deleteEntry(e.id); }
                   catch (err) { if (context.mounted) showFailure(context, err); }
                 },

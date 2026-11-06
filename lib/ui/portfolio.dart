@@ -189,7 +189,7 @@ class AssetDetailScreen extends StatelessWidget {
         OutlinedButton.icon(onPressed: () async {
           if (!await askConfirm(context, 'Archive this asset?',
             'The asset will be removed from active net-worth totals but preserved in your records.',
-            confirmLabel: 'Archive')) return;
+            confirmLabel: 'Archive')) { return; }
           try {
             await store.archiveAsset(id);
             if (context.mounted) Navigator.pop(context);

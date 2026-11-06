@@ -104,7 +104,7 @@ class LegacyScreen extends StatelessWidget {
           PopupMenuButton<String>(onSelected: (v) async {
             if (v == 'edit') { edit(context, b); return; }
             if (!await askConfirm(context, 'Remove contact?',
-              'This contact will be deleted from the encrypted vault.')) return;
+              'This contact will be deleted from the encrypted vault.')) { return; }
             try { await store.deleteBeneficiary(b.id); }
             catch (e) { if (context.mounted) showFailure(context, e); }
           }, itemBuilder: (_) => const [
@@ -227,7 +227,7 @@ class RemindersScreen extends StatelessWidget {
             PopupMenuButton<String>(onSelected: (v) async {
               if (v == 'edit') { edit(context, r); return; }
               if (!await askConfirm(context, 'Delete reminder?',
-                'Remove this date from your records?')) return;
+                'Remove this date from your records?')) { return; }
               try { await store.deleteReminder(r.id); }
               catch (e) { if (context.mounted) showFailure(context, e); }
             }, itemBuilder: (_) => const [
@@ -379,7 +379,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
           PopupMenuButton<String>(onSelected: (v) async {
             if (v == 'share') { await exportDocument(d); return; }
             if (!await askConfirm(context, 'Delete document?',
-              'The encrypted attachment will be permanently removed from this device.')) return;
+              'The encrypted attachment will be permanently removed from this device.')) { return; }
             try { await widget.store.deleteDocument(d.id); }
             catch (e) { if (context.mounted) showFailure(context, e); }
           }, itemBuilder: (_) => const [
@@ -420,8 +420,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() => busy = true);
     try {
       await widget.store.updateProfile(name.text, email.text);
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Profile updated in your encrypted vault.')));
+      if (mounted) { ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Profile updated in your encrypted vault.'))); }
     } catch (e) { if (mounted) showFailure(context, e); }
     finally { if (mounted) setState(() => busy = false); }
   }
@@ -436,7 +436,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> exportCsv() async {
     if (!await askConfirm(context, 'Export a readable report?',
       'CSV files are not encrypted. Only share your personal financial data with destinations you trust.',
-      confirmLabel: 'Export')) return;
+      confirmLabel: 'Export')) { return; }
     final out = StringBuffer('Record,Category,Name,Amount UGX,Date,Details\n');
     for (final a in widget.store.assets) {
       out.writeln('asset,${_csv(a.kind.label)},${_csv(a.name)},${a.valueUgx},${Fmt.date(a.valuedAt)},${_csv(sourceLabel(a.valuationSource))}');
@@ -492,7 +492,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           try {
             await widget.store.repo.setBiometrics(value);
             if (mounted) setState(() => biometric = value);
-          } catch (e) { if (mounted) showFailure(context, e); }
+          } catch (e) { if (context.mounted) { showFailure(context, e); } }
         },
       )),
       const SizedBox(height: 10),

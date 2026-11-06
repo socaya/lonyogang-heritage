@@ -53,7 +53,7 @@ class LgPage extends StatelessWidget {
             ],
             if (!showBack) const BrandLockup(compact: true),
             const Spacer(),
-            if (trailing != null) trailing!,
+            ?trailing,
           ]),
           const SizedBox(height: 27),
           Text(title, style: Theme.of(context).textTheme.headlineLarge),
@@ -99,7 +99,7 @@ class SectionHeading extends StatelessWidget {
     child: Row(children: [
       Expanded(child: Text(label, style: const TextStyle(
         color: LG.navy, fontWeight: FontWeight.w800, fontSize: 17))),
-      if (trailing != null) trailing!,
+      ?trailing,
     ]),
   );
 }
