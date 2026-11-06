@@ -48,7 +48,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
               child:const Icon(Icons.description_outlined,color:LG.sage)),
             const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
               Text(d.title,style:const TextStyle(fontWeight:FontWeight.w700)),
-              const SizedBox(height:5),Text(d.category+(d.expiresAt==null?'':' · Expires '+LG.date(d.expiresAt!)),
+              const SizedBox(height:5),Text(d.expiresAt==null?d.category:'${d.category} · Expires ${LG.date(d.expiresAt!)}',
                 style:TextStyle(color:overdue?LG.negative:LG.muted,fontSize:12)),
             ])),const Icon(Icons.chevron_right,color:LG.muted),
           ])));
@@ -148,13 +148,13 @@ class BeneficiariesScreen extends StatelessWidget {
       const SizedBox(height:22),
       SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('INTENDED ALLOCATION',style:TextStyle(color:LG.sage,fontWeight:FontWeight.w800,fontSize:11,letterSpacing:1.1)),
-        const SizedBox(height:8),Text((total/100).toStringAsFixed(0)+'% planned',
+        const SizedBox(height:8),Text('${(total/100).toStringAsFixed(0)}% planned',
           style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:12),LinearProgressIndicator(value:(total/10000).clamp(0.0,1.0).toDouble(),
           color:LG.gold,backgroundColor:LG.sageSoft,minHeight:8,borderRadius:BorderRadius.circular(8)),
         const SizedBox(height:8),const Text('Percentages are non-binding intentions, not a legal division of assets.',
           style:TextStyle(color:LG.muted,fontSize:11)),
-      ])),const SizedBox(height:22),SectionTitle('Beneficiaries ('+people.length.toString()+')'),
+      ])),const SizedBox(height:22),SectionTitle('Beneficiaries (${people.length})'),
       if(people.isEmpty)const EmptySection(title:'No intended beneficiaries',detail:'Create a planning entry. Avoid sensitive identification numbers in this preview.')
       else ...people.map((p)=>Padding(padding:const EdgeInsets.only(bottom:9),
         child:SoftCard(onTap:()=>openWealthPage(context,BeneficiaryFormScreen(store:store,existing:p)),child:Row(children:[
@@ -163,7 +163,7 @@ class BeneficiariesScreen extends StatelessWidget {
             Text(p.name,style:const TextStyle(fontWeight:FontWeight.w800)),
             Text(p.relationship,style:const TextStyle(color:LG.muted,fontSize:12)),
           ])),
-          Text((p.intendedShareBps/100).toStringAsFixed(0)+'%',
+          Text('${(p.intendedShareBps/100).toStringAsFixed(0)}%',
             style:const TextStyle(color:LG.sage,fontWeight:FontWeight.w800)),
           const Icon(Icons.chevron_right,color:LG.muted),
         ])))),
@@ -238,26 +238,26 @@ class NotificationsCenterScreen extends StatelessWidget {
     if(preferences.upcomingReminders){
       for(final r in store.state.reminders.where((x)=>!x.completed)){
         final delta=r.dueAt.difference(now).inDays;
-        if(delta<=30) alerts.add(_LocalAlert(r.title,delta<0?'Overdue · '+LG.date(r.dueAt):'Due '+LG.date(r.dueAt),
-          Icons.notifications_none_rounded,delta<0,()=>openWealthPage(context,RemindersScreen(store:store))));
+        if(delta<=30){alerts.add(_LocalAlert(r.title,delta<0?'Overdue · ${LG.date(r.dueAt)}':'Due ${LG.date(r.dueAt)}',
+          Icons.notifications_none_rounded,delta<0,()=>openWealthPage(context,RemindersScreen(store:store))));}
       }
     }
     if(preferences.expiringDocuments){
       for(final d in store.state.documents.where((x)=>!x.archived&&x.expiresAt!=null)){
         final delta=d.expiresAt!.difference(now).inDays;
-        if(delta<=60)alerts.add(_LocalAlert(d.title,delta<0?'Record expired':'Renew by '+LG.date(d.expiresAt!),
-          Icons.description_outlined,delta<0,()=>openWealthPage(context,DocumentsScreen(store:store))));
+        if(delta<=60){alerts.add(_LocalAlert(d.title,delta<0?'Record expired':'Renew by ${LG.date(d.expiresAt!)}',
+          Icons.description_outlined,delta<0,()=>openWealthPage(context,DocumentsScreen(store:store))));}
       }
     }
     if(preferences.staleValuations){
       for(final a in store.state.assets.where((x)=>!x.archived)){
-        if(now.difference(a.valuedAt).inDays>365)alerts.add(_LocalAlert(a.name,
+        if(now.difference(a.valuedAt).inDays>365){alerts.add(_LocalAlert(a.name,
           'Recorded value is more than 12 months old',Icons.update_rounded,false,
-          ()=>openWealthPage(context,ValuationHistoryScreen(store:store,asset:a))));
+          ()=>openWealthPage(context,ValuationHistoryScreen(store:store,asset:a))));}
       }
     }
     return WealthPage(title:'Notifications',subtitle:'Useful reminders from your local wealth records.',children:[
-      Row(children:[Expanded(child:Text(alerts.length.toString()+' items',
+      Row(children:[Expanded(child:Text('${alerts.length} items',
         style:Theme.of(context).textTheme.titleMedium)),
         TextButton.icon(onPressed:()=>openWealthPage(context,NotificationPreferencesScreen(store:store)),
           icon:const Icon(Icons.tune,size:18),label:const Text('Preferences'))]),
@@ -418,8 +418,8 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     ])),const SizedBox(height:20),
     OutlinedButton.icon(onPressed:()async{
       await Clipboard.setData(const ClipboardData(text:'LonyoGang Heritage preview feedback'));
-      if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content:Text('Feedback subject copied. Use your preferred support channel.')));
+      if(context.mounted){ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('Feedback subject copied. Use your preferred support channel.')));}
     },icon:const Icon(Icons.copy_outlined),label:const Text('Copy feedback subject')),
   ]);
 }
