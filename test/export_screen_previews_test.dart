@@ -67,7 +67,7 @@ void main(){
       try{
         final bytes=await image.toByteData(format:ui.ImageByteFormat.png);
         expect(bytes,isNotNull);
-        final destination=dir.path+'/'+page.$1+'.png';
+        final destination='${dir.path}/${page.$1}.png';
         await File(destination).writeAsBytes(bytes!.buffer.asUint8List());
       }finally{image.dispose();}
     }
