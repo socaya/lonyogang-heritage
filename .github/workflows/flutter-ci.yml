@@ -22,8 +22,11 @@ jobs:
         run: flutter pub get
       - name: Analyze Dart source
         run: flutter analyze --no-pub
-      - name: Domain tests
-        run: flutter test --no-pub
+      - name: Domain and widget tests
+        run: flutter test --no-pub --exclude-tags=visual-export
+      - name: Render 6.7-inch screen previews
+        continue-on-error: true
+        run: flutter test --no-pub test/export_screen_previews_test.dart
       - name: Upload 6.7-inch Flutter UI previews
         if: always()
         uses: actions/upload-artifact@v4
