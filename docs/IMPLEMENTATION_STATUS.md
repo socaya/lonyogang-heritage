@@ -3,7 +3,8 @@
 ## Completed in initial source package
 
 - Expo React Native TypeScript scaffold, Android/iOS project configuration, canonical Theme 1 tokens.
-- Original granary branding; supplied modern UI PNGs embedded as design reference material.
+- Approved Theme 1 granary branding (optimized PNG files) committed under `assets/brand/`.
+- The design reference manifest is in `docs/REFERENCE_ASSET_MANIFEST.json`. The 13 original full-resolution PNG mockups are distributed separately in the LonyoGang source ZIP; they have **not** been committed to this GitHub repository.
 - Reusable native views, action styles, data rows, summaries and two lightweight SVG graph components.
 - Route-based interactive prototype (five bottom tabs, back navigation, registration/security/setup pages, detail and reporting flows).
 - Editable session portfolio: add new asset; add outstanding liability; record income/expense/transfer entry.
@@ -18,7 +19,7 @@
 - Demo assets and activity are stored **in memory for the current session only**. Changes are lost on restart.
 - Reports show illustrative trends; a real historical valuation/ledger engine is not yet implemented.
 - 'Liquid assets' proxy currently uses savings only. Real product must classify account liquidity and restricted funds by product and effective date.
-- Image screens provide visual references. Native UI has not been proven pixel-equivalent on a 6.7-inch physical device or emulator.
+- Screenshots are retained in the separately delivered source ZIP as design references. Native UI has not been proven pixel-equivalent on a 6.7-inch physical device or emulator.
 - Document vault, beneficiary records, reminders, subscription and device management are information/placeholder screens; no document storage or notifications.
 
 ## Required before real-user launch
@@ -38,4 +39,4 @@ The container's npm registry requests and Git remote HTTPS DNS calls were unavai
 
 ## GitHub note
 
-The connected GitHub integration returned `403 Resource not accessible by integration` on an attempt to initialize `socaya/lonyogang-heritage`. The repository is empty. This package must be pushed after that integration's **Contents: Read and write** permission is granted or by a local authenticated Git workflow; do not claim the repository was updated before confirming a commit SHA.
+GitHub Contents read/write permissions were verified on 6 November 2026. The `main` branch now holds the Expo application source, component implementation, business-domain prototype, UI theme and branding assets, with tests in GitHub Actions. The 13 full-resolution design-reference PNGs and the confidential SRS PDF are not committed. This is not yet production ready.
