@@ -7,6 +7,15 @@ cat > android/app/proguard-rules.pro <<'RULES'
 -keep class net.sqlcipher.** { *; }
 RULES
 # Configure biometric system capabilities for Android after initial project generation.
+# Android local_auth uses FragmentActivity for the biometric prompt.
+python3 - <<'PY_NATIVE'
+from pathlib import Path
+for source in Path('android/app/src/main').rglob('MainActivity.kt'):
+    s=source.read_text()
+    s=s.replace('import io.flutter.embedding.android.FlutterActivity','import io.flutter.embedding.android.FlutterFragmentActivity')
+    s=s.replace('FlutterActivity()', 'FlutterFragmentActivity()')
+    source.write_text(s)
+PY_NATIVE
 python3 - <<'PY'
 from pathlib import Path
 p=Path('android/app/src/main/AndroidManifest.xml')

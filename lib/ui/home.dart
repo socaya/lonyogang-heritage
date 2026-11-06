@@ -2,11 +2,10 @@ import 'package:flutter/material.dart';
 import '../core/format.dart';
 import '../core/theme.dart';
 import '../domain/models.dart';
-import '../domain/finance.dart';
 import '../state/wealth_store.dart';
 import 'components.dart';
-import 'portfolio.dart';
 import 'organize.dart';
+import 'reports.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, required this.store, required this.onPortfolio,

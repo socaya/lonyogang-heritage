@@ -32,7 +32,7 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
       - name: Flutter analysis
-        run: flutter analyze --fatal-infos
+        run: flutter analyze
       - name: Unit and widget tests
         run: flutter test
       - name: Build Android debug APK

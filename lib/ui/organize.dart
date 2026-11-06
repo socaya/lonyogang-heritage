@@ -316,7 +316,7 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Future<void> pick() async {
     setState(() => busy = true);
     try {
-      final picked = await FilePicker.platform.pickFiles(type: FileType.any,
+      final picked = await FilePicker.pickFiles(type: FileType.any,
         allowMultiple: false, withData: true);
       if (picked == null || picked.files.isEmpty) return;
       final file = picked.files.single;
