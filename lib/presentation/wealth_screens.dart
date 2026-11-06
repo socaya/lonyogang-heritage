@@ -120,13 +120,13 @@ class _PortfolioSearchScreenState extends State<PortfolioSearchScreen> {
       ])),
       const SizedBox(height:24),
       if(filter=='All'||filter=='Assets')...[
-        SectionTitle('Assets ('+assets.length.toString()+')'),
+        SectionTitle('Assets (${assets.length})'),
         if(assets.isEmpty)const EmptySection(title:'No matching assets',detail:'Try another search term.')
         else ...assets.map((a)=>Padding(padding:const EdgeInsets.only(bottom:9),child:
           AssetTile(asset:a,onTap:()=>openWealthPage(context,AssetDetails(store:widget.store,asset:a))))),
       ],
       if(filter=='All'||filter=='Debts')...[
-        SectionTitle('Liabilities ('+debts.length.toString()+')'),
+        SectionTitle('Liabilities (${debts.length})'),
         ...debts.map((d)=>Padding(padding:const EdgeInsets.only(bottom:8),child:SoftCard(
           onTap:()=>openWealthPage(context,LiabilityForm(store:widget.store,existing:d)),
           child:Row(children:[const Icon(Icons.account_balance_outlined,color:LG.sage),
@@ -135,7 +135,7 @@ class _PortfolioSearchScreenState extends State<PortfolioSearchScreen> {
         if(debts.isEmpty)const Text('No matching liabilities',style:TextStyle(color:LG.muted)),
       ],
       if(filter=='All'||filter=='Activity')...[
-        SectionTitle('Transactions ('+events.length.toString()+')'),
+        SectionTitle('Transactions (${events.length})'),
         ...events.take(30).map((e)=>Padding(padding:const EdgeInsets.only(bottom:8),child:SoftCard(child:Row(children:[
           const Icon(Icons.receipt_long_outlined,color:LG.sage),const SizedBox(width:12),
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -179,13 +179,13 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
         InfoLabel(label:'Dividends, interest and rent',value:LG.money(income)),
         InfoLabel(label:'Expenses, fees and taxes',value:LG.money(costs),valueColor:LG.negative),
         InfoLabel(label:'Net external contributions',value:LG.money(contributions)),
-      ])),const SizedBox(height:22),SectionTitle('Activity ('+shown.length.toString()+')'),
+      ])),const SizedBox(height:22),SectionTitle('Activity (${shown.length})'),
       if(shown.isEmpty)const EmptySection(title:'No activity in this period',detail:'Record transactions to populate this report.')
       else ...shown.map((e)=>Padding(padding:const EdgeInsets.only(bottom:8),child:SoftCard(child:Row(children:[
         const Icon(Icons.receipt_long_outlined,color:LG.sage),const SizedBox(width:12),
         Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text(e.description,style:const TextStyle(fontWeight:FontWeight.w700)),
-          Text(e.kind.name+' · '+LG.date(e.occurredAt),style:const TextStyle(color:LG.muted,fontSize:11)),
+          Text('${e.kind.name} · ${LG.date(e.occurredAt)}',style:const TextStyle(color:LG.muted,fontSize:11)),
         ])),Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
       ])))),
       const SizedBox(height:12),const Text(
@@ -240,7 +240,7 @@ class ValuationHistoryScreen extends StatelessWidget {
       SoftCard(color:LG.sageSoft,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('CURRENT RECORDED FULL VALUE',style:TextStyle(color:LG.sage,fontWeight:FontWeight.w800,fontSize:11)),
         const SizedBox(height:8),Text(LG.money(current.valueUgx),style:Theme.of(context).textTheme.headlineMedium),
-        const SizedBox(height:6),Text('As of '+LG.date(current.valuedAt),style:const TextStyle(color:LG.muted,fontSize:12)),
+        const SizedBox(height:6),Text('As of ${LG.date(current.valuedAt)}',style:const TextStyle(color:LG.muted,fontSize:12)),
       ])),const SizedBox(height:22),
       const SectionTitle('Previous valuations'),
       if(history.isEmpty)const EmptySection(title:'No history yet',detail:'Save a new valuation to begin tracking sources and dates.')
@@ -249,7 +249,7 @@ class ValuationHistoryScreen extends StatelessWidget {
           Row(children:[const Icon(Icons.event_note_outlined,color:LG.sage),const SizedBox(width:10),
             Expanded(child:Text(LG.date(v.asOf),style:const TextStyle(fontWeight:FontWeight.w700))),
             Text(LG.money(v.fullValueUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800))]),
-          const SizedBox(height:7),Text('Source: '+v.source,style:const TextStyle(color:LG.muted,fontSize:12)),
+          const SizedBox(height:7),Text('Source: ${v.source}',style:const TextStyle(color:LG.muted,fontSize:12)),
           if(v.notes.isNotEmpty)Text(v.notes,style:const TextStyle(color:LG.muted,fontSize:12)),
         ])))),
       const SizedBox(height:14),ElevatedButton.icon(onPressed:()=>openWealthPage(context,ValuationForm(store:store,asset:current)),
