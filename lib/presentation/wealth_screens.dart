@@ -270,7 +270,8 @@ class _ValuationFormState extends State<ValuationForm> {
   final amount=TextEditingController();
   final source=TextEditingController();
   final notes=TextEditingController();
-  DateTime date=DateTime.now();
+  late DateTime date=widget.asset.valuedAt.isAfter(DateTime.now())
+    ? widget.asset.valuedAt : DateTime.now();
   bool saving=false;
   @override void dispose(){amount.dispose();source.dispose();notes.dispose();super.dispose();}
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const BrandMark(height:28)),
@@ -302,7 +303,6 @@ class _ValuationFormState extends State<ValuationForm> {
         finally{if(mounted)setState(()=>saving=false);}
       },child:Text(saving?'Saving...':'Save valuation')),
     ]))));
-  }
 }
 
 class ArchivedRecordsScreen extends StatelessWidget {
