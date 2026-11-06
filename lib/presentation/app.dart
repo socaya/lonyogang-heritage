@@ -4,6 +4,7 @@ import '../data/portfolio_store.dart';
 import '../domain/models.dart';
 import 'widgets.dart';
 import 'screens.dart';
+import 'security_screens.dart';
 import 'forms.dart';
 
 class AppRoot extends StatefulWidget {
@@ -14,6 +15,9 @@ class AppRoot extends StatefulWidget {
 class _AppRootState extends State<AppRoot> {
   int tab=0;
   @override Widget build(BuildContext context)=>AnimatedBuilder(animation:widget.store,builder:(context,_) {
+    if(widget.store.vault.hasPassphrase && !widget.store.isUnlocked){
+      return UnlockScreen(store:widget.store);
+    }
     if(!widget.store.state.onboardingDone)return WelcomeScreen(store:widget.store);
     return Scaffold(
       body:SafeArea(child:IndexedStack(index:tab,children:[

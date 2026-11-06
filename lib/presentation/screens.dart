@@ -7,6 +7,8 @@ import 'widgets.dart';
 import 'forms.dart';
 import 'wealth_screens.dart';
 import 'legacy_screens.dart';
+import 'analysis_screens.dart';
+import 'security_screens.dart';
 
 Widget paddedBody(List<Widget> children)=>ListView(padding:const EdgeInsets.fromLTRB(22,18,22,28),children:children);
 
@@ -179,9 +181,9 @@ class ReportsScreen extends StatelessWidget {
       SoftCard(child:Column(children:[
         InfoLabel(label:'Recorded net external contributions',value:LG.money(externalContributions(store.state.events))),
         InfoLabel(label:'Recorded net income after costs',value:LG.money(realizedIncome(store.state.events))),
-        const SizedBox(height:8),const Text('Returns (TWR / XIRR): N/A until dated valuations and eligible cash-flow history are available.',
-          style:TextStyle(fontSize:11,color:LG.muted,height:1.5)),
-      ])),const SizedBox(height:16),const SectionTitle('More analysis'),
+      ])),const SizedBox(height:22),const SectionTitle('Returns per asset'),
+      ReturnsList(store:store),
+      const SizedBox(height:16),const SectionTitle('More analysis'),
       SoftCard(child:Column(children:[
         ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.account_balance_wallet_outlined,color:LG.sage),
           title:const Text('Financial position'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
@@ -192,8 +194,38 @@ class ReportsScreen extends StatelessWidget {
         const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.home_work_outlined,color:LG.sage),
           title:const Text('Rental income'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
           onTap:()=>push(context,RentalIncomeScreen(store:store))),
+        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.tune_outlined,color:LG.sage),
+          title:const Text('Target allocation & drift'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+          onTap:()=>push(context,AllocationScreen(store:store))),
       ])),const SizedBox(height:16),const PrivacyBanner(),
     ]);
+  }
+}
+
+class ReturnsList extends StatelessWidget {
+  final PortfolioStore store;
+  const ReturnsList({super.key,required this.store});
+  @override Widget build(BuildContext context){
+    final now=DateTime.now();
+    final rows=store.state.assets.where((a)=>!a.archived)
+      .map((a)=>(a,assetReturns(a,store.state.valuations,store.state.events,now)))
+      .where((row)=>row.$2.hasAny).toList();
+    if(rows.isEmpty){
+      return const SoftCard(child:Text(
+        'Returns appear here once an asset has at least two dated valuations and any linked cashflows.',
+        style:TextStyle(color:LG.muted,fontSize:12,height:1.5)));
+    }
+    String fmt(double? v)=>v==null?'—':'${(v*100).toStringAsFixed(1)}%';
+    return SoftCard(child:Column(children:[
+      for(final row in rows)Padding(padding:const EdgeInsets.symmetric(vertical:6),
+        child:Row(children:[Expanded(child:Text(row.$1.name,
+          style:const TextStyle(fontWeight:FontWeight.w700))),
+          Text('TWR ${fmt(row.$2.twr)}   XIRR ${fmt(row.$2.xirr)}',
+            style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700))])),
+      const SizedBox(height:4),const Text(
+        'TWR is annualized from recorded valuation dates. XIRR uses contributions, withdrawals and recorded distributions plus the current value.',
+        style:TextStyle(color:LG.muted,fontSize:11,height:1.4)),
+    ]));
   }
 }
 
@@ -248,6 +280,9 @@ class MoreScreen extends StatelessWidget {
     const SizedBox(height:22),const SectionTitle('Plan & protect'),
     SoftCard(child:Column(children:[
       _moreItem(context,Icons.track_changes_outlined,'Wealth goals',GoalsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.tune_outlined,'Target allocation',AllocationScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.event_repeat_outlined,'Scheduled contributions',ScheduledContributionsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.currency_exchange_outlined,'FX reference rates',FxRatesScreen(store:store)),
       const Divider(),_moreItem(context,Icons.family_restroom_outlined,'Beneficiaries & legacy',BeneficiariesScreen(store:store)),
       const Divider(),_moreItem(context,Icons.people_outline,'Trusted contacts',LegacyScreen(store:store)),
       const Divider(),_moreItem(context,Icons.folder_copy_outlined,'Document records',DocumentsScreen(store:store)),
@@ -258,6 +293,7 @@ class MoreScreen extends StatelessWidget {
     SoftCard(child:Column(children:[
       _moreItem(context,Icons.person_outline,'Profile',ProfileScreen(store:store)),
       const Divider(),_moreItem(context,Icons.shield_outlined,'Security & privacy',SecurityCenterScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.lock_outline,'Encryption',EncryptionSetupScreen(store:store)),
       const Divider(),_moreItem(context,Icons.credit_card_outlined,'Subscription & billing',const SubscriptionScreen()),
       const Divider(),_moreItem(context,Icons.archive_outlined,'Archived records',ArchivedRecordsScreen(store:store)),
       const Divider(),_moreItem(context,Icons.settings_outlined,'Settings & data export',SettingsScreen(store:store)),

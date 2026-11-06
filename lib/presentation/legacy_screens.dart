@@ -1,10 +1,13 @@
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:open_filex/open_filex.dart';
 
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/models.dart';
 import 'forms.dart';
+import 'security_screens.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
 
@@ -23,11 +26,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         (d.title.toLowerCase().contains(query.text.toLowerCase())||
          d.category.toLowerCase().contains(query.text.toLowerCase()))).toList()
        ..sort((a,b)=>a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    final encryptionOn=widget.store.vault.hasPassphrase;
     return WealthPage(title:'Documents & records',subtitle:'A private catalog of important financial and property records.',children:[
-      const SoftCard(color:LG.sageSoft,child:Row(children:[
-        Icon(Icons.info_outline,color:LG.sage),SizedBox(width:12),
-        Expanded(child:Text('Metadata index only. No files are uploaded, scanned, encrypted or stored in this preview.',
-          style:TextStyle(color:LG.muted,fontSize:12,height:1.5)))])),
+      SoftCard(color:LG.sageSoft,child:Row(children:[
+        const Icon(Icons.info_outline,color:LG.sage),const SizedBox(width:12),
+        Expanded(child:Text(encryptionOn
+          ?'Attachments are AES-GCM encrypted on this device under your vault key.'
+          :'Attachments are stored on this device with a per-file key. Enable a passphrase to lock them to your vault.',
+          style:const TextStyle(color:LG.muted,fontSize:12,height:1.5)))])),
       const SizedBox(height:18),
       TextField(controller:query,onChanged:(_)=>setState((){}),
         decoration:const InputDecoration(prefixIcon:Icon(Icons.search,color:LG.sage),hintText:'Find a document record')),
@@ -41,15 +47,18 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       if(docs.isEmpty)const EmptySection(title:'No document records',detail:'Create a record for a deed, policy, contract or statement.')
       else ...docs.map((d){
         final overdue=d.expiresAt!=null&&d.expiresAt!.isBefore(DateTime.now());
+        final hasFile=d.attachment!=null;
         return Padding(padding:const EdgeInsets.only(bottom:10),child:SoftCard(
           onTap:()=>openWealthPage(context,DocumentFormScreen(store:widget.store,existing:d)),
           child:Row(children:[
             Container(width:44,height:44,decoration:BoxDecoration(color:LG.sageSoft,borderRadius:BorderRadius.circular(12)),
-              child:const Icon(Icons.description_outlined,color:LG.sage)),
+              child:Icon(hasFile?Icons.lock_outline:Icons.description_outlined,color:LG.sage)),
             const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
               Text(d.title,style:const TextStyle(fontWeight:FontWeight.w700)),
               const SizedBox(height:5),Text(d.expiresAt==null?d.category:'${d.category} · Expires ${LG.date(d.expiresAt!)}',
                 style:TextStyle(color:overdue?LG.negative:LG.muted,fontSize:12)),
+              if(hasFile)Text('Encrypted file attached',
+                style:const TextStyle(color:LG.sage,fontSize:11,fontWeight:FontWeight.w700)),
             ])),const Icon(Icons.chevron_right,color:LG.muted),
           ])));
       }),
@@ -73,8 +82,73 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   late String? linkedAssetId=widget.existing?.linkedAssetId;
   late DateTime? issued=widget.existing?.issuedAt;
   late DateTime? expires=widget.existing?.expiresAt;
+  late DocumentRecord? _current=widget.existing;
   bool saving=false;
+  bool _busyAttachment=false;
   @override void dispose(){title.dispose();notes.dispose();super.dispose();}
+
+  Future<void> _pickAttachment() async {
+    final current=_current;
+    if(current==null){
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('Save the document first, then attach a file.')));
+      return;
+    }
+    final result=await FilePicker.platform.pickFiles(withData:true);
+    if(result==null || result.files.isEmpty)return;
+    final file=result.files.first;
+    final bytes=file.bytes;
+    if(bytes==null){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content:Text('The file could not be read from the picker.')));
+      return;
+    }
+    setState(()=>_busyAttachment=true);
+    try{
+      final updated=await widget.store.attachFile(current,bytes,
+        filename:file.name,mimeType:file.extension==null?'application/octet-stream':_mimeFor(file.extension!));
+      if(mounted)setState(()=>_current=updated);
+    }catch(e){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Could not attach: $e')));
+    }finally{if(mounted)setState(()=>_busyAttachment=false);}
+  }
+
+  Future<void> _viewAttachment() async {
+    final current=_current;final ref=current?.attachment;
+    if(ref==null)return;
+    setState(()=>_busyAttachment=true);
+    try{
+      final tmp=await widget.store.attachments.materialize(ref,
+        key:widget.store.vault.activeKey);
+      await OpenFilex.open(tmp.path);
+    }catch(e){
+      if(mounted)ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content:Text('Could not open attachment: $e')));
+    }finally{
+      if(mounted)setState(()=>_busyAttachment=false);
+    }
+  }
+
+  Future<void> _removeAttachment() async {
+    final current=_current;
+    if(current==null||current.attachment==null)return;
+    await widget.store.removeAttachment(current);
+    if(mounted)setState(()=>_current=widget.store.state.documents
+      .firstWhere((d)=>d.id==current.id,orElse:()=>current.copyWith(clearAttachment:true)));
+  }
+
+  static String _mimeFor(String ext){
+    return switch(ext.toLowerCase()){
+      'pdf'=>'application/pdf',
+      'png'=>'image/png',
+      'jpg'||'jpeg'=>'image/jpeg',
+      'gif'=>'image/gif',
+      'txt'=>'text/plain',
+      'csv'=>'text/csv',
+      _=>'application/octet-stream',
+    };
+  }
   @override Widget build(BuildContext context) {
     final assets=widget.store.state.assets.where((x)=>!x.archived).toList();
     if(linkedAssetId!=null && !assets.any((a)=>a.id==linkedAssetId))linkedAssetId=null;
@@ -109,16 +183,22 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
           icon:const Icon(Icons.close,color:LG.muted,size:18))]))),
       FormFieldBlock(title:'Notes (optional)',child:TextFormField(controller:notes,maxLines:3,
         decoration:const InputDecoration(hintText:'Storage location or renewal instructions (no secrets)'))),
+      _attachmentBlock(context),
       const SizedBox(height:10),ElevatedButton(onPressed:saving?null:()async{
         if(!key.currentState!.validate())return;
         if(issued!=null&&expires!=null&&expires!.isBefore(issued!)){
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Expiry cannot precede issue date')));return;
         }
         setState(()=>saving=true);
-        try{await widget.store.upsertDocument(DocumentRecord(id:widget.existing?.id??makeId(),
-          title:title.text.trim(),category:category,linkedAssetId:linkedAssetId,
-          issuedAt:issued,expiresAt:expires,notes:notes.text.trim()));
-          if(context.mounted)Navigator.pop(context);
+        try{
+          final record=DocumentRecord(id:_current?.id??widget.existing?.id??makeId(),
+            title:title.text.trim(),category:category,linkedAssetId:linkedAssetId,
+            issuedAt:issued,expiresAt:expires,notes:notes.text.trim(),
+            attachment:_current?.attachment);
+          await widget.store.upsertDocument(record);
+          if(mounted)setState(()=>_current=record);
+          if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content:Text('Document saved. You can now attach a file.')));
         }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
         finally{if(mounted)setState(()=>saving=false);}
       },child:Text(saving?'Saving...':'Save document record')),
@@ -128,9 +208,49 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
           if(context.mounted)Navigator.pop(context);
         },child:const Text('Archive record',style:TextStyle(color:LG.negative))),
       ],
-      const SizedBox(height:18),const Text('No document image or content is uploaded. Avoid entering title numbers, identity numbers or credentials until the encrypted vault is delivered.',
-        style:TextStyle(fontSize:12,color:LG.muted,height:1.5)),
+      const SizedBox(height:12),
+      TextButton.icon(onPressed:()=>openWealthPage(context,
+        EncryptionSetupScreen(store:widget.store)),
+        icon:const Icon(Icons.lock_outline,size:16),
+        label:const Text('Manage encryption')),
+      const SizedBox(height:18),Text(widget.store.vault.hasPassphrase
+        ?'Attachment bytes are AES-GCM encrypted under your vault key on this device. Metadata (title, category, notes) is also encrypted at rest.'
+        :'Set a passphrase under Encryption to tie attachments to your vault key.',
+        style:const TextStyle(fontSize:12,color:LG.muted,height:1.5)),
     ]))));
+  }
+
+  Widget _attachmentBlock(BuildContext context){
+    final current=_current;
+    final attachment=current?.attachment;
+    return FormFieldBlock(title:'Encrypted attachment',
+      help:current==null?'Save the record first before attaching a file.':null,
+      child:SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        if(attachment!=null)...[
+          Row(children:[const Icon(Icons.lock,color:LG.sage),const SizedBox(width:10),
+            Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text(attachment.originalFilename,style:const TextStyle(fontWeight:FontWeight.w700)),
+              Text('${_sizeHuman(attachment.sizeBytes)} · ${attachment.mimeType}',
+                style:const TextStyle(color:LG.muted,fontSize:12))])),
+            IconButton(onPressed:_busyAttachment?null:_removeAttachment,
+              icon:const Icon(Icons.delete_outline,color:LG.muted))]),
+          const SizedBox(height:8),
+          OutlinedButton.icon(onPressed:_busyAttachment?null:_viewAttachment,
+            icon:const Icon(Icons.open_in_new),label:const Text('Decrypt and preview')),
+          const SizedBox(height:4),
+          Text('SHA-256 ${attachment.sha256Hex.substring(0,12)}…',
+            style:const TextStyle(color:LG.muted,fontSize:11)),
+        ]else ElevatedButton.icon(
+          onPressed:_busyAttachment||current==null?null:_pickAttachment,
+          icon:const Icon(Icons.upload_file),
+          label:Text(_busyAttachment?'Encrypting…':'Attach encrypted file')),
+      ])));
+  }
+
+  static String _sizeHuman(int bytes){
+    if(bytes<1024)return '$bytes B';
+    if(bytes<1024*1024)return '${(bytes/1024).toStringAsFixed(1)} KB';
+    return '${(bytes/(1024*1024)).toStringAsFixed(1)} MB';
   }
 }
 
@@ -348,28 +468,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class SecurityCenterScreen extends StatelessWidget {
   final PortfolioStore store;
   const SecurityCenterScreen({super.key,required this.store});
-  @override Widget build(BuildContext context)=>WealthPage(
-    title:'Security & privacy',subtitle:'A transparent view of the protection currently available.',children:[
-    const SoftCard(color:LG.sageSoft,child:Row(children:[
-      Icon(Icons.shield_outlined,color:LG.sage,size:30),SizedBox(width:14),
-      Expanded(child:Text('Preview mode: do not enter real financial credentials, title references or identity numbers.',
-        style:TextStyle(fontSize:12,color:LG.muted,height:1.5)))])),
-    const SizedBox(height:22),const SectionTitle('Security readiness'),
-    const SoftCard(child:Column(children:[
-      InfoLabel(label:'Passkey sign-in',value:'Not connected'),
-      InfoLabel(label:'Biometric access',value:'Not enabled'),
-      InfoLabel(label:'Encrypted local vault',value:'Not implemented'),
-      InfoLabel(label:'Cloud backup',value:'Not connected'),
-      InfoLabel(label:'Session management',value:'Not connected'),
-      InfoLabel(label:'Data import / export',value:'Manual JSON'),
-    ])),
-    const SizedBox(height:18),
-    OutlinedButton.icon(onPressed:()=>openWealthPage(context,SettingsScreen(store:store)),
-      icon:const Icon(Icons.settings_backup_restore),label:const Text('Data management settings')),
-    const SizedBox(height:18),const Text(
-      'No passkeys, biometrics, backend account or secure storage is simulated. A dedicated authentication and encryption implementation is required before handling sensitive data.',
-      style:TextStyle(color:LG.muted,fontSize:12,height:1.55)),
-  ]);
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:store,builder:(context,_){
+    final encryptionOn=store.vault.hasPassphrase;
+    final biometricLinked=store.vault.hasBiometricStash;
+    return WealthPage(
+      title:'Security & privacy',subtitle:'The protection currently active on this device.',children:[
+      SoftCard(color:encryptionOn?LG.sageSoft:LG.white,child:Row(children:[
+        Icon(encryptionOn?Icons.shield:Icons.shield_outlined,
+          color:encryptionOn?LG.sage:LG.muted,size:30),const SizedBox(width:14),
+        Expanded(child:Text(encryptionOn
+          ?'Your vault is encrypted on this device with AES-GCM 256 under a passphrase-derived key.'
+          :'Your portfolio is stored in cleartext on this device. Enable a passphrase to protect it.',
+          style:const TextStyle(fontSize:12,color:LG.muted,height:1.5)))])),
+      const SizedBox(height:22),const SectionTitle('Security readiness'),
+      SoftCard(child:Column(children:[
+        InfoLabel(label:'Passphrase lock',
+          value:encryptionOn?'Enabled':'Not set',
+          valueColor:encryptionOn?LG.sage:LG.muted),
+        InfoLabel(label:'Biometric unlock',
+          value:biometricLinked?'Linked':'Not linked',
+          valueColor:biometricLinked?LG.sage:LG.muted),
+        const InfoLabel(label:'Encryption algorithm',value:'AES-GCM 256'),
+        const InfoLabel(label:'Key derivation',value:'PBKDF2-HMAC-SHA256 · 120,000 rounds'),
+        const InfoLabel(label:'Cloud backup',value:'Not connected'),
+        const InfoLabel(label:'Multi-device sync',value:'Not connected'),
+        const InfoLabel(label:'Data import / export',value:'Manual JSON (unencrypted)'),
+      ])),
+      const SizedBox(height:18),
+      ElevatedButton.icon(onPressed:()=>openWealthPage(context,EncryptionSetupScreen(store:store)),
+        icon:Icon(encryptionOn?Icons.manage_accounts:Icons.lock),
+        label:Text(encryptionOn?'Manage encryption':'Enable encryption')),
+      const SizedBox(height:10),
+      OutlinedButton.icon(onPressed:()=>openWealthPage(context,SettingsScreen(store:store)),
+        icon:const Icon(Icons.settings_backup_restore),label:const Text('Data management settings')),
+      const SizedBox(height:18),const Text(
+        'This device is the only place holding your passphrase or derived key — there is no server-side recovery. Keep an unencrypted JSON export in a safe physical location.',
+        style:TextStyle(color:LG.muted,fontSize:12,height:1.55)),
+    ]);
+  });
 }
 
 class SubscriptionScreen extends StatelessWidget {

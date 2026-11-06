@@ -30,11 +30,11 @@ void main(){
     expect(find.textContaining('recorded balances'),findsOneWidget);
   });
 
-  testWidgets('Document metadata UI states clearly that no documents are uploaded',(tester)async{
+  testWidgets('Documents screen explains the encrypted-at-rest attachment policy',(tester)async{
     final store=PortfolioStore();await store.load();
     await pumpPhone(tester,DocumentsScreen(store:store));
     expect(find.text('Documents & records'),findsOneWidget);
-    expect(find.textContaining('No files are uploaded'),findsOneWidget);
+    expect(find.textContaining('per-file key'),findsOneWidget);
     expect(find.text('No document records'),findsOneWidget);
   });
 
