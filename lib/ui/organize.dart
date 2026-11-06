@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'dart:convert';
 import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
@@ -316,12 +316,9 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   Future<void> pick() async {
     setState(() => busy = true);
     try {
-      final picked = await FilePicker.pickFiles(type: FileType.any,
-        allowMultiple: false, withData: true);
-      if (picked == null || picked.files.isEmpty) return;
-      final file = picked.files.single;
-      final Uint8List bytes = file.bytes ??
-        (file.path == null ? Uint8List(0) : await File(file.path!).readAsBytes());
+      final file = await FilePicker.pickFile(type: FileType.any);
+      if (file == null) return;
+      final Uint8List bytes = await file.readAsBytes();
       if (bytes.isEmpty || bytes.length > 12 * 1024 * 1024) {
         throw StateError('File must be between 1 byte and 12 MB.');
       }
@@ -453,7 +450,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await SharePlus.instance.share(ShareParams(
         files: [XFile.fromData(
-          Uint8List.fromList(out.toString().codeUnits),
+          Uint8List.fromList(utf8.encode(out.toString())),
           name: 'lonyogang-wealth-export.csv', mimeType: 'text/csv')],
         fileNameOverrides: const ['lonyogang-wealth-export.csv'],
       ));
