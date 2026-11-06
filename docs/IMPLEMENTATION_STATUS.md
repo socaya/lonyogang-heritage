@@ -20,6 +20,9 @@
 - **New in 0.4.0**: Target allocation weights and per-asset drift reporting.
 - **New in 0.4.0**: Recurring scheduled contributions with a one-tap post-and-advance workflow.
 - **New in 0.4.0**: Scheduled local OS notifications (via `flutter_local_notifications` + `timezone`) that derive their fire list from `computeScheduledAlerts` and resync after every state change. A `NoopNotificationScheduler` is used on web/test.
+- **New in 0.4.0 (Phase 1+2)**: Shared component library (`AppPage`, `AppHeader`, `StepProgress`, `PrimaryCTA`, `SecurityNotice`, `StatusChip`, `MoneyField`, `DateField`, `PhoneField`, `confirmActionSheet`, `LoadingState`, `ErrorState`, `AppEmptyState`) in `lib/presentation/components.dart`.
+- **New in 0.4.0 (Phase 1+2)**: `SplashScreen` (A01), canonical flat `CreateAccountStep1Screen` / `CreateAccountStep2Screen` / `OtpVerificationScreen` / `RecoverAccountScreen` prototype flow (A07/A08/A09/A10), three-step `PortfolioSetupScreen` (A12), and `NotFoundScreen` (J12) in `lib/presentation/onboarding_screens.dart`.
+- **New in 0.4.0 (Phase 1+2)**: Visual export preview test now captures the new onboarding and 0.4 screens (step 1/2, recover, portfolio setup, not-found, unlock, encryption, allocation, FX, scheduled contributions).
 
 ## Not production implemented
 - Authenticated remote accounts, passkeys, remote recovery, or protected multi-device access. There is no server-side key escrow for the passphrase.

@@ -1,30 +1,60 @@
-# Screen inventory — Flutter 0.3.0
+# Screen inventory — Flutter 0.4.0
 
-LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render native Flutter widgets and reuse the same design tokens.
+LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render native Flutter widgets and reuse the same design tokens in `lib/core/design.dart` and the shared component library in `lib/presentation/components.dart`.
 
-## Core
-- Welcome/local portfolio: WelcomeScreen
-- Home with search and notices: HomeScreen
-- Portfolio and asset details: PortfolioScreen, AssetDetails
-- Asset / liability / transaction capture: AssetForm, LiabilityForm, EventForm
-- Debts, ledger and reports: DebtsScreen, TransactionsScreen, ReportsScreen
-- Goals, trusted contacts and reminders: GoalsScreen, LegacyScreen, RemindersScreen
-- Local JSON and settings: SettingsScreen
+## Launch, onboarding and identity (lib/presentation/onboarding_screens.dart)
+- A01 `SplashScreen` — real Flutter splash; loads the portfolio off disk and routes to the next state.
+- A02 `WelcomeScreen` (in `app.dart`) — value proposition, `Create local portfolio`, `Explore with sample data`, `View account design preview`.
+- A07 `CreateAccountStep1Screen` — canonical flat Create Account prototype; collects name, email, mobile; terms gate; clearly labeled as a design preview with no backend.
+- A08 `CreateAccountStep2Screen` — passkey & biometric option tiles, recovery contact, truthful "no server recovery" notice.
+- A09 `OtpVerificationScreen` — six-digit entry with resend cooldown; design preview, never verifies against a real server.
+- A10 `RecoverAccountScreen` — anti-enumeration recovery initiation; design preview until a backend exists.
+- A12 `PortfolioSetupScreen` — three-step multi-stage setup (name → category picks → confirm); persists `ownerName` and `onboardingDone` via `PortfolioStore.setOwner`.
+- J12 `NotFoundScreen` — fallback for unresolved deep links.
 
-## Newly completed
-- Financial position: WealthStatementScreen
-- Investments and savings: InvestmentOverviewScreen
-- Global portfolio search: PortfolioSearchScreen
-- Income and cashflow: CashFlowScreen
-- Property rental income: RentalIncomeScreen
-- Valuation history and capture: ValuationHistoryScreen, ValuationForm
-- Archived asset, liability and metadata restoration: ArchivedRecordsScreen
-- Document metadata index/edit: DocumentsScreen, DocumentFormScreen
-- Beneficiary planning/edit: BeneficiariesScreen, BeneficiaryFormScreen
-- Local notification center and preferences: NotificationsCenterScreen, NotificationPreferencesScreen
-- Local profile: ProfileScreen
-- Security status and privacy: SecurityCenterScreen
-- Subscription information: SubscriptionScreen
-- Help and about: HelpCenterScreen, AboutScreen
+## Primary wealth overview (lib/presentation/screens.dart)
+- B01 `HomeScreen` with search and alert icons.
+- B03 `PortfolioScreen` with category chips.
+- B04 `PortfolioSearchScreen` (in `wealth_screens.dart`).
+- B05 `InvestmentOverviewScreen`.
+- B08 `ArchivedRecordsScreen`.
+- `AssetDetails` with property-equity subpanel.
+- `AssetForm`, `LiabilityForm`, `EventForm` (in `forms.dart`).
+- `DebtsScreen`, `TransactionsScreen`.
 
-The screen code resides in lib/presentation/wealth_screens.dart and lib/presentation/legacy_screens.dart, wired to app navigation through lib/presentation/screens.dart. See docs/REMAINING_SCREENS.md for workflows and limitations.
+## Reports (lib/presentation/screens.dart, wealth_screens.dart)
+- F01 `ReportsScreen` with new per-asset TWR/XIRR row via `ReturnsList`.
+- F02 `WealthStatementScreen`.
+- F04 `CashFlowScreen`.
+- F05 `RentalIncomeScreen`.
+- F08 `AllocationScreen` (lib/presentation/analysis_screens.dart) for target weights & drift.
+
+## Planning, legacy, documents (lib/presentation/legacy_screens.dart)
+- G01 `GoalsScreen`.
+- G04 `BeneficiariesScreen`, `BeneficiaryFormScreen`.
+- G06 `LegacyScreen` for trusted contacts.
+- G07 `DocumentsScreen`.
+- G08 `DocumentFormScreen` — now handles real AES-GCM encrypted attachments via `file_picker` and `open_filex`; integrity verified with SHA-256 on read.
+- G10 `ArchivedRecordsScreen`.
+
+## Notifications, reminders (lib/presentation/legacy_screens.dart)
+- H01 `NotificationsCenterScreen` derives alerts from state.
+- H03 `NotificationPreferencesScreen` toggles reminder/document/stale rules; a `LocalNotificationScheduler` (lib/data/notifications.dart) schedules real OS notifications via `flutter_local_notifications`.
+- H04 `RemindersScreen` (in `forms.dart`).
+
+## Account, security, data (lib/presentation/legacy_screens.dart, security_screens.dart, analysis_screens.dart)
+- I01 `MoreScreen` navigation hub.
+- I02 `ProfileScreen`.
+- I03 `SecurityCenterScreen` — now reports the live vault/biometric/notification state truthfully.
+- I04 `NotificationPreferencesScreen`.
+- I05 `SubscriptionScreen` (information only).
+- I06 `SettingsScreen` for JSON import/export and demo reset.
+- `UnlockScreen` — gates the UI when a passphrase is set and the vault is locked.
+- `EncryptionSetupScreen` — enables, re-links or removes the passphrase and biometric stash.
+- `FxRatesScreen` — offline FX reference entries.
+- `ScheduledContributionsScreen`, `ScheduleForm` — recurring contributions with one-tap post-and-advance.
+
+## Shared component library (lib/presentation/components.dart)
+`AppPage`, `AppHeader`, `StepProgress`, `PrimaryCTA`, `SecurityNotice`, `StatusChip`, `MoneyField`, `DateField`, `PhoneField`, `confirmActionSheet`, `LoadingState`, `ErrorState`, `AppEmptyState`, `ListHeaderRow`, plus pure-Dart helpers `isLikelyEmail`, `isLikelyName`, `isLikelyPhone`, `recordStatusChip`.
+
+See `docs/REMAINING_SCREENS.md` for the feature map and `docs/IMPLEMENTATION_STATUS.md` for what is production-ready vs still gated.
