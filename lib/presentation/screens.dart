@@ -5,6 +5,8 @@ import '../domain/finance.dart';
 import '../domain/models.dart';
 import 'widgets.dart';
 import 'forms.dart';
+import 'wealth_screens.dart';
+import 'legacy_screens.dart';
 
 Widget paddedBody(List<Widget> children)=>ListView(padding:const EdgeInsets.fromLTRB(22,18,22,28),children:children);
 
@@ -14,8 +16,10 @@ class HomeScreen extends StatelessWidget {
   @override Widget build(BuildContext context){
     final total=store.totals;final assets=store.state.assets.where((x)=>!x.archived).toList();
     return paddedBody([
-      Row(children:[const BrandMark(height:30),const Spacer(),IconButton(tooltip:'Reminders',
-        onPressed:()=>push(context,RemindersScreen(store:store)),icon:const Icon(Icons.notifications_none_rounded))]),
+      Row(children:[const BrandMark(height:30),const Spacer(),IconButton(tooltip:'Search',
+        onPressed:()=>push(context,PortfolioSearchScreen(store:store)),icon:const Icon(Icons.search_rounded)),
+        IconButton(tooltip:'Notifications',onPressed:()=>push(context,NotificationsCenterScreen(store:store)),
+          icon:const Icon(Icons.notifications_none_rounded))]),
       const SizedBox(height:32),Text('Good morning,',style:Theme.of(context).textTheme.bodyMedium?.copyWith(color:LG.muted)),
       Text(store.state.ownerName,style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:24),
       SoftCard(color:LG.navy,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
@@ -109,6 +113,15 @@ class AssetDetails extends StatelessWidget {
           style:TextStyle(color:LG.muted,fontSize:11)),
       ],
       if(asset.notes.isNotEmpty)...[const SizedBox(height:18),const SectionTitle('Notes'),SoftCard(child:Text(asset.notes))],
+      const SizedBox(height:16),SoftCard(onTap:()=>push(context,ValuationHistoryScreen(store:store,asset:asset)),
+        child:const Row(children:[Icon(Icons.history,color:LG.sage),SizedBox(width:12),
+          Expanded(child:Text('Valuation history',style:TextStyle(fontWeight:FontWeight.w700))),
+          Icon(Icons.chevron_right,color:LG.muted)])),
+      if(asset.kind==AssetKind.property)...[const SizedBox(height:10),
+        SoftCard(onTap:()=>push(context,RentalIncomeScreen(store:store)),child:const Row(children:[
+          Icon(Icons.real_estate_agent_outlined,color:LG.sage),SizedBox(width:12),
+          Expanded(child:Text('Recorded property income',style:TextStyle(fontWeight:FontWeight.w700))),
+          Icon(Icons.chevron_right,color:LG.muted)]))],
       const SizedBox(height:24),ElevatedButton.icon(onPressed:()=>push(context,
         AssetForm(store:store,kind:asset.kind,existing:asset)),icon:const Icon(Icons.edit_outlined),label:const Text('Edit asset')),
       const SizedBox(height:10),TextButton(onPressed:()=>confirmArchive(context,()=>store.archiveAsset(asset)),
@@ -168,6 +181,17 @@ class ReportsScreen extends StatelessWidget {
         InfoLabel(label:'Recorded net income after costs',value:LG.money(realizedIncome(store.state.events))),
         const SizedBox(height:8),const Text('Returns (TWR / XIRR): N/A until dated valuations and eligible cash-flow history are available.',
           style:TextStyle(fontSize:11,color:LG.muted,height:1.5)),
+      ])),const SizedBox(height:16),const SectionTitle('More analysis'),
+      SoftCard(child:Column(children:[
+        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.account_balance_wallet_outlined,color:LG.sage),
+          title:const Text('Financial position'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+          onTap:()=>push(context,WealthStatementScreen(store:store))),
+        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.payments_outlined,color:LG.sage),
+          title:const Text('Cash flow & income'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+          onTap:()=>push(context,CashFlowScreen(store:store))),
+        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.home_work_outlined,color:LG.sage),
+          title:const Text('Rental income'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+          onTap:()=>push(context,RentalIncomeScreen(store:store))),
       ])),const SizedBox(height:16),const PrivacyBanner(),
     ]);
   }
@@ -202,23 +226,48 @@ class MoreScreen extends StatelessWidget {
   final PortfolioStore store;
   const MoreScreen({super.key,required this.store});
   @override Widget build(BuildContext context)=>paddedBody([
-    const SizedBox(height:8),const PageHeading('More',subtitle:'Your wealth records, planning and preferences.'),
-    SoftCard(child:Row(children:[CircleAvatar(backgroundColor:LG.sageSoft,child:Text(store.state.ownerName.isEmpty?'LG':store.state.ownerName.substring(0,1).toUpperCase(),
-      style:const TextStyle(fontWeight:FontWeight.w800,color:LG.sage))),const SizedBox(width:13),
-      Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text(store.state.ownerName,style:const TextStyle(fontWeight:FontWeight.w700)),
-        const Text('On-device portfolio',style:TextStyle(fontSize:11,color:LG.muted))]))])),
-    const SizedBox(height:20),SoftCard(child:Column(children:[
-      _moreItem(context,Icons.account_balance_outlined,'Liabilities',DebtsScreen(store:store)),
-      _moreItem(context,Icons.receipt_long_outlined,'Transactions',TransactionsScreen(store:store)),
+    const SizedBox(height:8),const PageHeading('More',subtitle:'Your wealth records, plans and preferences.'),
+    SoftCard(onTap:()=>push(context,ProfileScreen(store:store)),child:Row(children:[
+      CircleAvatar(backgroundColor:LG.sageSoft,child:Text(store.state.ownerName.isEmpty?'LG':store.state.ownerName.substring(0,1).toUpperCase(),
+        style:const TextStyle(fontWeight:FontWeight.w800,color:LG.sage))),
+      const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text(store.state.ownerName,style:const TextStyle(fontWeight:FontWeight.w800)),
+        const SizedBox(height:4),const Text('On-device portfolio',style:TextStyle(color:LG.muted,fontSize:12))])),
+      const Icon(Icons.chevron_right,color:LG.muted),
+    ])),
+    const SizedBox(height:22),const SectionTitle('Your financial position'),
+    SoftCard(child:Column(children:[
+      _moreItem(context,Icons.search_rounded,'Search portfolio',PortfolioSearchScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.account_balance_wallet_outlined,'Financial position',WealthStatementScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.savings_outlined,'Investments & savings',InvestmentOverviewScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.account_balance_outlined,'Liabilities',DebtsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.receipt_long_outlined,'Transactions',TransactionsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.payments_outlined,'Cash flow & income',CashFlowScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.home_work_outlined,'Property income',RentalIncomeScreen(store:store)),
+    ])),
+    const SizedBox(height:22),const SectionTitle('Plan & protect'),
+    SoftCard(child:Column(children:[
       _moreItem(context,Icons.track_changes_outlined,'Wealth goals',GoalsScreen(store:store)),
-      _moreItem(context,Icons.family_restroom_outlined,'Heritage & trusted contacts',LegacyScreen(store:store)),
-      _moreItem(context,Icons.notifications_none_outlined,'Reminders',RemindersScreen(store:store)),
-      _moreItem(context,Icons.settings_outlined,'Settings & data export',SettingsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.family_restroom_outlined,'Beneficiaries & legacy',BeneficiariesScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.people_outline,'Trusted contacts',LegacyScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.folder_copy_outlined,'Document records',DocumentsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.notifications_none_outlined,'Notifications',NotificationsCenterScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.event_available_outlined,'Reminders',RemindersScreen(store:store)),
+    ])),
+    const SizedBox(height:22),const SectionTitle('Account & support'),
+    SoftCard(child:Column(children:[
+      _moreItem(context,Icons.person_outline,'Profile',ProfileScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.shield_outlined,'Security & privacy',SecurityCenterScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.credit_card_outlined,'Subscription & billing',const SubscriptionScreen()),
+      const Divider(),_moreItem(context,Icons.archive_outlined,'Archived records',ArchivedRecordsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.settings_outlined,'Settings & data export',SettingsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.help_outline,'Help',const HelpCenterScreen()),
+      const Divider(),_moreItem(context,Icons.info_outline,'About LonyoGang',const AboutScreen()),
     ])),const SizedBox(height:18),const PrivacyBanner(),
   ]);
   Widget _moreItem(BuildContext context,IconData icon,String name,Widget target)=>ListTile(
-    contentPadding:EdgeInsets.zero,leading:Icon(icon,color:LG.sage),title:Text(name,style:const TextStyle(fontWeight:FontWeight.w700,fontSize:13)),
+    contentPadding:EdgeInsets.zero,leading:Icon(icon,color:LG.sage),title:Text(name,
+      style:const TextStyle(fontWeight:FontWeight.w700,fontSize:13)),
     trailing:const Icon(Icons.chevron_right,color:LG.muted,size:20),onTap:()=>push(context,target));
 }
 
