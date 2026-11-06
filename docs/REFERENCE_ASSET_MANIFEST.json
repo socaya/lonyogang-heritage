@@ -1,0 +1,114 @@
+{
+  "design_baseline": "Theme 1 / Modern flat UI",
+  "asset_policy": "Unmodified PNG reference images; no gradients or decorative landscape on implemented views",
+  "screen_target_px": [
+    1080,
+    2400
+  ],
+  "images": [
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_10_Portfolio_Setup.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "9d1133a906e6383960f83c91a78c49eb7eda1fcd21ac16cd6d3ca8f230331590"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_11_Home_Dashboard.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "7452923ef8e87f0e539a1fd708a88e6b65fac22010e1527788c732fe36c1f0e4"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_12_Net_Worth_Overview.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "bb102cc1650b60078fd7a4149e3869881763fcaac56063b176ccb4ebca90259b"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_13_Investments_List.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "5e58ec6c32872b0de32aff874ad3ab6c1cd0139e71dbbad893f7d2a224d34e44"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_14_Investment_Detail.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "70ec1b1135a5d6b7a153004b66e29d2242f21b87662f8efbd79d71680d7392d9"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_15_Properties_Portfolio.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "cc5ad598a086de00c4ecf7d7bc3fbe4fe8f077ad9df58a752025045899eaddd4"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_16_Property_Detail.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "a9806c496efdf5d88431b1c44301d0a78456b9e63382ddf16c50fb5cc57b0013"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_17_Liabilities.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "1f3b387644327e36504d4c7d953862ede6f6cd6be427235f4cd276170e7c3e08"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_18_Transactions.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "1710815cbf02eb3503cda7069feb14591f422f47e2c06047cc92fe9f548a8238"
+    },
+    {
+      "path": "assets/reference/screens/LonyoGang_Theme1_19_Reports_Insights.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "d83790e8fd30f2813410de90c0cc2f7f9bf4ca638cfbe793131d268a4d1a3a62"
+    },
+    {
+      "path": "assets/reference/screens/approved-account-layout.png",
+      "dimensions": [
+        921,
+        2048
+      ],
+      "sha256": "244433a13333d7155eeb3327467b65e5a87f7c9b3637ffd854a43cb5e22bb3f6"
+    },
+    {
+      "path": "assets/reference/screens/screen-06-create-account.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "14dda85bea14e39da0b623b80647867314a4af06084810ad02c0e9ae32ec77d4"
+    },
+    {
+      "path": "assets/reference/screens/screen-08-security.png",
+      "dimensions": [
+        1080,
+        2400
+      ],
+      "sha256": "0e2a70ce53a08bd2bda3ba8680498be8ba5b05a923dd721caae0e64a9bf16f2b"
+    }
+  ]
+}
