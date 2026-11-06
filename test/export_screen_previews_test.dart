@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:ui' as ui;
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lonyogang_heritage/core/design.dart';
@@ -22,6 +24,13 @@ void main(){
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();
     });
+    final flutterRoot=Platform.environment['FLUTTER_ROOT'];
+    expect(flutterRoot,isNotNull,reason:'Flutter SDK path required for screenshot fonts');
+    final font=File('$flutterRoot/bin/cache/artifacts/material_fonts/Roboto-Regular.ttf');
+    expect(font.existsSync(),isTrue,reason:'Roboto font not found in Flutter SDK');
+    final fontLoader=FontLoader('Roboto')
+      ..addFont(font.readAsBytes().then((bytes)=>ByteData.sublistView(bytes)));
+    await tester.runAsync(() async {await fontLoader.load();});
     final store=PortfolioStore();await store.loadDemo();
     await store.upsertBeneficiary(const BeneficiaryRecord(
       id:'demo-beneficiary',name:'Example Beneficiary',relationship:'Family',intendedShareBps:5000));
@@ -60,7 +69,7 @@ void main(){
     for(final page in pages){
       final repaintKey=GlobalKey();
       await tester.pumpWidget(RepaintBoundary(key:repaintKey,child:
-        MaterialApp(theme:LG.theme,debugShowCheckedModeBanner:false,home:page.$2)));
+        MaterialApp(theme:LG.theme.copyWith(fontFamily:'Roboto'),debugShowCheckedModeBanner:false,home:page.$2)));
       await tester.pumpAndSettle();
       final boundary=tester.renderObject<RenderRepaintBoundary>(find.byKey(repaintKey));
       await tester.runAsync(()async{
