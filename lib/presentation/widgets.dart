@@ -11,7 +11,7 @@ class BrandMark extends StatelessWidget {
     const SizedBox(width:8),Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
       RichText(text:TextSpan(children:[const TextSpan(text:'LONYO',style:TextStyle(color:LG.navy)),
         const TextSpan(text:'GANG',style:TextStyle(color:LG.gold))],
-        style:TextStyle(fontSize:height*.46,fontWeight:FontWeight.w900,letterSpacing:-1.1))),
+        style:TextStyle(fontSize:height*.46,fontFamily:'Roboto',fontWeight:FontWeight.w900,letterSpacing:-1.1))),
       Align(alignment:Alignment.centerRight,child:Text('H E R I T A G E',
         style:TextStyle(fontSize:height*.17,color:LG.navy,fontWeight:FontWeight.w800,letterSpacing:1.1))),
     ]),
