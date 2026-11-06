@@ -1,51 +1,63 @@
-# LonyoGang Heritage — Android & iOS app
+# LonyoGang Heritage
 
-**LonyoGang** is a personal wealth and asset portfolio tracker for investments, savings, property, liabilities and net worth. The name combines Acholi *Lonyo* (wealth) and *Gang* (home). The visual identity retains its granary construction motif and places **HERITAGE** beneath **GANG**.
+**Flutter / Dart personal wealth tracker** for Android and iOS — your home of wealth.
 
-## Implementation status
+LonyoGang is a private, offline-first, owner-controlled record of investments, property, bank/SACCO savings, loans, income, financial position and legacy. The UI follows the approved **Theme 1** flat design; the Acholi granary identity is retained without chart bars or arrows.
 
-This repository is a **functional Expo / React Native UI prototype**, not a production financial product. The portfolio is preloaded with obviously illustrative data, and add-asset, add-debt and record-transaction flows update session state. No backend or live financial accounts are connected. **Do not enter real financial credentials or sensitive portfolio information** until secure authentication, encryption, backend persistence and security review are implemented.
+## What works
 
-The prototype includes welcome, sign-up, verification, security and portfolio setup screens; Home, Portfolio, Net Worth, Investments, Savings, Property, Liabilities, Transactions, Reports; asset details; data-entry forms; Legacy, Documents, Reminders, Profile and Settings.
+This is a **real data-entry application, not a slideshow**:
 
-## Run
+- Create an encrypted device-local vault protected by an access PIN; optionally enable biometric unlock.
+- Add, edit, search, archive and inspect investment, property, savings and other asset records.
+- Record value, acquisition cost, date, ownership share, provenance and valuation history.
+- Register and edit liabilities, link mortgages to the underlying properties and calculate property equity.
+- Enter and edit dated income, expenses, contributions and withdrawals; see cash-flow totals.
+- View owned assets, outstanding debt, consolidated net worth and allocation reports.
+- Store beneficiary contacts, due-date reminders and **encrypted document attachments**.
+- Export a plain CSV portfolio statement after an explicit disclosure confirmation; edit profile and erase local vault.
+- Run Dart finance-domain tests and a Flutter widget test through GitHub Actions; build an Android debug APK.
+
+Records start empty by design. **No demo numbers are presented as your actual wealth.** Dates, source and ownership percentages are explicitly recorded. Currency is currently UGX.
+
+## Development
+
+Requirements: Flutter stable **3.47+**, Dart SDK **3.10+**, Android SDK; Xcode/CocoaPods for iOS.
 
 ```bash
-npm install
-npx expo start --android
-# or scan the QR in Expo Go where supported
+git clone https://github.com/socaya/lonyogang-heritage.git
+cd lonyogang-heritage
+bash tool/setup_platform.sh
+flutter pub get
+flutter analyze
+flutter test
+flutter run -d android
 ```
 
-Requirements: Node.js LTS, Android emulator or a compatible Expo Go application. This project targets the **Expo SDK 54** family and React Native 0.81.4. Run `npx expo install --check` and `npx expo-doctor` after dependencies have been installed; adjust package versions only based on the SDK's verified compatibility output.
+The `tool/setup_platform.sh` command generates standard Android and iOS host projects and inserts needed biometric platform configuration; Flutter source lives in `lib/`. On macOS, use `flutter run -d ios` with Xcode installed.
+
+For an Android installer:
 
 ```bash
-npm run typecheck
-npm run test:unit
+flutter build apk --debug
 ```
 
-> This build environment did not have npm registry access, so dependencies could not be downloaded and Android native builds could not be executed here. Source syntax and core finance rules were checked locally, but full device rendering remains a required verification step.
+The GitHub [Flutter Android CI workflow](.github/workflows/flutter-ci.yml) executes analysis, tests and a debug Android build, then uploads the debug APK as a workflow artifact when successful.
 
-## Source tree
+## Design system
 
-- `App.tsx` — Expo entrypoint
-- `src/screens/AppScreens.tsx` — navigation, core screens, interactive capture flows
-- `src/components/ui.tsx` — brand, typography, controls, cards, charts, bottom navigation primitives
-- `src/model/finance.ts` — typed assets, liabilities, records and wealth semantics
-- `src/data/demo.ts` — explicitly non-live sample portfolio
-- `src/theme/tokens.ts` — canonical Theme 1 design tokens
-- `assets/brand/` — approved original colour logo and granary image
-- `assets/reference/screens/` — PNG visual references retained intact
-- `docs/` — design specification, screenshot mapping, data and implementation notes
-- `tests/domain.test.cjs` — financial invariants and input parsing regression tests
+- **Background:** `#F7F9F7`
+- **Midnight Navy:** `#102D40`
+- **Antique Gold:** `#B88C3D`
+- **Sage:** `#607E68`
+- 24dp gutters, 14dp inputs, 18dp cards, low-chrome flat cards, readable hierarchy, native status/navigation bars.
+- The 6.7-inch/1080 × 2400 approved screenshots are **visual acceptance references**; a full device screenshot-diff acceptance run remains required.
+- Brand assets: `assets/brand/`; UI guidance: `docs/UI_DESIGN_SYSTEM.md`.
 
-## Safety and boundaries
+## Security and release boundaries
 
-LonyoGang does **not** hold customer funds, broker trades, provide regulated advice, guarantee yields, certify ownership or verify land titles. Imported/entered data must be labeled by provenance and date. The current app operates with **ephemeral demo state only**, deliberately avoiding storage of unencrypted real financial records.
+This implementation is **an encrypted local-device MVP**, not a production banking platform. The SQLCipher passphrase is kept in platform protected storage, and the local PIN is verified with a salted PBKDF2 check. Device biometrics provide optional unlocking. The PIN is an app-level unlock gate, **not independent cryptographic protection if the OS keystore has been compromised**. There is currently no server, cloud account, multi-device synchronization, cloud backup/recovery, live bank integration, live investment pricing, payment/subscription processing, legally valid nomination or official property-title verification. Exported CSV and shared document copies are **not encrypted**. Avoid storing irreplaceable information without your own backup strategy. Do not reuse real banking passwords in this app.
 
-The confidential product requirements document is **not** included in this public repository; the documentation here is a minimal implementation/design specification derived from approved UI and non-sensitive requirements.
+Before public release: threat model and security audit, recovery strategy, backup/restore, regulated-integration/compliance decisions, full accessibility and device-specific UI tests, code signing and App Store/Play Store readiness. See [Security](docs/SECURITY.md) and [Implementation status](docs/IMPLEMENTATION_STATUS.md).
 
-## Visual source of truth
-
-The modern account-creation screenshot is the canonical visual reference. Follow its calm light background, minimal dividers, subtle surfaces, compact brand lockup, navy text, muted sage help text and antique-gold accents; avoid thick outlines, gratuitous shadows, gradients, oversized illustrations and landscape wave backgrounds. Screens are designed responsively using dp and safe areas, with a **1080 × 2400 (6.7-inch 20:9)** PNG reference target.
-
-See [UI design system](docs/UI_DESIGN_SYSTEM.md), [screen inventory](docs/SCREEN_INVENTORY.md), and [implementation status](docs/IMPLEMENTATION_STATUS.md).
+**The full confidential v1.1 SRS is intentionally excluded from this public repository.** The previous React Native implementation remains available through Git history but is no longer the active mobile stack.

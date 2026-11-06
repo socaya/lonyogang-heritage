@@ -1,31 +1,25 @@
-# Build and verify the mobile application
+# Flutter development and verification
 
-The app source is now committed on the public `main` branch at https://github.com/socaya/lonyogang-heritage.
+Prerequisites: Flutter SDK stable 3.47 or later, Android Studio/SDK and for iOS Xcode/CocoaPods on macOS.
 
 ```bash
 git clone https://github.com/socaya/lonyogang-heritage.git
 cd lonyogang-heritage
-npm install
-npm run check
-npx expo install --check
-npx expo start --android
+bash tool/setup_platform.sh
+flutter pub get
+flutter analyze
+flutter test
+flutter run -d android
+# for local Android APK:
+flutter build apk --debug
 ```
 
-For iOS development on macOS, run `npx expo start --ios` with a configured iOS simulator. Mobile UI is an Expo/React Native **demo prototype**, not a production service. Use only synthetic portfolio data: no authentication server or persistent encrypted ledger is currently connected.
+`tool/setup_platform.sh` generates Android/iOS hosts with application ID `com.vitalworks.lonyogang_heritage`, inserts the Android biometric permission, configures a fragment activity for the biometric prompt, and sets the iOS Face ID usage description. Real-release bundle ID, signing certificate, provisioning profile and store configuration require product-owner confirmation.
 
-## Visual fidelity checks
+GitHub Actions executes source analysis, tests and a debug APK build; download the APK from the successful `Flutter Android CI` workflow artifact.
 
-The approved target is a 6.7-inch Android device, approximately **1080 × 2400** pixels (20:9). Capture actual emulator/device screenshots and compare layout, fonts, safe areas, padding, flat backgrounds, card radii, navigation and contrast against the separately supplied reference PNG archive. The 13 original full-resolution modern reference screenshots are distributed in the user's downloadable source package rather than committed to this public repository. The original registration screen takes precedence over older illustration-heavy designs.
+**Visual acceptance:** capture Android screenshots at 6.7-inch/20:9 equivalent (1080 × 2400 reference), check actual device font scaling, app bar and tab behavior, navigation, content clipping and responsive insets. Compare to the approved Theme 1 modern flat account-creation screenshot and the 10-screen visual set. Screenshot agreement is not established by a successful compiler alone.
 
-Use Theme 1: Midnight Navy, Antique Gold and Sage; the approved Acholi granary brand icon contains **no financial bars or arrows**. The approved `HERITAGE` text is directly beneath the `GANG` word.
+**Do not add Node/Expo dependencies:** this project uses Dart + Flutter, with no React Native runtime.
 
-## Commit future changes
-
-```bash
-git status
-git add .
-git commit -m "feat: describe the completed change"
-git push origin main
-```
-
-The repository is initialized and writable; **do not** run `git init` or force-push over `main`. Check GitHub Actions before merging or releasing work.
+Release signing and backend sync are deliberately excluded until appropriate device, security and platform review. Do not advertise cloud recovery, OTP, investments execution or regulated services that are not implemented.

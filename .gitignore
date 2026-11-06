@@ -1,12 +1,28 @@
-node_modules/
-.expo/
-dist/
-web-build/
+# Flutter, Android and iOS
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
 build/
 coverage/
 *.log
 *.jks
 *.keystore
+*.p12
+*.mobileprovision
+key.properties
+android/.gradle/
+android/local.properties
+ios/Pods/
+ios/.symlinks/
+ios/Flutter/Generated.xcconfig
+ios/Flutter/flutter_export_environment.sh
+# IDE and private user data
+.idea/
+*.iml
+.vscode/
 .env
 .env.*
 !.env.example

@@ -1,49 +1,52 @@
-# LonyoGang Heritage — UI design system v0.1
+# LonyoGang Heritage — Theme 1 flat mobile design
 
-## Approved style
+## Primary visual authority
 
-**Primary design authority:** the modern flat account-creation screen in `assets/reference/screens/approved-account-layout.png`, supported by `screen-06-create-account.png`, `screen-08-security.png`, and the 10 previously approved reference images. These references should not be reimagined or replaced with decorative finance-app templates. The supplied Theme 1 granary is a graphic asset, not a shape to reproduce with an improvised chart icon. The logo geometry is preserved.
-
-The interface is light, soft and calm. Navigation flows lead with task context; wealth summaries lead with the value and provenance. Establish clear vertical rhythm and avoid unnecessary information density.
+Use the approved **modern flat Create Account (01 / 02) image** as the design source of truth, not older illustration-heavy onboarding screens. The Acholi granary graphic remains an unchanged identity asset. HERITAGE is aligned directly below GANG; no bar-chart or arrow icon may replace the approved granary.
 
 ## Colour tokens
 
-| Token | Hex | Usage |
-|---|---|---|
-| Navy | `#102D40` | Headings, important data, primary button |
-| Navy deep | `#0D283A` | Strong contrast |
-| Antique gold | `#B88C3D` | Controlled emphasis, selected states, call-to-action arrow |
-| Sage | `#607E68` | Wealth context, supportive accent, success |
-| Sage dark | `#446B55` | Accessible sage text/icons |
-| Sage soft | `#E8F0E9` | Informational and security surfaces |
-| Canvas | `#F7F9F7` | App-level background |
-| White | `#FFFFFF` | Low-elevation cards/inputs |
-| Soft surface | `#F0F4F1` | Neutral cards and control backgrounds |
-| Hairline border | `#E1E8E3` | Inputs and nav separators only |
-| Ink | `#163246` | Default copy |
-| Muted | `#6F808A` | Supporting descriptions |
+| Token | Colour | Role |
+|--|--|--|
+| Navy | `#102D40` | Titles, numbers, primary buttons |
+| Deep Navy | `#0D283A` | Strong text contrast |
+| Antique Gold | `#B88C3D` | Selected highlights and accents |
+| Sage | `#607E68` | Wealth context / support |
+| Sage Dark | `#446B55` | Accessible emphasis |
+| Sage Soft | `#E8F0E9` | Subtle information surfaces |
+| Canvas | `#F7F9F7` | Overall surface |
+| White | `#FFFFFF` | Forms and cards |
+| Soft Surface | `#F0F4F1` | Low-contrast grouping |
+| Hairline | `#E1E8E3` | Light borders on fields only |
+| Ink | `#163246` | Body text |
+| Muted | `#6F808A` | Supporting labels |
 
-## Layout rules
+## Layout
+- Use 24dp horizontal gutters with an 8dp rhythm and 24-40dp vertical section spacing.
+- Page titles typically 27–31sp, body 14–16sp and metadata 11–12sp.
+- Corners: inputs 14dp, soft cards 18dp, primary actions 14dp, small badges pill.
+- Flat rounded surfaces only; no heavy shadows, thick boxes, gradient washes, decorative landscape waves or excessive illustration.
+- One clear 54–56dp high primary action; tactile targets at least 44dp.
+- Preserve readable UGX values (int amounts; display with thousands separators and prefix).
+- Include provenance/date for values, owner share for co-owned property, and a separate debt total.
+- Honour native status bar, gesture/navigation area, safe areas and accessibility text scaling.
+- 6.7-inch Android reference design target: 1080 × 2400 (20:9), verify across densities and devices.
 
-1. 24 dp horizontal gutters, 8 dp base rhythm; more air between titled sections (24–40 dp).
-2. Titles 27–31 sp, secondary headings 19 sp, body 14–16 sp, supporting labels 11–12 sp. Avoid tight letterspacing on multi-line copy.
-3. White inputs on off-white background with a thin *subtle* border; do not use bright or thick input outlines. Cards use softly filled surfaces without border boxing.
-4. Input corners 14 dp, standard cards 18 dp, primary buttons 14 dp, badges fully rounded. Do **not** apply universal 30+ dp radii.
-5. Keep the primary action 56 dp tall with meaningful button text. One visually dominant action per view.
-6. Maintain predictable content positions across flows. Align card titles, financial values and list rows with the same content grid.
-7. Reserve gold for selected tabs, progress marks and a few highlights; do not make every asset card gold.
-8. Use native status bar and safe-area handling rather than painting decorative fake Android system bars.
-9. Include source and date on all assets and property values. Never label an owner estimate as a certified appraisal.
-10. At 6.7-inch reference target, density should remain readable with Android font scaling. Scroll vertically for content rather than squeezing all details above the fold.
+## Flutter source mapping
 
-## Components implemented
+- `lib/core/theme.dart`: Theme 1 colours, typography, button/input theme.
+- `lib/ui/components.dart`: brand lockup, form inputs, labels, cards, actions, empty states.
+- `lib/ui/auth.dart`: device-local enrollment and unlock.
+- `lib/ui/shell.dart`: bottom navigation and Add sheet.
+- `lib/ui/home.dart`: wealth dashboard.
+- `lib/ui/portfolio.dart`: asset list, search, details and valuation history.
+- `lib/ui/editors.dart`: typed validated asset, debt and transaction editors.
+- `lib/ui/reports.dart`: net worth statement, cashflow report, allocation donut.
+- `lib/ui/organize.dart`: beneficiary, reminders, encrypted documents, privacy settings.
+- `assets/brand/`: approved Theme 1 granary and horizontal lockup assets.
 
-`Brand`, `H`, `Body`, `Surface`, `Pill`, `Action`, `Input`, `SectionHeading`, `ItemRow`, `Divider`, `Icon`, `Trend`, `WealthDonut`, bottom navigation and task-specific finance forms.
+### Fidelity and security gates
 
-## Image usage and fidelity policy
+UI fidelity is a **test criterion**, not automatically guaranteed by a design token palette. Compare Android screenshots at the reference device dimensions, check spacing and logo clear-space, verify scroll/keyboard safe area, and support large text. The Flutter version uses real native controls and local records, not screenshots as page backgrounds.
 
-The repository contains untouched approved screenshot/reference PNGs. They are the visual acceptance target, not a substitute for functional UI. React Native renders native components rather than presenting flattened PNG screenshots as app pages. **Pixel-for-pixel equivalence has not been verified on an Android emulator**; compare screenshots at matched density and adjust text metrics, logo clear-space and responsive sizing after a device build. Earlier generated screens sometimes place the same page into different compositions; the modern flat-account screen takes precedence where references conflict.
-
-## Accessibility and interactions
-
-Provide semantic accessibility roles, accessible button names, adequate touch sizes (~44 dp or more), sufficient contrast, no information encoded only by colour, dynamic type validation and positive/negative currency sign clarity. Demo tabs and forms are interactive. Production flows require external identity, accessibility and device QA.
+The registration flow is a **local vault account**, not remote account verification. Do not add fake OTP, bank sync or sign-in promises without supported services.

@@ -1,42 +1,34 @@
-# Initial implementation and delivery status
+# Flutter implementation status — 6 November 2026
 
-## Completed in initial source package
+## Implemented and committed
 
-- Expo React Native TypeScript scaffold, Android/iOS project configuration, canonical Theme 1 tokens.
-- Approved Theme 1 granary branding (optimized PNG files) committed under `assets/brand/`.
-- The design reference manifest is in `docs/REFERENCE_ASSET_MANIFEST.json`. The 13 original full-resolution PNG mockups are distributed separately in the LonyoGang source ZIP; they have **not** been committed to this GitHub repository.
-- Reusable native views, action styles, data rows, summaries and two lightweight SVG graph components.
-- Route-based interactive prototype (five bottom tabs, back navigation, registration/security/setup pages, detail and reporting flows).
-- Editable session portfolio: add new asset; add outstanding liability; record income/expense/transfer entry.
-- Basic validation on names, amounts, ownership percentages and YYYY-MM-DD date format.
-- Net-worth arithmetic: `gross assets = sum(value × ownership share)`; `net worth = gross assets − outstanding liabilities`.
-- Reporting cards explicitly mark demo trend data; asset detail shows last valuation date and source. Liabilities are not also subtracted from property gross value in the consolidated calculation.
-- Tests covering portfolio arithmetic, parsing, formatting and valuation age.
+- Flutter/Dart source with Theme 1 flat UI tokens; responsive navigation and reused approved granary artwork.
+- On-device account creation with local PIN gate, optional biometrics, vault lock, local profile updates and erase.
+- Encrypted device-local SQLCipher database for assets, valuations, debts, transactions, beneficiary records, reminders and documents.
+- User-controlled investment, property, savings and other-asset forms; full record CRUD, search and detailed valuations.
+- Consolidated ownership-adjusted gross assets, linked mortgage equity, total debt, net worth, account allocation and dated cash-flow calculations.
+- Explicit valuation date/source disclosure and stale estimate hints. No manufactured market rates or fabricated ROI.
+- Encrypted document import, user-confirmed decrypted sharing, beneficiary/contact record management and in-app due-date reminders.
+- Plain CSV export with explicit warnings that exported financial data leaves encryption.
+- Automated domain tests, widget test and GitHub Actions native Android debug APK build workflow.
 
-## Partial / demo-only
+## Deliberately excluded until services are selected
 
-- Sign-up, verification and passkey screens are **UI simulation**, not authenticated enrollment. They do not send OTPs or register device credentials.
-- Demo assets and activity are stored **in memory for the current session only**. Changes are lost on restart.
-- Reports show illustrative trends; a real historical valuation/ledger engine is not yet implemented.
-- 'Liquid assets' proxy currently uses savings only. Real product must classify account liquidity and restricted funds by product and effective date.
-- Screenshots are retained in the separately delivered source ZIP as design references. Native UI has not been proven pixel-equivalent on a 6.7-inch physical device or emulator.
-- Document vault, beneficiary records, reminders, subscription and device management are information/placeholder screens; no document storage or notifications.
+- Cloud identities, email/SMS OTP, synchronized multi-device accounts, secure backup/recovery and server-side APIs.
+- Live read-only bank, SACCO or investment integrations; official financial/product pricing or validation.
+- Payment processing, subscription billing, custody, trades, advisory, property brokerage or official land registry verification.
+- Automatic push notifications and web portal (in-app due-date list exists).
+- Legally binding nomination or estate-transfer workflow; beneficiary records are informational.
 
-## Required before real-user launch
+## Before production release
 
-1. Identity provider implementing verifiable email/phone, MFA and actual passkeys; secure session token lifecycle and step-up operations.
-2. Authenticated, tenant-isolated API with transaction audit log, server-side monetary precision, permissions and input validation.
-3. Encrypted database and evidence vault, key rotation, backup, restore, deletion/export policy and threat-model review.
-4. Immutable double-entry-like journal, reconciliation, effective-dated balances, cash flow aware TWR/XIRR and multi-currency FX provenance.
-5. Property-specific ownership history, valuation source and freshness, rent/capex/opex, mortgage equity rules and evidence.
-6. Beneficiary/continuity, nomination verification states and platform billing, implemented according to approved business and legal decisions.
-7. Test on real Android and iOS targets, Android accessibility / WCAG 2.2 AA-oriented review, performance profiling and screenshot-diff visual QA against supplied references.
-8. CI checks, dependency lockfile (requires network), repository protections, secret scan, pen-test and compliance review.
+- Independent security review, secure recovery and backup/restore protocol, OS keystore compromise analysis and key rotation.
+- Financial correctness test suite with real-world fixtures, full ledger/reconciliation model, multicurrency FX policy, property income/ownership history and independent comparison.
+- Android/iOS device-level screenshot QA against approved 6.7-inch modern designs; accessibility/large-text, low memory and offline tests.
+- Privacy/retention and subscription terms, secure deployment, signing and store distribution.
 
-## Build verification limitation
+## User interface source of truth
 
-The container's npm registry requests and Git remote HTTPS DNS calls were unavailable. An Expo dependency installation, Metro bundle build, device render and end-to-end app test therefore could not be performed. Syntax and domain tests can be run with a local TypeScript compiler; successful native builds must be verified by CI or your development machine.
+`docs/UI_DESIGN_SYSTEM.md` specifies layout and colours. Reference screenshots were provided separately to the design process; they are not guaranteed to be present in this public repository. Avoid reinterpreting them as heavily boxed finance UI. Android screenshot-diff acceptance is still outstanding.
 
-## GitHub note
-
-GitHub Contents read/write permissions were verified on 6 November 2026. The `main` branch now holds the Expo application source, component implementation, business-domain prototype, UI theme and branding assets, with tests in GitHub Actions. The 13 full-resolution design-reference PNGs and the confidential SRS PDF are not committed. This is not yet production ready.
+The previous Expo source was removed from the active tree when Flutter became the selected stack; it is preserved in Git commit history.
