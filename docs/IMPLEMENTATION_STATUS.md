@@ -1,4 +1,4 @@
-# Implementation status — Flutter 0.3.0 preview
+# Implementation status — Flutter 0.4.0 local alpha
 
 ## Implemented and tested
 - Material 3 Theme 1 native Flutter components and functional navigation.
@@ -10,15 +10,22 @@
 - Goals, reminders, in-app notification rules and persisted alert settings.
 - Search, financial statement, rental income and archive recovery.
 - Local profile editing, help, safety disclosures, and subscription-information screen.
-- JSON schema-1 backward compatibility for existing exports.
+- Schema-1 JSON backward compatibility; schema-2 export carries new fields.
 - Automated finance, persistence and widget tests; CI analyzer + Android debug APK.
-- CI-generated 1080×2400 Flutter UI preview PNGs for new screen visual review (workflow artifact).
+- CI-generated 1080×2400 Flutter UI preview PNGs for new screen visual review.
+- **New in 0.4.0**: AES-GCM 256-bit at-rest encryption of the persisted portfolio under a PBKDF2-HMAC-SHA-256 (120k rounds) passphrase-derived key, with optional biometric unlock stash.
+- **New in 0.4.0**: Real document attachments picked via `file_picker`, stored on device under `vault-attachments/`, AES-GCM encrypted at rest and decrypted into a temporary file for preview via `open_filex`.
+- **New in 0.4.0**: Pure-Dart TWR (Modified-Dietz chain-link, annualized) and XIRR (Newton–Raphson) per asset, surfaced in Reports when enough history exists.
+- **New in 0.4.0**: Offline FX reference table and dated UGX conversion with freshest-rate selection.
+- **New in 0.4.0**: Target allocation weights and per-asset drift reporting.
+- **New in 0.4.0**: Recurring scheduled contributions with a one-tap post-and-advance workflow.
+- **New in 0.4.0**: Scheduled local OS notifications (via `flutter_local_notifications` + `timezone`) that derive their fire list from `computeScheduledAlerts` and resync after every state change. A `NoopNotificationScheduler` is used on web/test.
 
 ## Not production implemented
-- Authenticated user accounts, passkeys, biometrics, account recovery, or protected multi-device access.
-- Encrypted local database, encrypted file vault, real document uploads, remote backup.
-- Financial integrations, FX policy, verified third-party valuations, full TWR/XIRR.
-- Push notifications, payment processing, subscriber billing and account entitlements.
+- Authenticated remote accounts, passkeys, remote recovery, or protected multi-device access. There is no server-side key escrow for the passphrase.
+- Encrypted cloud backup, financial-institution feeds, verified third-party valuations, live FX feed.
+- Payment processing, subscriber billing and account entitlements.
 - Certified accessibility, cross-device pixel matching, independent security review or signed release distribution.
+- iOS release signing and TestFlight distribution.
 
-IMPORTANT: use **only fictional demonstration data** until security and privacy infrastructure is delivered. No legal estate transfer is performed by beneficiary notes. The public repository deliberately excludes confidential SRS materials.
+IMPORTANT: use **only fictional demonstration data** until an independent security review has signed off on the local vault model. Attachments are encrypted on device, but the device itself remains the only backup — losing the passphrase makes encrypted data unrecoverable.
