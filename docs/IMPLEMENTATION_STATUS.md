@@ -1,7 +1,24 @@
-# Implementation status — Flutter 0.2.0 alpha
+# Implementation status — Flutter 0.3.0 preview
 
-**Implemented and code complete:** Flutter Material 3 Theme 1, branded initial portfolio setup, real navigation, portfolio CRUD and archive, ownership adjusted property values, linked mortgages, debt CRUD/archive, append-only ledger with reversal, reporting summary, event-type cashflow classification, goals, trusted contact records, in-app reminders, local persistence and JSON transfer, financial fixtures, store persistence tests, navigation widget tests and CI.
+## Implemented and tested
+- Material 3 Theme 1 native Flutter components and functional navigation.
+- Investment, savings, property and debt create/edit/archive; owner-adjusted property accounting.
+- Immutable transaction log with reversal; reports and cashflow range filtering.
+- Valuation histories, recorded value source and dates; explicit zero/old valuation checks.
+- Document metadata create/edit/archive/restore, categories, optional asset links and expiry.
+- Legacy beneficiary intentions with combined 100%-share guard; trusted contacts.
+- Goals, reminders, in-app notification rules and persisted alert settings.
+- Search, financial statement, rental income and archive recovery.
+- Local profile editing, help, safety disclosures, and subscription-information screen.
+- JSON schema-1 backward compatibility for existing exports.
+- Automated finance, persistence and widget tests; CI analyzer + Android debug APK.
+- CI-generated 1080×2400 Flutter UI preview PNGs for new screen visual review (workflow artifact).
 
-**Not yet implemented and not claimed:** remote authentication/passkeys, backend or authenticated data isolation, encrypted persistence, device notifications, secure evidence upload, institutions and automatic pricing feeds, FX conversions, detailed fund accounting, full performance TWR/XIRR, legal transfers/estate nomination, subscription/payment processing, iOS code-signing, pixel-level screenshot verification, accessibility certification and security assurance.
+## Not production implemented
+- Authenticated user accounts, passkeys, biometrics, account recovery, or protected multi-device access.
+- Encrypted local database, encrypted file vault, real document uploads, remote backup.
+- Financial integrations, FX policy, verified third-party valuations, full TWR/XIRR.
+- Push notifications, payment processing, subscriber billing and account entitlements.
+- Certified accessibility, cross-device pixel matching, independent security review or signed release distribution.
 
-Development-only local data is **not suitable for private financial credentials**. This repository is public; original detailed SRS is confidential and is intentionally excluded.
+IMPORTANT: use **only fictional demonstration data** until security and privacy infrastructure is delivered. No legal estate transfer is performed by beneficiary notes. The public repository deliberately excludes confidential SRS materials.
