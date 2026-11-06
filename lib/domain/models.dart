@@ -50,9 +50,9 @@ class WealthAsset {
     institution:asString(j['institution']),location:asString(j['location']),
     status:RecordStatus.values.firstWhere((x)=>x.name==j['status'],orElse:()=>RecordStatus.userEntered),
     valuedAt:readDate(j['valuedAt']),notes:asString(j['notes']),archived:j['archived']==true);
-  WealthAsset copyWith({bool? archived}) => WealthAsset(id:id,name:name,kind:kind,category:category,valueUgx:valueUgx,
-    ownershipBps:ownershipBps,costUgx:costUgx,institution:institution,location:location,status:status,
-    valuedAt:valuedAt,notes:notes,archived:archived??this.archived);
+  WealthAsset copyWith({bool? archived,int? valueUgx,DateTime? valuedAt,RecordStatus? status}) => WealthAsset(id:id,name:name,kind:kind,category:category,valueUgx:valueUgx??this.valueUgx,
+    ownershipBps:ownershipBps,costUgx:costUgx,institution:institution,location:location,status:status??this.status,
+    valuedAt:valuedAt??this.valuedAt,notes:notes,archived:archived??this.archived);
 }
 
 class Liability {
@@ -130,12 +130,22 @@ class PortfolioState {
   final List<WealthGoal> goals;
   final List<LegacyContact> contacts;
   final List<ReminderRecord> reminders;
+  final List<DocumentRecord> documents;
+  final List<BeneficiaryRecord> beneficiaries;
+  final List<ValuationRecord> valuations;
+  final NotificationOptions notificationOptions;
   const PortfolioState({this.ownerName='',this.onboardingDone=false,this.assets=const [],this.liabilities=const [],
-    this.events=const [],this.goals=const [],this.contacts=const [],this.reminders=const []});
+    this.events=const [],this.goals=const [],this.contacts=const [],this.reminders=const [],
+    this.documents=const [],this.beneficiaries=const [],this.valuations=const [],
+    this.notificationOptions=const NotificationOptions()});
   Json toJson()=>{'schemaVersion':1,'ownerName':ownerName,'onboardingDone':onboardingDone,
     'assets':assets.map((x)=>x.toJson()).toList(),'liabilities':liabilities.map((x)=>x.toJson()).toList(),
     'events':events.map((x)=>x.toJson()).toList(),'goals':goals.map((x)=>x.toJson()).toList(),
-    'contacts':contacts.map((x)=>x.toJson()).toList(),'reminders':reminders.map((x)=>x.toJson()).toList()};
+    'contacts':contacts.map((x)=>x.toJson()).toList(),'reminders':reminders.map((x)=>x.toJson()).toList(),
+    'documents':documents.map((x)=>x.toJson()).toList(),
+    'beneficiaries':beneficiaries.map((x)=>x.toJson()).toList(),
+    'valuations':valuations.map((x)=>x.toJson()).toList(),
+    'notificationOptions':notificationOptions.toJson()};
   factory PortfolioState.fromJson(Json j) {
     if (asInt(j['schemaVersion'])!=1) throw const FormatException('Unsupported portfolio data schema');
     List<T> read<T>(String key,T Function(Json) parse)=>(j[key] as List<dynamic>? ?? const [])
@@ -143,7 +153,91 @@ class PortfolioState {
     return PortfolioState(ownerName:asString(j['ownerName']),onboardingDone:j['onboardingDone']==true,
       assets:read('assets',WealthAsset.fromJson),liabilities:read('liabilities',Liability.fromJson),
       events:read('events',LedgerEvent.fromJson),goals:read('goals',WealthGoal.fromJson),
-      contacts:read('contacts',LegacyContact.fromJson),reminders:read('reminders',ReminderRecord.fromJson));
+      contacts:read('contacts',LegacyContact.fromJson),reminders:read('reminders',ReminderRecord.fromJson),
+      documents:read('documents',DocumentRecord.fromJson),
+      beneficiaries:read('beneficiaries',BeneficiaryRecord.fromJson),
+      valuations:read('valuations',ValuationRecord.fromJson),
+      notificationOptions:NotificationOptions.fromJson(j['notificationOptions'] is Map ? Map<String,dynamic>.from(j['notificationOptions'] as Map) : <String,dynamic>{}));
   }
   String encode()=>jsonEncode(toJson());
+}
+
+
+/// A catalog record only; the app never copies or stores the underlying evidence
+/// file until encrypted storage and access controls are available.
+class DocumentRecord {
+  final String id;
+  final String title;
+  final String category;
+  final String? linkedAssetId;
+  final DateTime? issuedAt;
+  final DateTime? expiresAt;
+  final String notes;
+  final bool archived;
+  const DocumentRecord({required this.id,required this.title,required this.category,
+    this.linkedAssetId,this.issuedAt,this.expiresAt,this.notes='',this.archived=false});
+  Json toJson()=>{'id':id,'title':title,'category':category,'linkedAssetId':linkedAssetId,
+    'issuedAt':issuedAt?.toIso8601String(),'expiresAt':expiresAt?.toIso8601String(),
+    'notes':notes,'archived':archived};
+  factory DocumentRecord.fromJson(Json j)=>DocumentRecord(id:asString(j['id']),
+    title:asString(j['title']),category:asString(j['category'],'Other'),
+    linkedAssetId:j['linkedAssetId'] as String?,
+    issuedAt:j['issuedAt']==null?null:readDate(j['issuedAt']),
+    expiresAt:j['expiresAt']==null?null:readDate(j['expiresAt']),
+    notes:asString(j['notes']),archived:j['archived']==true);
+  DocumentRecord copyWith({bool? archived})=>DocumentRecord(id:id,title:title,category:category,
+    linkedAssetId:linkedAssetId,issuedAt:issuedAt,expiresAt:expiresAt,notes:notes,
+    archived:archived??this.archived);
+}
+
+/// A planning note, NOT a registered beneficiary nomination or legal instrument.
+class BeneficiaryRecord {
+  final String id;
+  final String name;
+  final String relationship;
+  final int intendedShareBps;
+  final String notes;
+  const BeneficiaryRecord({required this.id,required this.name,required this.relationship,
+    this.intendedShareBps=0,this.notes=''});
+  Json toJson()=>{'id':id,'name':name,'relationship':relationship,
+    'intendedShareBps':intendedShareBps,'notes':notes};
+  factory BeneficiaryRecord.fromJson(Json j)=>BeneficiaryRecord(id:asString(j['id']),
+    name:asString(j['name']),relationship:asString(j['relationship']),
+    intendedShareBps:asInt(j['intendedShareBps']).clamp(0,10000).toInt(),
+    notes:asString(j['notes']));
+}
+
+class ValuationRecord {
+  final String id;
+  final String assetId;
+  final int fullValueUgx;
+  final DateTime asOf;
+  final String source;
+  final String notes;
+  const ValuationRecord({required this.id,required this.assetId,required this.fullValueUgx,
+    required this.asOf,required this.source,this.notes=''});
+  Json toJson()=>{'id':id,'assetId':assetId,'fullValueUgx':fullValueUgx,
+    'asOf':asOf.toIso8601String(),'source':source,'notes':notes};
+  factory ValuationRecord.fromJson(Json j)=>ValuationRecord(id:asString(j['id']),
+    assetId:asString(j['assetId']),fullValueUgx:asInt(j['fullValueUgx']),
+    asOf:readDate(j['asOf']),source:asString(j['source']),notes:asString(j['notes']));
+}
+
+class NotificationOptions {
+  final bool upcomingReminders;
+  final bool expiringDocuments;
+  final bool staleValuations;
+  const NotificationOptions({this.upcomingReminders=true,
+    this.expiringDocuments=true,this.staleValuations=true});
+  Json toJson()=>{'upcomingReminders':upcomingReminders,
+    'expiringDocuments':expiringDocuments,'staleValuations':staleValuations};
+  factory NotificationOptions.fromJson(Json j)=>NotificationOptions(
+    upcomingReminders:j['upcomingReminders']!=false,
+    expiringDocuments:j['expiringDocuments']!=false,
+    staleValuations:j['staleValuations']!=false);
+  NotificationOptions copyWith({bool? upcomingReminders,bool? expiringDocuments,
+    bool? staleValuations})=>NotificationOptions(
+      upcomingReminders:upcomingReminders??this.upcomingReminders,
+      expiringDocuments:expiringDocuments??this.expiringDocuments,
+      staleValuations:staleValuations??this.staleValuations);
 }
