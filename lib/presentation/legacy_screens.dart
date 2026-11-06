@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/models.dart';
-import 'screens.dart';
+import 'forms.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
 
