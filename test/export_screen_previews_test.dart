@@ -27,9 +27,12 @@ void main(){
     expect(flutterRoot,isNotNull,reason:'Flutter SDK path required for screenshot fonts');
     final font=File('$flutterRoot/bin/cache/artifacts/material_fonts/Roboto-Regular.ttf');
     expect(font.existsSync(),isTrue,reason:'Roboto font not found in Flutter SDK');
-    final fontLoader=FontLoader('Roboto')
-      ..addFont(font.readAsBytes().then((bytes)=>ByteData.sublistView(bytes)));
-    await tester.runAsync(() async {await fontLoader.load();});
+    await tester.runAsync(() async {
+      final fontBytes=font.readAsBytesSync();
+      final fontLoader=FontLoader('Roboto')
+        ..addFont(Future<ByteData>.value(ByteData.sublistView(fontBytes)));
+      await fontLoader.load();
+    });
     final store=PortfolioStore();await store.loadDemo();
     await store.upsertBeneficiary(const BeneficiaryRecord(
       id:'demo-beneficiary',name:'Example Beneficiary',relationship:'Family',intendedShareBps:5000));
