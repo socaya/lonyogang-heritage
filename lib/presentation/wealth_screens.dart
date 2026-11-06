@@ -131,7 +131,7 @@ class _PortfolioSearchScreenState extends State<PortfolioSearchScreen> {
           onTap:()=>openWealthPage(context,LiabilityForm(store:widget.store,existing:d)),
           child:Row(children:[const Icon(Icons.account_balance_outlined,color:LG.sage),
             const SizedBox(width:12),Expanded(child:Text(d.name)),
-            Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800))]))),
+            Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800))])))),
         if(debts.isEmpty)const Text('No matching liabilities',style:TextStyle(color:LG.muted)),
       ],
       if(filter=='All'||filter=='Activity')...[
@@ -141,7 +141,7 @@ class _PortfolioSearchScreenState extends State<PortfolioSearchScreen> {
           Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
             Text(e.description,style:const TextStyle(fontWeight:FontWeight.w700)),
             Text(LG.date(e.occurredAt),style:const TextStyle(color:LG.muted,fontSize:12))])),
-          Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w700))]))),
+          Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w700))])))),
         if(events.isEmpty)const Text('No matching transactions',style:TextStyle(color:LG.muted)),
       ],
     ]);
@@ -317,17 +317,17 @@ class ArchivedRecordsScreen extends StatelessWidget {
       if(assets.isEmpty)const Text('No archived assets',style:TextStyle(color:LG.muted))
       else ...assets.map((a)=>SoftCard(child:ListTile(contentPadding:EdgeInsets.zero,
         title:Text(a.name),subtitle:Text(LG.money(a.attributableUgx)),
-        trailing:TextButton(onPressed:()=>store.restoreAsset(a),child:const Text('Restore')))),
+        trailing:TextButton(onPressed:()=>store.restoreAsset(a),child:const Text('Restore'))))),
       const SizedBox(height:16),const SectionTitle('Liabilities'),
       if(debts.isEmpty)const Text('No archived debts',style:TextStyle(color:LG.muted))
       else ...debts.map((d)=>SoftCard(child:ListTile(contentPadding:EdgeInsets.zero,
         title:Text(d.name),subtitle:Text(LG.money(d.outstandingUgx)),
-        trailing:TextButton(onPressed:()=>store.restoreLiability(d),child:const Text('Restore')))),
+        trailing:TextButton(onPressed:()=>store.restoreLiability(d),child:const Text('Restore'))))),
       const SizedBox(height:16),const SectionTitle('Document records'),
       if(docs.isEmpty)const Text('No archived document records',style:TextStyle(color:LG.muted))
       else ...docs.map((d)=>SoftCard(child:ListTile(contentPadding:EdgeInsets.zero,
         title:Text(d.title),subtitle:Text(d.category),
-        trailing:TextButton(onPressed:()=>store.restoreDocument(d),child:const Text('Restore')))),
+        trailing:TextButton(onPressed:()=>store.restoreDocument(d),child:const Text('Restore'))))),
     ]);
   });
 }
