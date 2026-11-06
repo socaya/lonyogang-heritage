@@ -12,7 +12,9 @@ import 'attachment_store.dart';
 class PortfolioStore extends ChangeNotifier {
   PortfolioStore({Vault? vault, AttachmentStore? attachments})
       : vault = vault ?? Vault(),
-        attachments = attachments ?? AttachmentStore();
+        attachments = attachments ?? AttachmentStore() {
+    this.vault.addListener(notifyListeners);
+  }
 
   final Vault vault;
   final AttachmentStore attachments;
@@ -22,21 +24,24 @@ class PortfolioStore extends ChangeNotifier {
   WealthTotals get totals => computeTotals(_state.assets, _state.liabilities);
   String? loadError;
   bool isDemo = false;
+  bool _loaded = false;
+  bool get isLoaded => _loaded;
   bool get isUnlocked => vault.isUnlocked;
 
   Future<void> load() async {
     await vault.load();
-    vault.addListener(notifyListeners);
     try {
       final raw = await vault.readPayload();
       if (raw != null) {
         _state = PortfolioState.fromJson(jsonDecode(raw) as Json);
       }
+      loadError = null;
     } on StateError {
       // Vault is locked; wait for an unlock call.
     } catch (e) {
       loadError = 'Saved local data could not be loaded. Nothing was deleted.';
     }
+    _loaded = true;
     notifyListeners();
   }
 
@@ -439,6 +444,8 @@ class PortfolioStore extends ChangeNotifier {
 
   /// Explicit test fixture only; never silently generate fabricated balances.
   Future<void> loadDemo() async {
+    if (!_loaded) await vault.load();
+    _loaded = true;
     final now = DateTime.now();
     isDemo = true;
     _state = PortfolioState(ownerName: 'Demo portfolio', onboardingDone: true, assets: [
