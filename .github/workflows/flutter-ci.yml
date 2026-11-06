@@ -15,7 +15,9 @@ jobs:
           channel: stable
           cache: true
       - name: Generate native Android and iOS project wrappers
-        run: flutter create --platforms=android,ios --org com.lonyogang .
+        run: |
+          flutter create --platforms=android,ios --org com.lonyogang .
+          rm -f test/widget_test.dart
       - name: Dependencies
         run: flutter pub get
       - name: Analyze Dart source

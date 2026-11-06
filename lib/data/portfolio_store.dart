@@ -102,7 +102,7 @@ class PortfolioStore extends ChangeNotifier {
     // Validate all amounts before replacing the active portfolio.
     if(parsed.assets.any((x)=>x.valueUgx<0||x.ownershipBps<0||x.ownershipBps>10000)||
        parsed.liabilities.any((x)=>x.outstandingUgx<0)||
-       parsed.events.any((x)=>x.amountUgx<0))throw const FormatException('Negative or invalid financial amount');
+       parsed.events.any((x)=>x.amountUgx<0)) {throw const FormatException('Negative or invalid financial amount');}
     _state=parsed;await _save();
   }
 

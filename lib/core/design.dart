@@ -32,7 +32,7 @@ class LG {
       inputDecorationTheme:InputDecorationTheme(filled:true,fillColor:white,contentPadding:const EdgeInsets.symmetric(horizontal:16,vertical:16),
         hintStyle:const TextStyle(color:Color(0xFF93A0A6),fontSize:14),
         border:OutlineInputBorder(borderSide:BorderSide.none,borderRadius:BorderRadius.circular(12)),
-        enabledBorder:OutlineInputBorder(borderSide:BorderSide(color:line,width:1),borderRadius:BorderRadius.circular(12)),
+        enabledBorder:OutlineInputBorder(borderSide:const BorderSide(color:line,width:1),borderRadius:BorderRadius.circular(12)),
         focusedBorder:OutlineInputBorder(borderSide:const BorderSide(color:sage,width:1.4),borderRadius:BorderRadius.circular(12))),
       elevatedButtonTheme:ElevatedButtonThemeData(style:ElevatedButton.styleFrom(
         backgroundColor:navy,foregroundColor:white,elevation:0,minimumSize:const Size.fromHeight(52),
