@@ -1,25 +1,31 @@
-# Build, visually verify, then publish
+# Build and verify the mobile application
+
+The app source is now committed on the public `main` branch at https://github.com/socaya/lonyogang-heritage.
 
 ```bash
-unzip LonyoGang_Heritage_Mobile_App_Source.zip
+git clone https://github.com/socaya/lonyogang-heritage.git
 cd lonyogang-heritage
 npm install
-npx expo install --check
 npm run check
+npx expo install --check
 npx expo start --android
 ```
 
-For pixel-matched quality checks, start an Android emulator using a 1080 × 2400 screen definition (or comparable 6.7-inch screen, 20:9), collect rendered screens and compare against `assets/reference/screens/`. Review measured native font sizes, safe areas, card spacing and contrast. The approved account registration image has precedence over any older illustration-heavy screen design.
+For iOS development on macOS, run `npx expo start --ios` with a configured iOS simulator. Mobile UI is an Expo/React Native **demo prototype**, not a production service. Use only synthetic portfolio data: no authentication server or persistent encrypted ledger is currently connected.
 
-## Publish after granting GitHub write permission
+## Visual fidelity checks
+
+The approved target is a 6.7-inch Android device, approximately **1080 × 2400** pixels (20:9). Capture actual emulator/device screenshots and compare layout, fonts, safe areas, padding, flat backgrounds, card radii, navigation and contrast against the separately supplied reference PNG archive. The 13 original full-resolution modern reference screenshots are distributed in the user's downloadable source package rather than committed to this public repository. The original registration screen takes precedence over older illustration-heavy designs.
+
+Use Theme 1: Midnight Navy, Antique Gold and Sage; the approved Acholi granary brand icon contains **no financial bars or arrows**. The approved `HERITAGE` text is directly beneath the `GANG` word.
+
+## Commit future changes
 
 ```bash
-git init
-git branch -M main
+git status
 git add .
-git commit -m "feat: initialize LonyoGang Heritage Expo mobile app and UI references"
-git remote add origin https://github.com/socaya/lonyogang-heritage.git
-git push -u origin main
+git commit -m "feat: describe the completed change"
+git push origin main
 ```
 
-The remote was empty at inspection time. If it is no longer empty, **fetch and reconcile** before any push; do not force-push existing work.
+The repository is initialized and writable; **do not** run `git init` or force-push over `main`. Check GitHub Actions before merging or releasing work.
