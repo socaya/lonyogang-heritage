@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:ui' as ui;
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter/services.dart';
@@ -69,7 +68,9 @@ void main(){
     for(final page in pages){
       final repaintKey=GlobalKey();
       await tester.pumpWidget(RepaintBoundary(key:repaintKey,child:
-        MaterialApp(theme:LG.theme.copyWith(fontFamily:'Roboto'),debugShowCheckedModeBanner:false,home:page.$2)));
+        MaterialApp(theme:LG.theme.copyWith(textTheme:LG.theme.textTheme.apply(fontFamily:'Roboto'),
+          primaryTextTheme:LG.theme.primaryTextTheme.apply(fontFamily:'Roboto')),
+          debugShowCheckedModeBanner:false,home:page.$2)));
       await tester.pumpAndSettle();
       final boundary=tester.renderObject<RenderRepaintBoundary>(find.byKey(repaintKey));
       await tester.runAsync(()async{
