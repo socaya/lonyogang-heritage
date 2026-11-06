@@ -154,7 +154,8 @@ class PortfolioStore extends ChangeNotifier {
     final index=_state.assets.indexWhere((x)=>x.id==assetId&&!x.archived);
     if(index<0)throw ArgumentError('Asset not found');
     final asset=_state.assets[index];
-    if(asOf.isBefore(asset.valuedAt)) {
+    if(DateTime(asOf.year,asOf.month,asOf.day).isBefore(
+        DateTime(asset.valuedAt.year,asset.valuedAt.month,asset.valuedAt.day))) {
       throw ArgumentError('Use a valuation date on or after the current valuation');
     }
     final updated=[..._state.assets];
