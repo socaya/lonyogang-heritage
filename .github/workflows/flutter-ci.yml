@@ -24,6 +24,13 @@ jobs:
         run: flutter analyze --no-pub
       - name: Domain tests
         run: flutter test --no-pub
+      - name: Upload 6.7-inch Flutter UI previews
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lonyogang-ui-previews-1080x2400
+          path: build/ui-previews/*.png
+          if-no-files-found: warn
       - name: Android debug APK
         run: flutter build apk --debug --no-pub
       - name: APK artifact
