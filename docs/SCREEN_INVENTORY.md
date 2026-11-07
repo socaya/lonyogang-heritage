@@ -5,6 +5,7 @@ LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render
 ## Launch, onboarding and identity (lib/presentation/onboarding_screens.dart)
 - A01 `SplashScreen` — real Flutter splash; loads the portfolio off disk and routes to the next state.
 - A02 `WelcomeScreen` (in `app.dart`) — value proposition, `Create local portfolio`, `Explore with sample data`, `View account design preview`.
+- A06 `SignInScreen` — email + password prototype with gated passkey tile; clearly labeled as a design preview, never verifies credentials.
 - A07 `CreateAccountStep1Screen` — canonical flat Create Account prototype; collects name, email, mobile; terms gate; clearly labeled as a design preview with no backend.
 - A08 `CreateAccountStep2Screen` — passkey & biometric option tiles, recovery contact, truthful "no server recovery" notice.
 - A09 `OtpVerificationScreen` — six-digit entry with resend cooldown; design preview, never verifies against a real server.
@@ -15,6 +16,7 @@ LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render
 ## Primary wealth overview (lib/presentation/screens.dart)
 - B01 `HomeScreen` with search and alert icons.
 - B03 `PortfolioScreen` with category chips.
+- B06 `HomeRecentActivity` — three most recent non-reversed ledger entries on Home, tapping each opens `TransactionDetailScreen`.
 - B04 `PortfolioSearchScreen` (in `wealth_screens.dart`).
 - B05 `InvestmentOverviewScreen`.
 - B08 `ArchivedRecordsScreen`.

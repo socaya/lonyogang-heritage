@@ -85,6 +85,7 @@ void main(){
       ('18-goal-form',GoalForm(store:store)),
       ('19-notification-detail',NotificationDetailScreen(store:store,
         alert:buildLocalAlerts(store.state,DateTime.now()).first)),
+      ('19a-sign-in',const SignInScreen()),
       ('20-financial-position',WealthStatementScreen(store:store)),
       ('21-financial-holdings',InvestmentOverviewScreen(store:store)),
       ('22-portfolio-search',PortfolioSearchScreen(store:store)),

@@ -6,6 +6,8 @@ import 'package:lonyogang_heritage/domain/models.dart';
 import 'package:lonyogang_heritage/presentation/detail_screens.dart';
 import 'package:lonyogang_heritage/presentation/forms.dart';
 import 'package:lonyogang_heritage/presentation/legacy_screens.dart';
+import 'package:lonyogang_heritage/presentation/onboarding_screens.dart';
+import 'package:lonyogang_heritage/presentation/screens.dart';
 import 'package:lonyogang_heritage/presentation/widgets.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -130,6 +132,43 @@ void main() {
                   padding: const EdgeInsets.all(16),
                   child: AssetTile(asset: asset, onTap: () {}))));
       expect(find.text('Stale'), findsNothing);
+    });
+  });
+
+  group('A06 sign-in prototype', () {
+    testWidgets('Sign-in screen is explicitly a design preview',
+        (tester) async {
+      await pumpPhone(tester, const SignInScreen());
+      expect(find.text('Welcome back'), findsOneWidget);
+      expect(find.textContaining('design preview'), findsAtLeast(1));
+      expect(find.text('Use passkey (not available)'), findsOneWidget);
+    });
+  });
+
+  group('B06 home recent activity', () {
+    testWidgets('HomeRecentActivity hides itself when there are no events',
+        (tester) async {
+      final store = PortfolioStore();
+      await store.load();
+      await pumpPhone(
+          tester, Scaffold(body: HomeRecentActivity(store: store)));
+      expect(find.text('Recent activity'), findsNothing);
+    });
+
+    testWidgets('HomeRecentActivity lists the most recent non-reversed entry',
+        (tester) async {
+      final store = PortfolioStore();
+      await store.load();
+      await store.postEvent(LedgerEvent(
+          id: 'e1',
+          description: 'SACCO interest',
+          kind: EventKind.interest,
+          amountUgx: 10000,
+          occurredAt: DateTime(2026, 11, 1)));
+      await pumpPhone(
+          tester, Scaffold(body: HomeRecentActivity(store: store)));
+      expect(find.text('Recent activity'), findsOneWidget);
+      expect(find.text('SACCO interest'), findsOneWidget);
     });
   });
 }

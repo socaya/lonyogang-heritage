@@ -32,6 +32,7 @@
 - **New in 0.4.0 (Phase 5+6 polish)**: `DocumentDetailScreen` (G09) separates metadata from the attachment lifecycle; `DocumentFormScreen` is now a pure metadata editor.
 - **New in 0.4.0 (Phase 5+6 polish)**: Pure-Dart `buildLocalAlerts` plus `NotificationDetailScreen` (H02); the alert center routes through detail rather than straight to source screens.
 - **New in 0.4.0 (Phase 5+6 polish)**: `AssetTile` shows a Stale pill when the recorded valuation is older than 365 days and carries a descriptive `Semantics` label; `PrimaryCTA` and the Home net-worth hero are also Semantics-annotated for TalkBack/VoiceOver.
+- **New in 0.4.0 (B06/A06 slice)**: Home now includes a `HomeRecentActivity` section listing the three most recent non-reversed ledger entries (hidden when the ledger is empty). `SignInScreen` (A06) is reachable from the Create Account prototype's Sign-in-instead link and labelled as a backend-gated design preview. `HelpCenterScreen` FAQ refreshed to describe encryption, biometrics, encrypted attachments, TWR/XIRR, allocation drift, scheduled contributions and local reset. PrivacyBanner copy updated to reflect the configurable encryption instead of the old "not encrypted" line.
 
 ## Not production implemented
 - Authenticated remote accounts, passkeys, remote recovery, or protected multi-device access. There is no server-side key escrow for the passphrase.
