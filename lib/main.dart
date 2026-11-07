@@ -3,21 +3,47 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'core/design.dart';
+import 'data/credentials_store.dart';
 import 'data/notifications.dart';
 import 'data/portfolio_store.dart';
+import 'data/remote_sync.dart';
 import 'data/sync.dart';
+import 'data/sync_outbox.dart';
 import 'domain/models.dart';
 import 'presentation/app.dart';
 import 'presentation/onboarding_screens.dart';
+import 'presentation/online_scope.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-  final store = PortfolioStore();
+  final outbox = SyncOutbox();
+  final store = PortfolioStore(outbox: outbox);
   final NotificationScheduler scheduler =
       kIsWeb ? NoopNotificationScheduler() : LocalNotificationScheduler();
-  final SyncService sync = NoopSyncService();
-  runApp(LonyoGangApp(store: store, scheduler: scheduler, sync: sync));
+  final credentials = CredentialsStore();
+  final backendBase = Uri.tryParse(
+    const String.fromEnvironment('LONYOGANG_BACKEND_URL', defaultValue: ''),
+  );
+  final SyncService sync = backendBase == null || backendBase.toString().isEmpty
+      ? NoopSyncService()
+      : RemoteSyncService(
+          baseUri: backendBase,
+          credentialsLoader: credentials.load,
+          credentialsSaver: credentials.save,
+          outboxLoader: outbox.snapshot,
+          pullHandler: (_) async {
+            // Pull handler is a hook for a future reducer that decrypts an
+            // incoming event and merges it into the store. The current build
+            // stores ciphertext and only re-plays its own writes.
+          },
+        );
+  runApp(LonyoGangApp(
+    store: store,
+    scheduler: scheduler,
+    sync: sync,
+    credentials: credentials,
+  ));
 }
 
 /// Root MaterialApp. Displays [SplashScreen] while the portfolio loads on
@@ -28,12 +54,14 @@ class LonyoGangApp extends StatefulWidget {
   final PortfolioStore store;
   final NotificationScheduler? scheduler;
   final SyncService? sync;
+  final CredentialsStore? credentials;
   final Duration? splashDuration;
   const LonyoGangApp(
       {super.key,
       required this.store,
       this.scheduler,
       this.sync,
+      this.credentials,
       this.splashDuration});
   @override
   State<LonyoGangApp> createState() => _LonyoGangAppState();
@@ -78,7 +106,13 @@ class _LonyoGangAppState extends State<LonyoGangApp> {
   }
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
+  Widget build(BuildContext context) {
+    final syncService = widget.sync;
+    final remote = syncService is RemoteSyncService ? syncService : null;
+    return OnlineScope(
+      sync: remote,
+      credentials: widget.credentials ?? CredentialsStore(),
+      child: MaterialApp(
         title: 'LonyoGang Heritage',
         debugShowCheckedModeBanner: false,
         theme: LG.theme,
@@ -97,5 +131,7 @@ class _LonyoGangAppState extends State<LonyoGangApp> {
                       builder: (_) => AppRoot(store: widget.store)));
                 },
               ),
-      );
+      ),
+    );
+  }
 }

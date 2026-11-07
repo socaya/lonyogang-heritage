@@ -4,20 +4,56 @@ import '../domain/models.dart';
 import '../domain/finance.dart';
 import 'vault.dart';
 import 'attachment_store.dart';
+import 'sync_outbox.dart';
 
 /// Local, offline-first repository. In 0.3 this wrote cleartext to
 /// SharedPreferences; 0.4 can transparently keep the same payload on disk, or
 /// — when a passphrase is set — persist an AES-GCM envelope and mediate all
 /// reads and writes through [Vault]. Nothing is pushed to a server.
 class PortfolioStore extends ChangeNotifier {
-  PortfolioStore({Vault? vault, AttachmentStore? attachments})
+  PortfolioStore({Vault? vault, AttachmentStore? attachments, SyncOutbox? outbox, String? deviceId})
       : vault = vault ?? Vault(),
-        attachments = attachments ?? AttachmentStore() {
+        attachments = attachments ?? AttachmentStore(),
+        outbox = outbox,
+        deviceId = deviceId ?? _newDeviceId() {
     this.vault.addListener(notifyListeners);
   }
 
   final Vault vault;
   final AttachmentStore attachments;
+  final SyncOutbox? outbox;
+  final String deviceId;
+
+  static int _deviceIdCounter = 0;
+  static String _newDeviceId() {
+    final ms = DateTime.now().millisecondsSinceEpoch.toString().padLeft(13, '0');
+    final suffix = (_deviceIdCounter++).toString().padLeft(4, '0');
+    // Shape a UUID-like identifier that matches the server's uuid validator.
+    final part = '${ms.substring(0, 8)}-${ms.substring(8, 12)}-4${ms.substring(12).padRight(3, '0').substring(0, 3)}-a${suffix}';
+    return '$part-${DateTime.now().microsecondsSinceEpoch.toRadixString(16).padLeft(12, '0').substring(0, 12)}';
+  }
+
+  Future<void> _recordOutbox({
+    required String payloadType,
+    required Map<String, dynamic> payload,
+    Map<String, dynamic>? integrity,
+  }) async {
+    final box = outbox;
+    final key = vault.activeKey;
+    if (box == null || key == null) return;
+    try {
+      await box.record(
+        payloadType: payloadType,
+        payload: payload,
+        integrity: integrity,
+        vaultKey: key,
+        deviceId: deviceId,
+      );
+    } catch (_) {
+      // Record-on-mutation failures do not break the local write; the next
+      // sync run will retry when the vault is available.
+    }
+  }
 
   PortfolioState _state = const PortfolioState();
   PortfolioState get state => _state;
@@ -144,6 +180,11 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(assets: list, valuations: history);
     await _save();
+    await _recordOutbox(
+      payloadType: 'asset',
+      payload: asset.toJson(),
+      integrity: {'ownership_bps': asset.ownershipBps},
+    );
   }
 
   Future<void> archiveAsset(WealthAsset asset) async =>
@@ -164,6 +205,7 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(liabilities: list);
     await _save();
+    await _recordOutbox(payloadType: 'liability', payload: liability.toJson());
   }
 
   Future<void> archiveLiability(Liability debt) async =>
@@ -184,6 +226,11 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(events: [..._state.events, event]);
     await _save();
+    await _recordOutbox(
+      payloadType: 'ledger_event',
+      payload: event.toJson(),
+      integrity: {'amount_ugx': event.amountUgx},
+    );
   }
 
   Future<void> reverseEvent(LedgerEvent event) async => postEvent(LedgerEvent(
@@ -353,6 +400,11 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(beneficiaries: entries);
     await _save();
+    await _recordOutbox(
+      payloadType: 'beneficiary_batch',
+      payload: {'beneficiaries': entries.map((e) => e.toJson()).toList()},
+      integrity: {'combined_bps': total},
+    );
   }
 
   Future<void> deleteBeneficiary(String id) async {

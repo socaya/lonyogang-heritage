@@ -3,8 +3,11 @@ import 'package:flutter/material.dart';
 
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
+import '../data/remote_sync.dart';
 import '../data/sync.dart';
 import 'components.dart';
+import 'online_account_screen.dart';
+import 'online_scope.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
 
@@ -120,6 +123,7 @@ class DataSyncStatusScreen extends StatelessWidget {
               const SizedBox(height: 18),
               const SectionTitle('Remote state'),
               _RemoteStatusCard(sync: sync),
+              _OnlineAccountCta(sync: sync),
               const SizedBox(height: 18),
               const SecurityNotice(
                 title: 'No silent cloud backup',
@@ -177,6 +181,34 @@ class _RemoteStatusCard extends StatelessWidget {
           ],
         ]));
       },
+    );
+  }
+}
+
+/// Offers the real online onboarding flow when the app was launched with
+/// a backend URL. Hidden when `sync` is null or already a Noop so the UI
+/// never advertises a service that cannot actually run.
+class _OnlineAccountCta extends StatelessWidget {
+  final SyncService? sync;
+  const _OnlineAccountCta({required this.sync});
+  @override
+  Widget build(BuildContext context) {
+    final scope = OnlineScope.maybeOf(context);
+    final remote = scope?.sync;
+    if (remote == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 16),
+      child: PrimaryCTA(
+        label: 'Connect online account',
+        showArrow: false,
+        onPressed: () async {
+          await Navigator.of(context).push(MaterialPageRoute<void>(
+              builder: (_) => OnlineAccountScreen(
+                    sync: remote,
+                    credentials: scope!.credentials,
+                  )));
+        },
+      ),
     );
   }
 }
