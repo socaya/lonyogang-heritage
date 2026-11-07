@@ -8,6 +8,7 @@ import type { PaymentsService } from '../../services/payments.js';
 import type { PushService } from '../../services/push.js';
 import type { IdentityService } from '../../services/identity.js';
 import type { TransparencyService } from '../../services/transparency.js';
+import type { AccountService } from '../../services/account.js';
 import { requireAuth } from '../auth.js';
 
 export async function registerMiscRoutes(
@@ -21,9 +22,37 @@ export async function registerMiscRoutes(
     payments: PaymentsService;
     push: PushService;
     transparency: TransparencyService;
+    account: AccountService;
   },
 ): Promise<void> {
   const auth = requireAuth(deps.identity.tokens);
+
+  // ---- /me (data-subject rights) ----
+  app.get('/me', { preHandler: auth }, async (req, reply) => {
+    const profile = await deps.account.getProfile(req.auth!.accountId);
+    if (!profile) return reply.code(404).send({ error: 'not_found' });
+    return profile;
+  });
+
+  app.patch('/me', { preHandler: auth }, async (req) => {
+    const body = z
+      .object({
+        displayName: z.string().min(1).max(120).nullable().optional(),
+        phone: z.string().min(6).max(32).nullable().optional(),
+        marketingConsent: z.boolean().optional(),
+      })
+      .parse(req.body);
+    return deps.account.updateProfile(req.auth!.accountId, body);
+  });
+
+  app.get('/me/export', { preHandler: auth }, async (req) => {
+    return deps.account.exportProfile(req.auth!.accountId);
+  });
+
+  app.delete('/me', { preHandler: auth }, async (req, reply) => {
+    await deps.account.eraseAccount(req.auth!.accountId);
+    return reply.code(204).send();
+  });
 
   // ---- Audit ----
   app.get('/audit/entries', { preHandler: auth }, async (req) => {
@@ -182,19 +211,11 @@ export async function registerMiscRoutes(
     return reply.code(204).send();
   });
 
-  app.post('/webhooks/stripe', {
-    config: { rawBody: true },
-    preValidation: async (req) => {
-      // Keep raw body for signature verification. Fastify exposes the parsed
-      // body by default; we recover the raw string from the pre-serialised
-      // request we captured at the body parser.
-      (req as unknown as { rawBody: string }).rawBody = (req as unknown as { rawBody: string }).rawBody ?? JSON.stringify(req.body);
-    },
-  }, async (req, reply) => {
+  app.post('/webhooks/stripe', async (req, reply) => {
     const header = req.headers['stripe-signature'];
     const signature = Array.isArray(header) ? header[0] : header;
-    const raw = (req as unknown as { rawBody: string }).rawBody;
-    if (!deps.payments.verifyStripeSignature(raw ?? '', signature)) {
+    const raw = (req as unknown as { rawBody?: string }).rawBody ?? '';
+    if (!deps.payments.verifyStripeSignature(raw, signature)) {
       return reply.code(401).send({ error: 'bad_signature' });
     }
     const event = deps.payments.parseStripePayload(req.body);

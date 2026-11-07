@@ -179,4 +179,32 @@ describe('Payment webhooks', () => {
     });
     expect(res.statusCode).toBe(401);
   });
+
+  it('matches a Stripe signature computed over the raw body, not the parsed object', async () => {
+    const { accountId, accessToken } = await authedAccount('billing-raw@example.com');
+    const secret = 'whsec_raw_body';
+    harness.services.payments['config'].STRIPE_WEBHOOK_SECRET = secret;
+    // Deliberately-weird key order + extra whitespace → proves the server no
+    // longer re-stringifies the body before hashing.
+    const raw =
+      `{  "type":"customer.subscription.updated",   "data": {"object":{"id":"sub_raw","metadata":{"account_id":"${accountId}","tier":"family"},"current_period_end":9999999999}}  }`;
+    const timestamp = Math.floor(Date.now() / 1000);
+    const signature = createHmac('sha256', secret).update(`${timestamp}.${raw}`).digest('hex');
+    const res = await harness.app.inject({
+      method: 'POST',
+      url: '/webhooks/stripe',
+      payload: raw,
+      headers: {
+        'stripe-signature': `t=${timestamp},v1=${signature}`,
+        'content-type': 'application/json',
+      },
+    });
+    expect(res.statusCode).toBe(204);
+    const subscription = await harness.app.inject({
+      method: 'GET',
+      url: '/billing/subscription',
+      headers: { authorization: `Bearer ${accessToken}` },
+    });
+    expect(subscription.json<{ tier: string }>().tier).toBe('family');
+  });
 });

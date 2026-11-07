@@ -30,6 +30,7 @@ import {
   TransparencyService,
   type TransparencyNotary,
 } from '../services/transparency.js';
+import { AccountService } from '../services/account.js';
 import { registerIdentityRoutes } from './routes/identity.js';
 import { registerSyncRoutes } from './routes/sync.js';
 import { registerMiscRoutes } from './routes/misc.js';
@@ -49,6 +50,7 @@ export interface ServerDependencies {
   push: PushService;
   virusScanner: VirusScanner;
   transparency: TransparencyService;
+  account: AccountService;
 }
 
 export interface AssembleOverrides {
@@ -72,6 +74,7 @@ export function assembleServices(
   const sync = new SyncService(db, audit);
   const attachments = new AttachmentService(db, config, audit, virusScanner);
   const transparency = new TransparencyService(db, audit, notary);
+  const account = new AccountService(db, audit, attachments);
   const fx = new FxService(db, config.NODE_ENV === 'test' ? new MockFxProvider() : pickProvider(config), config);
   const recovery = new RecoveryService(db, kms, audit);
   const aggregation = new AggregationService(db, kms, audit);
@@ -110,6 +113,7 @@ export function assembleServices(
     push,
     virusScanner,
     transparency,
+    account,
   };
 }
 
@@ -170,6 +174,24 @@ export async function buildServer(
     bodyLimit: 2 * 1024 * 1024,
     trustProxy: true,
   });
+
+  // Replace Fastify's default JSON parser with one that also keeps the raw
+  // bytes on the request under `rawBody`. Needed for Stripe webhook
+  // signature verification — the stringified representation of the parsed
+  // body is not byte-equivalent to what Stripe signed.
+  app.addContentTypeParser(
+    'application/json',
+    { parseAs: 'buffer' },
+    (req, body, done) => {
+      const buf = body as Buffer;
+      (req as unknown as { rawBody: string }).rawBody = buf.toString('utf8');
+      try {
+        done(null, buf.length === 0 ? undefined : JSON.parse(buf.toString('utf8')));
+      } catch (err) {
+        done(err as Error);
+      }
+    },
+  );
 
   await app.register(helmet, { global: true });
   await app.register(cors, { origin: true, credentials: true });

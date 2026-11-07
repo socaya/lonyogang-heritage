@@ -19,7 +19,12 @@ export interface AccountRow {
   status: 'pending' | 'active' | 'locked' | 'closed';
   created_at: Date;
   verified_at: Date | null;
+  failed_login_count?: number | null;
+  locked_until?: Date | null;
 }
+
+const MAX_FAILED_BEFORE_LOCK = 5;
+const LOCKOUT_MINUTES = 15;
 
 export interface SessionResult {
   accessToken: string;
@@ -204,20 +209,27 @@ export class IdentityService {
     const account = await queryOne<AccountRow>(
       this.db,
       `select id, email, phone, display_name, password_hash, totp_secret, status,
-              created_at, verified_at
+              created_at, verified_at, failed_login_count, locked_until
          from accounts where email = $1`,
       [normalised],
     );
     if (!account || !account.password_hash) {
-      // Delay slightly to level the response time of unknown-user vs bad-password.
       await argon2.hash('decoy-password', { type: argon2.argon2id, memoryCost: 1024, timeCost: 1 });
       throw new ClientError('bad_credentials', 'Email or password is incorrect');
     }
     if (account.status !== 'active') {
       throw new ClientError('not_active', `Account is ${account.status}`);
     }
-    const ok = await argon2.verify(account.password_hash, this.pepper(input.password));
-    if (!ok) {
+    if (account.locked_until && account.locked_until.getTime() > Date.now()) {
+      throw new ClientError(
+        'locked',
+        `Too many failed attempts. Try again after ${account.locked_until.toISOString()}`,
+      );
+    }
+
+    const passwordOk = await argon2.verify(account.password_hash, this.pepper(input.password));
+    if (!passwordOk) {
+      await this.recordFailedAttempt(account.id);
       throw new ClientError('bad_credentials', 'Email or password is incorrect');
     }
 
@@ -229,11 +241,41 @@ export class IdentityService {
         await this.kms.unseal(Buffer.from(account.totp_secret, 'base64'), Buffer.from(account.id, 'utf8'))
       ).toString('utf8');
       if (!authenticator.check(input.totpCode, secret)) {
+        await this.recordFailedAttempt(account.id);
         throw new ClientError('bad_totp', 'Second factor code is invalid');
       }
     }
 
+    await this.db.query(
+      `update accounts set failed_login_count = 0, locked_until = null where id = $1`,
+      [account.id],
+    );
     return await this.openSession(account.id, input.deviceId, input.userAgent);
+  }
+
+  private async recordFailedAttempt(accountId: string): Promise<void> {
+    const row = await queryOne<{ failed_login_count: number }>(
+      this.db,
+      `update accounts
+          set failed_login_count = failed_login_count + 1,
+              locked_until = case
+                when failed_login_count + 1 >= $2
+                  then now() + ($3 || ' minutes')::interval
+                else locked_until
+              end
+         where id = $1
+         returning failed_login_count`,
+      [accountId, MAX_FAILED_BEFORE_LOCK, LOCKOUT_MINUTES.toString()],
+    );
+    if (row && row.failed_login_count >= MAX_FAILED_BEFORE_LOCK) {
+      await this.audit.record({
+        accountId,
+        actor: { kind: 'system' },
+        action: 'account.locked',
+        resource: `account:${accountId}`,
+        context: { reason: 'failed_login_count_exceeded', threshold: MAX_FAILED_BEFORE_LOCK },
+      });
+    }
   }
 
   /** Issues a new session and both tokens. Shared by password and passkey

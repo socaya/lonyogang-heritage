@@ -73,6 +73,34 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
       },
     },
     paths: {
+      '/me': {
+        get: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'Return the authenticated owner profile',
+          responses: { '200': { description: 'Account profile.' } },
+        },
+        patch: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'Update display name, phone and marketing consent',
+          responses: { '200': { description: 'Updated profile.' } },
+        },
+        delete: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'Exercise right to erasure',
+          responses: { '204': { description: 'Account tombstoned.' } },
+        },
+      },
+      '/me/export': {
+        get: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'Portable JSON export (right of access)',
+          responses: { '200': { description: 'Export bundle.' } },
+        },
+      },
       '/healthz': {
         get: {
           tags: ['health'],
