@@ -27,6 +27,8 @@ class PortfolioStore extends ChangeNotifier {
   bool _loaded = false;
   bool get isLoaded => _loaded;
   bool get isUnlocked => vault.isUnlocked;
+  DateTime? _lastSavedAt;
+  DateTime? get lastSavedAt => _lastSavedAt;
 
   Future<void> load() async {
     await vault.load();
@@ -74,10 +76,36 @@ class PortfolioStore extends ChangeNotifier {
     notifyListeners();
     try {
       await vault.writePayload(_state.encode());
+      _lastSavedAt = DateTime.now();
     } catch (_) {
       loadError = 'The last change may not be saved. Storage is unavailable.';
       notifyListeners();
     }
+  }
+
+  /// Destructive: clear every local portfolio record and tear down the vault
+  /// (encryption off, metadata removed). Used by the Settings → Reset flow.
+  /// Attachments on disk are also removed on a best-effort basis — missing
+  /// files are ignored so a partial failure cannot corrupt the store.
+  Future<void> resetLocal() async {
+    for (final doc in _state.documents) {
+      final ref = doc.attachment;
+      if (ref == null) continue;
+      try {
+        await attachments.delete(ref);
+      } catch (_) {
+        // Attachment file may already be gone or unreadable; move on.
+      }
+    }
+    try {
+      await vault.disablePassphrase(currentCleartext: '');
+    } on StateError {
+      // Vault had no passphrase; nothing to tear down.
+    }
+    _state = const PortfolioState();
+    isDemo = false;
+    _lastSavedAt = null;
+    await _save();
   }
 
   Future<void> setOwner(String name) async {

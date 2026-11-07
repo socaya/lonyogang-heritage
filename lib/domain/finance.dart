@@ -288,3 +288,76 @@ ReturnMetrics assetReturns(WealthAsset asset, Iterable<ValuationRecord> valuatio
 
   return ReturnMetrics(twr: twr, xirr: rate, sampleCount: history.length);
 }
+
+/// A dated net-worth observation synthesized from the available history.
+/// Each snapshot uses the freshest recorded valuation for every asset not
+/// yet archived at [at] and the current outstanding of every liability not
+/// yet archived — liabilities carry no dated history in the current schema,
+/// so historical snapshots inherit today's debt.
+class WealthSnapshot {
+  final DateTime at;
+  final int grossAssetsUgx;
+  final int liabilitiesUgx;
+  const WealthSnapshot(
+      {required this.at,
+      required this.grossAssetsUgx,
+      required this.liabilitiesUgx});
+  int get netWorthUgx => grossAssetsUgx - liabilitiesUgx;
+}
+
+/// Derives a portfolio-level snapshot series from the current assets,
+/// liabilities and valuation history. Returns at most [maxPoints] evenly
+/// sampled points so the sparkline stays legible. Returns an empty list if
+/// fewer than two distinct snapshot dates are available.
+List<WealthSnapshot> wealthHistory(
+  Iterable<WealthAsset> assets,
+  Iterable<Liability> liabilities,
+  Iterable<ValuationRecord> valuations, {
+  int maxPoints = 24,
+}) {
+  final activeAssets = assets.where((a) => !a.archived).toList();
+  final activeDebts = liabilities.where((l) => !l.archived).toList();
+  if (activeAssets.isEmpty) return const [];
+
+  final allValuations = valuations.toList()
+    ..sort((a, b) => a.asOf.compareTo(b.asOf));
+
+  // Build the set of relevant dates: every valuation asOf plus each asset's
+  // own valuedAt (its latest known value). We dedupe on day resolution.
+  final rawDates = <DateTime>{};
+  for (final v in allValuations) {
+    rawDates.add(DateTime(v.asOf.year, v.asOf.month, v.asOf.day));
+  }
+  for (final a in activeAssets) {
+    rawDates
+        .add(DateTime(a.valuedAt.year, a.valuedAt.month, a.valuedAt.day));
+  }
+  if (rawDates.length < 2) return const [];
+
+  final sortedDates = rawDates.toList()..sort();
+  final debtTotal = activeDebts.fold<int>(0, (s, l) => s + l.outstandingUgx);
+
+  int valueAt(WealthAsset asset, DateTime date) {
+    final history = allValuations
+        .where((v) => v.assetId == asset.id && !v.asOf.isAfter(date))
+        .toList();
+    final fullValue = history.isNotEmpty
+        ? history.last.fullValueUgx
+        : (!asset.valuedAt.isAfter(date) ? asset.valueUgx : 0);
+    return (fullValue * asset.ownershipBps) ~/ 10000;
+  }
+
+  final rawSnapshots = sortedDates.map((d) {
+    final gross =
+        activeAssets.fold<int>(0, (s, a) => s + valueAt(a, d));
+    return WealthSnapshot(
+        at: d, grossAssetsUgx: gross, liabilitiesUgx: debtTotal);
+  }).toList();
+
+  if (rawSnapshots.length <= maxPoints) return rawSnapshots;
+
+  // Downsample by picking evenly spaced indices while preserving first + last.
+  final step = (rawSnapshots.length - 1) / (maxPoints - 1);
+  return List<WealthSnapshot>.generate(
+      maxPoints, (i) => rawSnapshots[(i * step).round().clamp(0, rawSnapshots.length - 1)]);
+}
