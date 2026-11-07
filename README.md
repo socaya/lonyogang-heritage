@@ -51,4 +51,8 @@ The implementation includes fully navigable Flutter widget screens for: financia
 
 Use the **More** tab to explore these workflows. Reports and asset details also link to contextual analysis pages. The 6.7-inch UI reference images are under assets/reference/screens, and native Flutter preview exports are published by GitHub Actions under the lonyogang-ui-previews-1080x2400 artifact.
 
-0.4.0 makes the local data path real: a passphrase derives an AES-GCM 256 key under PBKDF2-HMAC-SHA-256 (120k iterations), document attachments are encrypted on device, and reminders/document expiries/scheduled contributions schedule real OS notifications via `flutter_local_notifications`. There is still no remote account, no cloud sync, no live FX feed and no payment processing — see `docs/REMAINING_SCREENS.md` for a screen-by-screen map and `docs/SECURITY.md` for the security boundary.
+0.4.0 makes the local data path real: a passphrase derives an AES-GCM 256 key under PBKDF2-HMAC-SHA-256 (120k iterations), document attachments are encrypted on device, and reminders/document expiries/scheduled contributions schedule real OS notifications via `flutter_local_notifications`. See `docs/REMAINING_SCREENS.md` for a screen-by-screen map and `docs/SECURITY.md` for the on-device security boundary.
+
+## Online services (backend)
+
+A full Node 20 + TypeScript + Fastify + Postgres backend lives in `backend/`. It implements identity (passkey + password + TOTP + Shamir recovery), zero-knowledge event-sourced sync with Merkle hashes, S3-presigned attachment relay, FX feed with provider adapters (exchangerate.host, Bank of Uganda, mock), Flutterwave + Stripe webhook receivers, FCM + APNs push, and a Merkle-chained audit log — see `backend/README.md` for the full feature list and `docs/ONLINE_SERVICE_PLAN.md` for the design plan.
