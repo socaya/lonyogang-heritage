@@ -187,13 +187,16 @@ class DebtsScreen extends StatelessWidget {
         const SizedBox(height:8),Text(LG.money(store.totals.liabilities),style:const TextStyle(fontSize:27,color:Colors.white,fontWeight:FontWeight.w800))])),
       const SizedBox(height:18),
       if(debts.isEmpty)const EmptySection(title:'No liabilities recorded',detail:'Add loans and mortgages for an accurate net-worth view.')
-      else ...debts.map((d)=>Padding(padding:const EdgeInsets.only(bottom:10),child:SoftCard(
-        onTap:()=>push(context,LiabilityDetailScreen(store:store,liability:d)),
-        child:Column(children:[Row(children:[const Icon(Icons.account_balance_outlined,color:LG.sage),const SizedBox(width:12),
-          Expanded(child:Text(d.name,style:const TextStyle(fontWeight:FontWeight.w700))),
-          Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
-          const SizedBox(width:6),const Icon(Icons.chevron_right,color:LG.muted,size:18)]),
-          const SizedBox(height:8),InfoLabel(label:'As of',value:LG.date(d.asOf))])))),
+      else ...debts.map((d)=>Padding(padding:const EdgeInsets.only(bottom:10),
+        child:Semantics(container:true,button:true,
+          label:'${d.name}. Outstanding ${LG.money(d.outstandingUgx)}. As of ${LG.date(d.asOf)}.',
+          child:SoftCard(
+          onTap:()=>push(context,LiabilityDetailScreen(store:store,liability:d)),
+          child:Column(children:[Row(children:[const Icon(Icons.account_balance_outlined,color:LG.sage),const SizedBox(width:12),
+            Expanded(child:Text(d.name,style:const TextStyle(fontWeight:FontWeight.w700))),
+            Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
+            const SizedBox(width:6),const Icon(Icons.chevron_right,color:LG.muted,size:18)]),
+            const SizedBox(height:8),InfoLabel(label:'As of',value:LG.date(d.asOf))]))))),
       const SizedBox(height:18),ElevatedButton.icon(onPressed:()=>push(context,LiabilityForm(store:store)),
         icon:const Icon(Icons.add),label:const Text('Add liability')),
     ]);
@@ -290,19 +293,24 @@ class TransactionsScreen extends StatelessWidget {
     final events=[...store.state.events]..sort((a,b)=>b.occurredAt.compareTo(a.occurredAt));
     return ScreenPage(title:'Transactions',subtitle:'A record of money movements and income.',children:[
       if(events.isEmpty)const EmptySection(title:'No transactions yet',detail:'Add contributions, income, rental receipts or expenses.')
-      else ...events.map((e)=>Padding(padding:const EdgeInsets.only(bottom:8),child:SoftCard(
-        onTap:()=>push(context,TransactionDetailScreen(store:store,event:e)),
-        child:Row(children:[
-        Icon(e.kind==EventKind.reversal?Icons.undo:Icons.receipt_long_outlined,color:LG.sage),
-        const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          Text(e.description,style:const TextStyle(fontWeight:FontWeight.w700)),const SizedBox(height:4),
-          Text('${e.kind.name} · ${LG.date(e.occurredAt)}',style:const TextStyle(fontSize:11,color:LG.muted)),
-          if(eventIsReversed(e,events))const Text('Reversed',style:TextStyle(color:LG.negative,fontSize:11)),
-        ])),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
-          Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
-          const SizedBox(height:4),
-          const Icon(Icons.chevron_right,color:LG.muted,size:18),
-        ])])))),
+      else ...events.map((e){
+        final reversed=eventIsReversed(e,events);
+        final label='${e.description}. ${e.kind.name}. ${LG.money(e.amountUgx)}. ${LG.date(e.occurredAt)}.'
+          '${reversed?' Reversed.':''}';
+        return Padding(padding:const EdgeInsets.only(bottom:8),child:Semantics(
+          container:true,button:true,label:label,
+          child:SoftCard(onTap:()=>push(context,TransactionDetailScreen(store:store,event:e)),
+            child:Row(children:[
+            Icon(e.kind==EventKind.reversal?Icons.undo:Icons.receipt_long_outlined,color:LG.sage),
+            const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text(e.description,style:const TextStyle(fontWeight:FontWeight.w700)),const SizedBox(height:4),
+              Text('${e.kind.name} · ${LG.date(e.occurredAt)}',style:const TextStyle(fontSize:11,color:LG.muted)),
+              if(reversed)const Text('Reversed',style:TextStyle(color:LG.negative,fontSize:11)),
+            ])),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
+              Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
+              const SizedBox(height:4),
+              const Icon(Icons.chevron_right,color:LG.muted,size:18),
+            ])]))));}),
       const SizedBox(height:18),ElevatedButton.icon(onPressed:()=>push(context,EventForm(store:store)),
         icon:const Icon(Icons.add),label:const Text('Record transaction')),
     ]);

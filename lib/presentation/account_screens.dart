@@ -1,7 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
+import '../data/sync.dart';
 import 'components.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
@@ -11,7 +13,8 @@ import 'wealth_screens.dart';
 /// the spec wants this clearly labelled rather than silently implied.
 class DataSyncStatusScreen extends StatelessWidget {
   final PortfolioStore store;
-  const DataSyncStatusScreen({super.key, required this.store});
+  final SyncService? sync;
+  const DataSyncStatusScreen({super.key, required this.store, this.sync});
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
       animation: store,
@@ -69,6 +72,16 @@ class DataSyncStatusScreen extends StatelessWidget {
                       value: store.loadError!,
                       valueColor: LG.negative),
               ])),
+              if (store.loadError != null) ...[
+                const SizedBox(height: 10),
+                ErrorState(
+                  message: store.loadError!,
+                  retryLabel: 'Retry load',
+                  onRetry: () async {
+                    await store.load();
+                  },
+                ),
+              ],
               const SizedBox(height: 18),
               const SectionTitle('What is being tracked'),
               SoftCard(
@@ -106,13 +119,7 @@ class DataSyncStatusScreen extends StatelessWidget {
               ])),
               const SizedBox(height: 18),
               const SectionTitle('Remote state'),
-              const SoftCard(
-                  child: Column(children: [
-                InfoLabel(label: 'Cloud sync', value: 'Not connected'),
-                InfoLabel(label: 'Server account', value: 'Not configured'),
-                InfoLabel(label: 'Multi-device access', value: 'Not available'),
-                InfoLabel(label: 'Server-backed recovery', value: 'Not available'),
-              ])),
+              _RemoteStatusCard(sync: sync),
               const SizedBox(height: 18),
               const SecurityNotice(
                 title: 'No silent cloud backup',
@@ -122,6 +129,56 @@ class DataSyncStatusScreen extends StatelessWidget {
               ),
             ]);
       });
+}
+
+/// Compact widget that listens to [SyncService.status] (when supplied) and
+/// renders honest "Not connected" state otherwise. Never claims connectivity
+/// unless the service itself reports [SyncStatus.ready].
+class _RemoteStatusCard extends StatelessWidget {
+  final SyncService? sync;
+  const _RemoteStatusCard({required this.sync});
+  @override
+  Widget build(BuildContext context) {
+    final service = sync;
+    if (service == null) {
+      return const SoftCard(
+          child: Column(children: [
+        InfoLabel(label: 'Cloud sync', value: 'Not connected'),
+        InfoLabel(label: 'Server account', value: 'Not configured'),
+        InfoLabel(label: 'Multi-device access', value: 'Not available'),
+        InfoLabel(label: 'Server-backed recovery', value: 'Not available'),
+      ]));
+    }
+    return ValueListenableBuilder<SyncStatus>(
+      valueListenable: service.status,
+      builder: (context, status, _) {
+        final connected = status == SyncStatus.ready || status == SyncStatus.syncing;
+        return SoftCard(
+            child: Column(children: [
+          InfoLabel(
+              label: 'Cloud sync',
+              value: describeSyncStatus(status),
+              valueColor: connected ? LG.sage : null),
+          InfoLabel(
+              label: 'Server account',
+              value: connected ? 'Configured' : 'Not configured'),
+          InfoLabel(
+              label: 'Multi-device access',
+              value: connected ? 'Available' : 'Not available'),
+          InfoLabel(
+              label: 'Server-backed recovery',
+              value: connected ? 'Available' : 'Not available'),
+          if (service.lastError != null) ...[
+            const Divider(),
+            InfoLabel(
+                label: 'Last sync error',
+                value: service.lastError!,
+                valueColor: LG.negative),
+          ],
+        ]));
+      },
+    );
+  }
 }
 
 /// Entry-point shown in Settings that triggers the full local data reset

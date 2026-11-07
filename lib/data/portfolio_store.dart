@@ -274,6 +274,27 @@ class PortfolioStore extends ChangeNotifier {
   Future<void> restoreDocument(DocumentRecord document) async =>
       upsertDocument(document.copyWith(archived: false));
 
+  /// Maximum attachment size enforced client-side. Larger files are rejected
+  /// before they ever touch disk so we never half-write an encrypted blob.
+  /// The current cap mirrors the online-service plan's free-tier soft limit.
+  static const maxAttachmentBytes = 25 * 1024 * 1024;
+
+  /// Common MIME prefixes we let through. Anything else is rejected so a
+  /// stray `.exe` from a filesystem picker cannot be smuggled into the vault
+  /// disguised as a document.
+  static const allowedMimePrefixes = {
+    'application/pdf',
+    'image/',
+    'text/',
+    'application/json',
+    'application/zip',
+    'application/vnd.oasis.opendocument',
+    'application/vnd.openxmlformats-officedocument',
+    'application/msword',
+    'application/vnd.ms-excel',
+    'application/octet-stream',
+  };
+
   /// Attaches raw [bytes] to [document], encrypts them under the vault key and
   /// writes the AttachmentRef back into the record. Requires an unlocked vault
   /// when a passphrase is set; otherwise falls back to an unprotected on-disk
@@ -281,6 +302,18 @@ class PortfolioStore extends ChangeNotifier {
   /// key) so file bytes are never readable to other apps.
   Future<DocumentRecord> attachFile(DocumentRecord document, List<int> bytes,
       {required String filename, required String mimeType}) async {
+    if (bytes.isEmpty) {
+      throw ArgumentError('Attachment is empty');
+    }
+    if (bytes.length > maxAttachmentBytes) {
+      throw ArgumentError(
+          'Attachment exceeds the ${maxAttachmentBytes ~/ (1024 * 1024)} MB limit');
+    }
+    final acceptable = allowedMimePrefixes
+        .any((prefix) => mimeType == prefix || mimeType.startsWith(prefix));
+    if (!acceptable) {
+      throw ArgumentError('Attachment type "$mimeType" is not allowed');
+    }
     final key = vault.activeKey;
     final ref = await attachments.write(
         documentId: document.id,

@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'core/design.dart';
 import 'data/notifications.dart';
 import 'data/portfolio_store.dart';
+import 'data/sync.dart';
 import 'domain/models.dart';
 import 'presentation/app.dart';
 import 'presentation/onboarding_screens.dart';
@@ -15,7 +16,8 @@ Future<void> main() async {
   final store = PortfolioStore();
   final NotificationScheduler scheduler =
       kIsWeb ? NoopNotificationScheduler() : LocalNotificationScheduler();
-  runApp(LonyoGangApp(store: store, scheduler: scheduler));
+  final SyncService sync = NoopSyncService();
+  runApp(LonyoGangApp(store: store, scheduler: scheduler, sync: sync));
 }
 
 /// Root MaterialApp. Displays [SplashScreen] while the portfolio loads on
@@ -25,11 +27,13 @@ Future<void> main() async {
 class LonyoGangApp extends StatefulWidget {
   final PortfolioStore store;
   final NotificationScheduler? scheduler;
+  final SyncService? sync;
   final Duration? splashDuration;
   const LonyoGangApp(
       {super.key,
       required this.store,
       this.scheduler,
+      this.sync,
       this.splashDuration});
   @override
   State<LonyoGangApp> createState() => _LonyoGangAppState();
