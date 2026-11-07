@@ -5,6 +5,7 @@ import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/finance.dart';
 import '../domain/models.dart';
+import 'components.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
 
@@ -442,4 +443,297 @@ class _ScheduleFormState extends State<ScheduleForm> {
                   ],
                 ]))));
   }
+}
+
+/// Historical wealth trend (F06). Synthesizes net-worth snapshots from the
+/// valuation history and shows an honest "Not enough history" state when
+/// the series is too short to be meaningful.
+class HistoricalTrendScreen extends StatelessWidget {
+  final PortfolioStore store;
+  const HistoricalTrendScreen({super.key, required this.store});
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        final snapshots = wealthHistory(
+            store.state.assets, store.state.liabilities, store.state.valuations);
+        return WealthPage(
+            title: 'Wealth trend',
+            subtitle:
+                'Derived from the dated valuations you have recorded. We never fabricate a growth curve.',
+            children: [
+              if (snapshots.length < 2)
+                const AppEmptyState(
+                  title: 'Not enough history yet',
+                  detail:
+                      'Record at least two dated valuations for any asset to see a wealth trend. The series uses the freshest value known at each date.',
+                  icon: Icons.insights_outlined,
+                )
+              else ...[
+                SoftCard(
+                    color: LG.navy,
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      const Text('RECORDED NET WORTH TREND',
+                          style: TextStyle(
+                              color: Colors.white70,
+                              fontSize: 11,
+                              letterSpacing: 1.4,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                          height: 120,
+                          child: Sparkline(
+                              values: [
+                                for (final s in snapshots)
+                                  s.netWorthUgx.toDouble()
+                              ],
+                              lineColor: LG.gold,
+                              fillColor: LG.gold.withValues(alpha: 0.2))),
+                      const SizedBox(height: 10),
+                      Text(
+                          '${LG.money(snapshots.first.netWorthUgx, compact: true)} → ${LG.money(snapshots.last.netWorthUgx, compact: true)}',
+                          style: const TextStyle(
+                              color: Colors.white, fontWeight: FontWeight.w800)),
+                    ])),
+                const SizedBox(height: 18),
+                const SectionTitle('Snapshots'),
+                SoftCard(
+                    child: Column(
+                        children: [
+                  for (var i = snapshots.length - 1; i >= 0; i--) ...[
+                    Row(children: [
+                      Expanded(
+                          child: Text(LG.date(snapshots[i].at),
+                              style: const TextStyle(
+                                  fontWeight: FontWeight.w700))),
+                      Text(LG.money(snapshots[i].netWorthUgx, compact: true),
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w800)),
+                    ]),
+                    if (i > 0) const Divider(),
+                  ],
+                ])),
+                const SizedBox(height: 16),
+                const Text(
+                    'Liabilities are carried at the current outstanding balance because dated debt history is not yet modelled. Treat older snapshots as directional, not audited.',
+                    style:
+                        TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+              ],
+            ]);
+      });
+}
+
+/// Per-asset performance (F07). Shows the asset's TWR, XIRR, a cashflow
+/// table and a valuation sparkline. Every number is derived from recorded
+/// state — no projections or fabricated curves.
+class AssetPerformanceScreen extends StatelessWidget {
+  final PortfolioStore store;
+  final WealthAsset asset;
+  const AssetPerformanceScreen(
+      {super.key, required this.store, required this.asset});
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        final now = DateTime.now();
+        final metrics = assetReturns(
+            asset, store.state.valuations, store.state.events, now);
+        final history = store.state.valuations
+            .where((v) => v.assetId == asset.id)
+            .toList()
+          ..sort((a, b) => a.asOf.compareTo(b.asOf));
+        final related = store.state.events
+            .where((e) =>
+                e.assetId == asset.id &&
+                e.kind != EventKind.reversal &&
+                !eventIsReversed(e, store.state.events))
+            .toList()
+          ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+
+        String fmt(double? v) =>
+            v == null ? 'Not available yet' : '${(v * 100).toStringAsFixed(1)}%';
+
+        return WealthPage(
+            title: 'Performance',
+            subtitle: asset.name,
+            children: [
+              SoftCard(
+                  color: LG.navy,
+                  child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                    const Text('CURRENT ATTRIBUTABLE VALUE',
+                        style: TextStyle(
+                            color: Colors.white70,
+                            fontSize: 11,
+                            letterSpacing: 1.3,
+                            fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 10),
+                    Text(LG.money(asset.attributableUgx),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 10),
+                    Text(
+                        'Valued ${LG.date(asset.valuedAt)} · ${asset.status.name}',
+                        style: const TextStyle(
+                            color: Colors.white70, fontSize: 12)),
+                  ])),
+              const SizedBox(height: 18),
+              const SectionTitle('Return measures'),
+              SoftCard(
+                  child: Column(children: [
+                InfoLabel(
+                    label: 'Time-weighted return (annualized)',
+                    value: fmt(metrics.twr)),
+                InfoLabel(
+                    label: 'Internal rate of return (XIRR)',
+                    value: fmt(metrics.xirr)),
+                InfoLabel(
+                    label: 'Valuation samples',
+                    value: metrics.sampleCount.toString()),
+                const SizedBox(height: 6),
+                const Text(
+                    'TWR uses dated valuations and excludes the impact of contributions / withdrawals. XIRR folds contributions, distributions and the current value together. Both are pure-Dart derivations with no external benchmark.',
+                    style: TextStyle(
+                        color: LG.muted, fontSize: 11, height: 1.5)),
+              ])),
+              if (history.length >= 2) ...[
+                const SizedBox(height: 18),
+                const SectionTitle('Valuation curve'),
+                SoftCard(
+                    child: SizedBox(
+                        height: 120,
+                        child: Sparkline(
+                            values: [
+                              for (final v in history)
+                                v.fullValueUgx.toDouble()
+                            ],
+                            lineColor: LG.sage,
+                            fillColor: LG.sageSoft))),
+              ],
+              const SizedBox(height: 18),
+              const SectionTitle('Cashflows feeding XIRR'),
+              if (related.isEmpty)
+                const AppEmptyState(
+                    title: 'No linked cashflows',
+                    detail:
+                        'Record contributions, distributions or costs and link them to this asset to feed the XIRR computation.',
+                    icon: Icons.account_balance_wallet_outlined)
+              else
+                SoftCard(
+                    child: Column(children: [
+                  for (var i = 0; i < related.length; i++) ...[
+                    Row(children: [
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                            color: LG.sageSoft,
+                            borderRadius: BorderRadius.circular(10)),
+                        child: Icon(_eventIcon(related[i].kind),
+                            color: LG.sage, size: 18),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                            Text(related[i].description,
+                                style:
+                                    const TextStyle(fontWeight: FontWeight.w700)),
+                            Text(
+                                '${related[i].kind.name} · ${LG.date(related[i].occurredAt)}',
+                                style: const TextStyle(
+                                    color: LG.muted, fontSize: 11)),
+                          ])),
+                      Text(LG.money(related[i].amountUgx, compact: true),
+                          style:
+                              const TextStyle(fontWeight: FontWeight.w800)),
+                    ]),
+                    if (i < related.length - 1) const Divider(),
+                  ]
+                ])),
+            ]);
+      });
+}
+
+IconData _eventIcon(EventKind kind) => switch (kind) {
+      EventKind.contribution => Icons.input,
+      EventKind.withdrawal => Icons.output,
+      EventKind.dividend => Icons.payments_outlined,
+      EventKind.interest => Icons.percent_rounded,
+      EventKind.rent => Icons.home_work_outlined,
+      EventKind.fee => Icons.monetization_on_outlined,
+      EventKind.tax => Icons.receipt_long_outlined,
+      EventKind.expense => Icons.shopping_cart_outlined,
+      EventKind.transfer => Icons.swap_horiz,
+      EventKind.adjustment => Icons.tune,
+      EventKind.reversal => Icons.undo,
+    };
+
+/// Minimal sparkline painter. Avoids pulling in a charting library for a
+/// single-line visualization. No axes, no ticks — the numeric context lives
+/// in surrounding Text widgets so the chart remains honest about what it
+/// shows (relative shape only).
+class Sparkline extends StatelessWidget {
+  final List<double> values;
+  final Color lineColor;
+  final Color fillColor;
+  const Sparkline(
+      {super.key,
+      required this.values,
+      this.lineColor = LG.sage,
+      this.fillColor = LG.sageSoft});
+  @override
+  Widget build(BuildContext context) =>
+      CustomPaint(painter: _SparklinePainter(values, lineColor, fillColor),
+          size: Size.infinite);
+}
+
+class _SparklinePainter extends CustomPainter {
+  final List<double> values;
+  final Color lineColor;
+  final Color fillColor;
+  const _SparklinePainter(this.values, this.lineColor, this.fillColor);
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (values.length < 2) return;
+    var minV = values.first, maxV = values.first;
+    for (final v in values) {
+      if (v < minV) minV = v;
+      if (v > maxV) maxV = v;
+    }
+    if (maxV - minV == 0) {
+      maxV = minV + 1;
+    }
+    final dx = size.width / (values.length - 1);
+    double y(double v) =>
+        size.height - ((v - minV) / (maxV - minV)) * size.height;
+    final line = Path()..moveTo(0, y(values.first));
+    final fill = Path()..moveTo(0, size.height)..lineTo(0, y(values.first));
+    for (var i = 1; i < values.length; i++) {
+      line.lineTo(i * dx, y(values[i]));
+      fill.lineTo(i * dx, y(values[i]));
+    }
+    fill
+      ..lineTo(size.width, size.height)
+      ..close();
+    canvas.drawPath(
+        fill, Paint()..color = fillColor..style = PaintingStyle.fill);
+    canvas.drawPath(
+        line,
+        Paint()
+          ..color = lineColor
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2
+          ..strokeCap = StrokeCap.round);
+  }
+
+  @override
+  bool shouldRepaint(covariant _SparklinePainter old) =>
+      old.values != values || old.lineColor != lineColor;
 }

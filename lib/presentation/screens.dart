@@ -7,7 +7,9 @@ import 'widgets.dart';
 import 'forms.dart';
 import 'wealth_screens.dart';
 import 'legacy_screens.dart';
+import 'account_screens.dart';
 import 'analysis_screens.dart';
+import 'detail_screens.dart';
 import 'security_screens.dart';
 
 Widget paddedBody(List<Widget> children)=>ListView(padding:const EdgeInsets.fromLTRB(22,18,22,28),children:children);
@@ -119,6 +121,10 @@ class AssetDetails extends StatelessWidget {
         child:const Row(children:[Icon(Icons.history,color:LG.sage),SizedBox(width:12),
           Expanded(child:Text('Valuation history',style:TextStyle(fontWeight:FontWeight.w700))),
           Icon(Icons.chevron_right,color:LG.muted)])),
+      const SizedBox(height:10),SoftCard(onTap:()=>push(context,AssetPerformanceScreen(store:store,asset:asset)),
+        child:const Row(children:[Icon(Icons.insights_outlined,color:LG.sage),SizedBox(width:12),
+          Expanded(child:Text('Performance',style:TextStyle(fontWeight:FontWeight.w700))),
+          Icon(Icons.chevron_right,color:LG.muted)])),
       if(asset.kind==AssetKind.property)...[const SizedBox(height:10),
         SoftCard(onTap:()=>push(context,RentalIncomeScreen(store:store)),child:const Row(children:[
           Icon(Icons.real_estate_agent_outlined,color:LG.sage),SizedBox(width:12),
@@ -143,10 +149,12 @@ class DebtsScreen extends StatelessWidget {
         const SizedBox(height:8),Text(LG.money(store.totals.liabilities),style:const TextStyle(fontSize:27,color:Colors.white,fontWeight:FontWeight.w800))])),
       const SizedBox(height:18),
       if(debts.isEmpty)const EmptySection(title:'No liabilities recorded',detail:'Add loans and mortgages for an accurate net-worth view.')
-      else ...debts.map((d)=>Padding(padding:const EdgeInsets.only(bottom:10),child:SoftCard(onTap:()=>push(context,LiabilityForm(store:store,existing:d)),
+      else ...debts.map((d)=>Padding(padding:const EdgeInsets.only(bottom:10),child:SoftCard(
+        onTap:()=>push(context,LiabilityDetailScreen(store:store,liability:d)),
         child:Column(children:[Row(children:[const Icon(Icons.account_balance_outlined,color:LG.sage),const SizedBox(width:12),
           Expanded(child:Text(d.name,style:const TextStyle(fontWeight:FontWeight.w700))),
-          Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800))]),
+          Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
+          const SizedBox(width:6),const Icon(Icons.chevron_right,color:LG.muted,size:18)]),
           const SizedBox(height:8),InfoLabel(label:'As of',value:LG.date(d.asOf))])))),
       const SizedBox(height:18),ElevatedButton.icon(onPressed:()=>push(context,LiabilityForm(store:store)),
         icon:const Icon(Icons.add),label:const Text('Add liability')),
@@ -197,6 +205,9 @@ class ReportsScreen extends StatelessWidget {
         const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.tune_outlined,color:LG.sage),
           title:const Text('Target allocation & drift'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
           onTap:()=>push(context,AllocationScreen(store:store))),
+        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.insights_outlined,color:LG.sage),
+          title:const Text('Historical wealth trend'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+          onTap:()=>push(context,HistoricalTrendScreen(store:store))),
       ])),const SizedBox(height:16),const PrivacyBanner(),
     ]);
   }
@@ -217,13 +228,18 @@ class ReturnsList extends StatelessWidget {
     }
     String fmt(double? v)=>v==null?'—':'${(v*100).toStringAsFixed(1)}%';
     return SoftCard(child:Column(children:[
-      for(final row in rows)Padding(padding:const EdgeInsets.symmetric(vertical:6),
-        child:Row(children:[Expanded(child:Text(row.$1.name,
-          style:const TextStyle(fontWeight:FontWeight.w700))),
-          Text('TWR ${fmt(row.$2.twr)}   XIRR ${fmt(row.$2.xirr)}',
-            style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700))])),
+      for(final row in rows)InkWell(
+        onTap:()=>push(context,AssetPerformanceScreen(store:store,asset:row.$1)),
+        borderRadius:BorderRadius.circular(10),
+        child:Padding(padding:const EdgeInsets.symmetric(vertical:8),
+          child:Row(children:[Expanded(child:Text(row.$1.name,
+            style:const TextStyle(fontWeight:FontWeight.w700))),
+            Text('TWR ${fmt(row.$2.twr)}   XIRR ${fmt(row.$2.xirr)}',
+              style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700)),
+            const SizedBox(width:6),
+            const Icon(Icons.chevron_right,color:LG.muted,size:18)]))),
       const SizedBox(height:4),const Text(
-        'TWR is annualized from recorded valuation dates. XIRR uses contributions, withdrawals and recorded distributions plus the current value.',
+        'Tap an asset to see its cashflows and valuation history. TWR is annualized; XIRR uses contributions, withdrawals and recorded distributions plus the current value.',
         style:TextStyle(color:LG.muted,fontSize:11,height:1.4)),
     ]));
   }
@@ -236,7 +252,9 @@ class TransactionsScreen extends StatelessWidget {
     final events=[...store.state.events]..sort((a,b)=>b.occurredAt.compareTo(a.occurredAt));
     return ScreenPage(title:'Transactions',subtitle:'A record of money movements and income.',children:[
       if(events.isEmpty)const EmptySection(title:'No transactions yet',detail:'Add contributions, income, rental receipts or expenses.')
-      else ...events.map((e)=>Padding(padding:const EdgeInsets.only(bottom:8),child:SoftCard(child:Row(children:[
+      else ...events.map((e)=>Padding(padding:const EdgeInsets.only(bottom:8),child:SoftCard(
+        onTap:()=>push(context,TransactionDetailScreen(store:store,event:e)),
+        child:Row(children:[
         Icon(e.kind==EventKind.reversal?Icons.undo:Icons.receipt_long_outlined,color:LG.sage),
         const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text(e.description,style:const TextStyle(fontWeight:FontWeight.w700)),const SizedBox(height:4),
@@ -244,9 +262,8 @@ class TransactionsScreen extends StatelessWidget {
           if(eventIsReversed(e,events))const Text('Reversed',style:TextStyle(color:LG.negative,fontSize:11)),
         ])),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
           Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
-          if(e.kind!=EventKind.reversal&&!eventIsReversed(e,events))
-            TextButton(onPressed:()=>confirmArchive(context,()=>store.reverseEvent(e),text:'Reverse this posted entry?'),
-              child:const Text('Reverse',style:TextStyle(fontSize:11))),
+          const SizedBox(height:4),
+          const Icon(Icons.chevron_right,color:LG.muted,size:18),
         ])])))),
       const SizedBox(height:18),ElevatedButton.icon(onPressed:()=>push(context,EventForm(store:store)),
         icon:const Icon(Icons.add),label:const Text('Record transaction')),
@@ -296,6 +313,7 @@ class MoreScreen extends StatelessWidget {
       const Divider(),_moreItem(context,Icons.lock_outline,'Encryption',EncryptionSetupScreen(store:store)),
       const Divider(),_moreItem(context,Icons.credit_card_outlined,'Subscription & billing',const SubscriptionScreen()),
       const Divider(),_moreItem(context,Icons.archive_outlined,'Archived records',ArchivedRecordsScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.storage_outlined,'Data & sync status',DataSyncStatusScreen(store:store)),
       const Divider(),_moreItem(context,Icons.settings_outlined,'Settings & data export',SettingsScreen(store:store)),
       const Divider(),_moreItem(context,Icons.help_outline,'Help',const HelpCenterScreen()),
       const Divider(),_moreItem(context,Icons.info_outline,'About LonyoGang',const AboutScreen()),

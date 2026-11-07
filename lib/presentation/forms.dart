@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/models.dart';
+import 'account_screens.dart';
 import 'widgets.dart';
 import 'screens.dart';
 
@@ -277,12 +278,27 @@ class SettingsScreen extends StatelessWidget {
             TextButton(onPressed:()=>Navigator.pop(c,true),child:const Text('Load demo'))]));
         if(yes==true)await store.loadDemo();
       }),
-    ])),const SizedBox(height:22),const SectionTitle('About'),
+    ])),const SizedBox(height:22),const SectionTitle('Device state'),
+    SoftCard(child:Column(children:[
+      ListTile(contentPadding:EdgeInsets.zero,
+        leading:const Icon(Icons.storage_outlined,color:LG.sage),
+        title:const Text('Data & sync status'),
+        subtitle:const Text('Counts, last-saved time, encryption and remote status'),
+        trailing:const Icon(Icons.chevron_right,color:LG.muted),
+        onTap:()=>push(context,DataSyncStatusScreen(store:store))),
+      const Divider(),
+      ListTile(contentPadding:EdgeInsets.zero,
+        leading:const Icon(Icons.restart_alt,color:LG.negative),
+        title:const Text('Reset portfolio',style:TextStyle(color:LG.negative,fontWeight:FontWeight.w800)),
+        subtitle:const Text('Remove every local record, attachment and passphrase'),
+        onTap:()=>runLocalReset(context,store)),
+    ])),
+    const SizedBox(height:22),const SectionTitle('About'),
     const SoftCard(child:Column(children:[InfoLabel(label:'App',value:'LonyoGang Heritage'),
-      InfoLabel(label:'Prototype version',value:'0.3.0'),
+      InfoLabel(label:'Prototype version',value:'0.4.0 local alpha'),
       InfoLabel(label:'Default currency',value:'UGX'),
       InfoLabel(label:'Cloud synchronization',value:'Unavailable'),
-      InfoLabel(label:'Encrypted local storage',value:'Not implemented'),
+      InfoLabel(label:'Encrypted local storage',value:'User-configurable (AES-GCM)'),
       InfoLabel(label:'Subscription / payments',value:'Not connected'),
     ])),
   ]);
