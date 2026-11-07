@@ -23,17 +23,22 @@ async function createVerifiedAccount(email: string) {
     },
   });
   expect(signup.statusCode).toBe(201);
-  const body = signup.json<{ accountId: string; emailCode: string; phoneCode: string }>();
+  const body = signup.json<{ accountId: string; dispatched: { email: boolean; phone: boolean } }>();
+  expect(body.dispatched.email).toBe(true);
+  const emailCode = harness.otp.latestCode(body.accountId, 'email');
+  const phoneCode = harness.otp.latestCode(body.accountId, 'phone');
+  expect(emailCode).toBeTruthy();
+  expect(phoneCode).toBeTruthy();
   const verifyEmail = await harness.app.inject({
     method: 'POST',
     url: '/identity/accounts/verify',
-    payload: { accountId: body.accountId, channel: 'email', code: body.emailCode },
+    payload: { accountId: body.accountId, channel: 'email', code: emailCode },
   });
   expect(verifyEmail.statusCode).toBe(200);
   const verifyPhone = await harness.app.inject({
     method: 'POST',
     url: '/identity/accounts/verify',
-    payload: { accountId: body.accountId, channel: 'phone', code: body.phoneCode },
+    payload: { accountId: body.accountId, channel: 'phone', code: phoneCode },
   });
   expect(verifyPhone.statusCode).toBe(200);
   expect(verifyPhone.json<{ status: string }>().status).toBe('active');
@@ -150,19 +155,20 @@ describe('identity service', () => {
 
   it('runs anti-enumeration password reset', async () => {
     const email = 'reset@example.com';
-    await createVerifiedAccount(email);
+    const accountId = await createVerifiedAccount(email);
+    harness.otp.clear();
     const begin = await harness.app.inject({
       method: 'POST',
       url: '/identity/password/reset/begin',
       payload: { email },
     });
-    expect(begin.statusCode).toBe(200);
-    const { dispatchToken } = begin.json<{ dispatchToken: string }>();
-    expect(dispatchToken).toBeTruthy();
+    expect(begin.statusCode).toBe(202);
+    const dispatched = harness.otp.latestCode(accountId, 'email');
+    expect(dispatched).toBeTruthy();
     const complete = await harness.app.inject({
       method: 'POST',
       url: '/identity/password/reset/complete',
-      payload: { email, token: dispatchToken, newPassword: 'new-password-123' },
+      payload: { email, token: dispatched, newPassword: 'new-password-123' },
     });
     expect(complete.statusCode).toBe(204);
     const oldAttempt = await harness.app.inject({
@@ -187,13 +193,14 @@ describe('identity service', () => {
     expect(newAttempt.statusCode).toBe(200);
   });
 
-  it('produces no dispatchToken for an unknown email (anti-enumeration)', async () => {
+  it('never dispatches a reset code for an unknown email', async () => {
+    harness.otp.clear();
     const begin = await harness.app.inject({
       method: 'POST',
       url: '/identity/password/reset/begin',
       payload: { email: 'nobody@example.com' },
     });
-    expect(begin.statusCode).toBe(200);
-    expect(begin.json<{ dispatchToken: string | null }>().dispatchToken).toBeNull();
+    expect(begin.statusCode).toBe(202);
+    expect(harness.otp.dispatched).toHaveLength(0);
   });
 });

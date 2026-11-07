@@ -2,7 +2,7 @@ import { createHash, randomBytes, timingSafeEqual } from 'node:crypto';
 import sss from 'shamirs-secret-sharing';
 import type { Db } from '../db.js';
 import { queryOne } from '../db.js';
-import type { LocalKms } from '../kms.js';
+import type { KeyStore } from './keystore.js';
 import type { AuditService } from './audit.js';
 
 /**
@@ -15,7 +15,7 @@ import type { AuditService } from './audit.js';
 export class RecoveryService {
   constructor(
     private readonly db: Db,
-    private readonly kms: LocalKms,
+    private readonly kms: KeyStore,
     private readonly audit: AuditService,
   ) {}
 
@@ -33,7 +33,7 @@ export class RecoveryService {
     if (!deviceShare || !serverShare || !printableShare) {
       throw new Error('Shamir split did not produce three shares');
     }
-    const sealedServerShare = this.kms.seal(serverShare, Buffer.from(accountId, 'utf8'));
+    const sealedServerShare = await this.kms.seal(serverShare, Buffer.from(accountId, 'utf8'));
     const printableHash = createHash('sha256').update(printableShare).digest();
     await this.db.query(
       `insert into vault_envelopes (account_id, wrapped_content_key, server_recovery_share, recovery_sheet_hash, version)
@@ -86,7 +86,10 @@ export class RecoveryService {
       });
       throw new Error('Printable share did not match');
     }
-    const serverShare = this.kms.unseal(row.server_recovery_share, Buffer.from(input.accountId, 'utf8'));
+    const serverShare = await this.kms.unseal(
+      row.server_recovery_share,
+      Buffer.from(input.accountId, 'utf8'),
+    );
     await this.audit.record({
       accountId: input.accountId,
       actor: { kind: 'user', id: input.accountId },

@@ -22,20 +22,24 @@ async function session(email: string) {
       phone: '+256700123456',
     },
   });
-  const { accountId, emailCode, phoneCode } = signup.json<{
-    accountId: string;
-    emailCode: string;
-    phoneCode: string;
-  }>();
+  const { accountId } = signup.json<{ accountId: string }>();
   await harness.app.inject({
     method: 'POST',
     url: '/identity/accounts/verify',
-    payload: { accountId, channel: 'email', code: emailCode },
+    payload: {
+      accountId,
+      channel: 'email',
+      code: harness.otp.latestCode(accountId, 'email'),
+    },
   });
   await harness.app.inject({
     method: 'POST',
     url: '/identity/accounts/verify',
-    payload: { accountId, channel: 'phone', code: phoneCode },
+    payload: {
+      accountId,
+      channel: 'phone',
+      code: harness.otp.latestCode(accountId, 'phone'),
+    },
   });
   const signIn = await harness.app.inject({
     method: 'POST',

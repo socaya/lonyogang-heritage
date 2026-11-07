@@ -5,7 +5,7 @@ import sensible from '@fastify/sensible';
 import rateLimit from '@fastify/rate-limit';
 import type { AppConfig } from '../config.js';
 import type { Db } from '../db.js';
-import type { LocalKms } from '../kms.js';
+import type { KeyStore } from '../services/keystore.js';
 import { IdentityService } from '../services/identity.js';
 import { AuditService } from '../services/audit.js';
 import { PasskeyService } from '../services/passkeys.js';
@@ -16,6 +16,13 @@ import { RecoveryService } from '../services/recovery.js';
 import { AggregationService, MockBankProvider, StanbicProvider, MtnMomoProvider } from '../services/aggregation.js';
 import { PaymentsService } from '../services/payments.js';
 import { PushService, ConsolePushTransport, FcmTransport, ApnsTransport } from '../services/push.js';
+import {
+  AfricasTalkingSmsDispatcher,
+  CompositeOtpDispatcher,
+  ConsoleOtpDispatcher,
+  SmtpOtpDispatcher,
+  type OtpDispatcher,
+} from '../services/otp_dispatcher.js';
 import { registerIdentityRoutes } from './routes/identity.js';
 import { registerSyncRoutes } from './routes/sync.js';
 import { registerMiscRoutes } from './routes/misc.js';
@@ -33,9 +40,19 @@ export interface ServerDependencies {
   push: PushService;
 }
 
-export function assembleServices(config: AppConfig, db: Db, kms: LocalKms): ServerDependencies {
+export interface AssembleOverrides {
+  otpDispatcher?: OtpDispatcher;
+}
+
+export function assembleServices(
+  config: AppConfig,
+  db: Db,
+  kms: KeyStore,
+  overrides: AssembleOverrides = {},
+): ServerDependencies {
   const audit = new AuditService(db);
-  const identity = new IdentityService(db, config, kms, audit);
+  const otpDispatcher = overrides.otpDispatcher ?? defaultOtpDispatcher(config);
+  const identity = new IdentityService(db, config, kms, audit, otpDispatcher);
   const passkeys = new PasskeyService(db, config, audit);
   const sync = new SyncService(db, audit);
   const attachments = new AttachmentService(db, config, audit);
@@ -65,6 +82,31 @@ export function assembleServices(config: AppConfig, db: Db, kms: LocalKms): Serv
     push.register(new ConsolePushTransport('apns'));
   }
   return { identity, audit, passkeys, sync, attachments, fx, recovery, aggregation, payments, push };
+}
+
+function defaultOtpDispatcher(config: AppConfig): OtpDispatcher {
+  const children: { email?: OtpDispatcher; sms?: OtpDispatcher } = {};
+  if (config.SMTP_HOST && config.SMTP_FROM) {
+    children.email = new SmtpOtpDispatcher({
+      host: config.SMTP_HOST,
+      port: config.SMTP_PORT,
+      user: config.SMTP_USER,
+      pass: config.SMTP_PASS,
+      secure: config.SMTP_SECURE,
+      from: config.SMTP_FROM,
+    });
+  }
+  if (config.AFRICASTALKING_API_KEY && config.AFRICASTALKING_USERNAME) {
+    children.sms = new AfricasTalkingSmsDispatcher({
+      username: config.AFRICASTALKING_USERNAME,
+      apiKey: config.AFRICASTALKING_API_KEY,
+      senderId: config.AFRICASTALKING_SENDER_ID,
+    });
+  }
+  if (!children.email && !children.sms) {
+    return new ConsoleOtpDispatcher();
+  }
+  return new CompositeOtpDispatcher(children);
 }
 
 export async function buildServer(config: AppConfig, deps: ServerDependencies) {

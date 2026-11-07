@@ -4,9 +4,10 @@ import { authenticator } from 'otplib';
 import type { Db } from '../db.js';
 import { queryOne, queryMany, withTx } from '../db.js';
 import type { AppConfig } from '../config.js';
-import type { LocalKms } from '../kms.js';
+import type { KeyStore } from './keystore.js';
 import { TokenService } from './tokens.js';
 import type { AuditService } from './audit.js';
+import type { OtpDispatcher } from './otp_dispatcher.js';
 
 export interface AccountRow {
   id: string;
@@ -33,8 +34,9 @@ export class IdentityService {
   constructor(
     private readonly db: Db,
     private readonly config: AppConfig,
-    private readonly kms: LocalKms,
+    private readonly kms: KeyStore,
     private readonly audit: AuditService,
+    private readonly dispatcher: OtpDispatcher,
   ) {
     this.tokens = new TokenService(config);
     authenticator.options = { window: 1 };
@@ -44,13 +46,14 @@ export class IdentityService {
 
   /** Creates an account in `pending` state, hashes the password with Argon2id
    *  (plus a configured pepper), generates verification codes for the email
-   *  and (optionally) phone channel and audits the action. */
+   *  and (optionally) phone channel, dispatches the codes through the
+   *  configured [OtpDispatcher] and audits the action. */
   async signUp(input: {
     email: string;
     phone?: string;
     displayName?: string;
     password: string;
-  }): Promise<{ accountId: string; emailCode: string; phoneCode: string | null }> {
+  }): Promise<{ accountId: string; dispatched: { email: boolean; phone: boolean } }> {
     const normalisedEmail = input.email.trim().toLowerCase();
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(normalisedEmail)) {
       throw new ClientError('invalid_email', 'Email is not a valid address');
@@ -101,6 +104,23 @@ export class IdentityService {
       return { accountId, emailCode, phoneCode };
     });
 
+    await this.dispatcher.send({
+      accountId,
+      channel: 'email',
+      code: emailCode,
+      destination: normalisedEmail,
+      purpose: 'signup',
+    });
+    if (input.phone && phoneCode) {
+      await this.dispatcher.send({
+        accountId,
+        channel: 'phone',
+        code: phoneCode,
+        destination: input.phone,
+        purpose: 'signup',
+      });
+    }
+
     await this.audit.record({
       accountId,
       actor: { kind: 'user', id: accountId },
@@ -109,7 +129,10 @@ export class IdentityService {
       context: { email: normalisedEmail, hasPhone: Boolean(input.phone) },
     });
 
-    return { accountId, emailCode, phoneCode };
+    return {
+      accountId,
+      dispatched: { email: true, phone: Boolean(input.phone) },
+    };
   }
 
   /** Verifies one channel. When all pending verifications are consumed the
@@ -202,7 +225,9 @@ export class IdentityService {
       if (!input.totpCode) {
         throw new ClientError('totp_required', 'Second factor is required');
       }
-      const secret = this.kms.unseal(Buffer.from(account.totp_secret, 'base64')).toString('utf8');
+      const secret = (
+        await this.kms.unseal(Buffer.from(account.totp_secret, 'base64'), Buffer.from(account.id, 'utf8'))
+      ).toString('utf8');
       if (!authenticator.check(input.totpCode, secret)) {
         throw new ClientError('bad_totp', 'Second factor code is invalid');
       }
@@ -289,7 +314,9 @@ export class IdentityService {
       [accountId],
     );
     if (!account) throw new ClientError('not_found', 'Account not found');
-    const sealed = this.kms.seal(Buffer.from(secret, 'utf8')).toString('base64');
+    const sealed = (
+      await this.kms.seal(Buffer.from(secret, 'utf8'), Buffer.from(accountId, 'utf8'))
+    ).toString('base64');
     await this.db.query('update accounts set totp_secret = $1 where id = $2', [sealed, accountId]);
     const otpauth = authenticator.keyuri(account.email, 'LonyoGang Heritage', secret);
     await this.audit.record({
@@ -304,28 +331,35 @@ export class IdentityService {
   // ---------- Password reset (anti-enumeration) ----------
 
   /** Initiates recovery. Always succeeds from the client's perspective to
-   *  avoid confirming which emails exist. Returns the generated token only
-   *  for in-process delivery (email provider adapter reads it). */
-  async beginPasswordReset(email: string): Promise<{ token: string | null }> {
+   *  avoid confirming which emails exist. Dispatches the token to the
+   *  configured email provider; the HTTP response never includes it. */
+  async beginPasswordReset(email: string): Promise<void> {
+    const normalised = email.trim().toLowerCase();
     const account = await queryOne<AccountRow>(
       this.db,
-      'select id from accounts where email = $1 and status = $2',
-      [email.trim().toLowerCase(), 'active'],
+      'select id, email from accounts where email = $1 and status = $2',
+      [normalised, 'active'],
     );
-    if (!account) return { token: null };
+    if (!account) return;
     const token = randomBytes(24).toString('base64url');
     await this.db.query(
       `insert into account_verifications (account_id, channel, code_hash, expires_at)
        values ($1, 'email', $2, now() + interval '30 minutes')`,
       [account.id, this.hashCode(token)],
     );
+    await this.dispatcher.send({
+      accountId: account.id,
+      channel: 'email',
+      code: token,
+      destination: account.email,
+      purpose: 'password_reset',
+    });
     await this.audit.record({
       accountId: account.id,
       actor: { kind: 'user', id: account.id },
       action: 'password.reset_requested',
       resource: `account:${account.id}`,
     });
-    return { token };
   }
 
   async completePasswordReset(input: {

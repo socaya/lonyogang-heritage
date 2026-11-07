@@ -9,6 +9,8 @@ import { generateMasterKeyBase64, LocalKms } from '../../src/kms.js';
 import { loadConfig } from '../../src/config.js';
 import { assembleServices, buildServer } from '../../src/http/server.js';
 import { MockBankProvider } from '../../src/services/aggregation.js';
+import { LocalKeyStore } from '../../src/services/keystore.js';
+import { ConsoleOtpDispatcher } from '../../src/services/otp_dispatcher.js';
 
 const migrationsDir = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'migrations');
 
@@ -18,6 +20,7 @@ export interface Harness {
   teardown: () => Promise<void>;
   config: ReturnType<typeof loadConfig>;
   services: ReturnType<typeof assembleServices>;
+  otp: ConsoleOtpDispatcher;
 }
 
 export async function startHarness(): Promise<Harness> {
@@ -52,8 +55,9 @@ export async function startHarness(): Promise<Harness> {
     FX_PROVIDER: 'mock',
   };
   const config = loadConfig(env as NodeJS.ProcessEnv);
-  const kms = new LocalKms(config.KMS_MASTER_KEY_B64);
-  const services = assembleServices(config, pool, kms);
+  const kms = new LocalKeyStore(new LocalKms(config.KMS_MASTER_KEY_B64));
+  const otp = new ConsoleOtpDispatcher();
+  const services = assembleServices(config, pool, kms, { otpDispatcher: otp });
   // Stub out S3 — we don't start a real MinIO in the test harness; attachment
   // tests use a null adapter test where the bucket pre-flight is skipped.
   const app = await buildServer(config, services);
@@ -64,6 +68,7 @@ export async function startHarness(): Promise<Harness> {
     pool,
     config,
     services,
+    otp,
     teardown: async () => {
       await app.close();
       await pool.end();

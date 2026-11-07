@@ -43,6 +43,24 @@ const schema = z.object({
   APNS_KEY_ID: z.string().optional(),
   APNS_PRIVATE_KEY_PEM: z.string().optional(),
   APNS_BUNDLE_ID: z.string().default('com.lonyogang.heritage'),
+
+  // Transactional email (SendGrid/SES/Mailgun/anything SMTP).
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().optional(),
+  SMTP_SECURE: z.coerce.boolean().optional(),
+
+  // Africa's Talking SMS gateway.
+  AFRICASTALKING_USERNAME: z.string().optional(),
+  AFRICASTALKING_API_KEY: z.string().optional(),
+  AFRICASTALKING_SENDER_ID: z.string().optional(),
+
+  // Cloud KMS selection and target key id.
+  KMS_PROVIDER: z.enum(['local', 'aws']).default('local'),
+  KMS_AWS_KEY_ID: z.string().optional(),
+  KMS_AWS_REGION: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof schema>;

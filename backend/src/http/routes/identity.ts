@@ -93,11 +93,13 @@ export async function registerIdentityRoutes(
   });
 
   // ---- Password reset ----
-  app.post('/identity/password/reset/begin', async (req) => {
+  app.post('/identity/password/reset/begin', async (req, reply) => {
     const body = z.object({ email: emailSchema }).parse(req.body);
-    // Always 202 to avoid leaking account existence.
-    const result = await deps.identity.beginPasswordReset(body.email);
-    return { status: 'accepted', dispatchToken: result.token };
+    // Always 202 to avoid leaking account existence. The server dispatches
+    // the reset code through the configured OtpDispatcher; the response
+    // intentionally never carries the code.
+    await deps.identity.beginPasswordReset(body.email);
+    return reply.code(202).send({ status: 'accepted' });
   });
 
   app.post('/identity/password/reset/complete', async (req, reply) => {

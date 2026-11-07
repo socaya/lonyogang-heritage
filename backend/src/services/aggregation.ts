@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { request } from 'undici';
 import type { Db } from '../db.js';
 import { queryMany, queryOne } from '../db.js';
-import type { LocalKms } from '../kms.js';
+import type { KeyStore } from './keystore.js';
 import type { AuditService } from './audit.js';
 
 export interface BankTransaction {
@@ -41,7 +41,7 @@ export class AggregationService {
 
   constructor(
     private readonly db: Db,
-    private readonly kms: LocalKms,
+    private readonly kms: KeyStore,
     private readonly audit: AuditService,
   ) {}
 
@@ -61,7 +61,7 @@ export class AggregationService {
 
   async registerLink(ctx: LinkContext): Promise<{ connectionId: string }> {
     const sealed = ctx.providerToken
-      ? this.kms.seal(Buffer.from(ctx.providerToken, 'utf8'), Buffer.from(ctx.accountId, 'utf8'))
+      ? await this.kms.seal(Buffer.from(ctx.providerToken, 'utf8'), Buffer.from(ctx.accountId, 'utf8'))
       : null;
     const row = await queryOne<{ id: string }>(
       this.db,
@@ -120,7 +120,9 @@ export class AggregationService {
     if (!row) throw new Error('Connection not found or not linked');
     const provider = this.providerFor(row.provider);
     const token = row.secret_cipher
-      ? this.kms.unseal(row.secret_cipher, Buffer.from(accountId, 'utf8')).toString('utf8')
+      ? (
+          await this.kms.unseal(row.secret_cipher, Buffer.from(accountId, 'utf8'))
+        ).toString('utf8')
       : undefined;
     const since = row.last_sync_at ?? undefined;
     const ctx: LinkContext = {
