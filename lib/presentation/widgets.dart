@@ -156,8 +156,8 @@ class PrivacyBanner extends StatelessWidget {
   const PrivacyBanner({super.key});
   @override Widget build(BuildContext context)=>const SoftCard(color:LG.sageSoft,child:Row(children:[
     Icon(Icons.shield_outlined,color:LG.sage,size:27),SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text('Local preview mode',style:TextStyle(fontWeight:FontWeight.w800,fontSize:13)),SizedBox(height:3),
-      Text('Data on this device is not yet encrypted or cloud backed up. Use demonstration values only.',
+      Text('Local alpha mode',style:TextStyle(fontWeight:FontWeight.w800,fontSize:13)),SizedBox(height:3),
+      Text('Optional AES-GCM encryption on this device. No cloud sync. Keep an unencrypted JSON export as your backup.',
         style:TextStyle(fontSize:11,height:1.45,color:LG.muted))
     ]))]));
 }

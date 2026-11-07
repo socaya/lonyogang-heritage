@@ -207,7 +207,8 @@ class _CreateAccountStep1ScreenState extends State<CreateAccountStep1Screen> {
               spacing: 12,
               children: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => const SignInScreen())),
                   child: const Text('Sign in instead',
                       style: TextStyle(color: LG.muted)),
                 ),
@@ -504,6 +505,123 @@ class _OtpBoxes extends StatelessWidget {
             ),
           );
         }),
+      );
+}
+
+/// Sign-in prototype (A06). The spec permits a visually complete design flow
+/// labelled as backend-gated. Any email + length-8+ password proceeds the
+/// flow; no credentials are ever verified.
+class SignInScreen extends StatefulWidget {
+  const SignInScreen({super.key});
+  @override
+  State<SignInScreen> createState() => _SignInScreenState();
+}
+
+class _SignInScreenState extends State<SignInScreen> {
+  final form = GlobalKey<FormState>();
+  final email = TextEditingController();
+  final password = TextEditingController();
+  bool _busy = false;
+  bool _passkeyAttempted = false;
+
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!form.currentState!.validate()) return;
+    setState(() => _busy = true);
+    await Future<void>.delayed(const Duration(milliseconds: 400));
+    if (!mounted) return;
+    setState(() => _busy = false);
+    Navigator.of(context).popUntil((r) => r.isFirst);
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            'Sign-in is a design preview. Open More → Encryption to protect this device.')));
+  }
+
+  @override
+  Widget build(BuildContext context) => AppPage(
+        appBar: const AppHeader(),
+        children: [
+          const Center(child: BrandMark(height: 32)),
+          const SizedBox(height: 28),
+          Text('Welcome back',
+              style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 10),
+          const Text(
+            'Sign in to your LonyoGang owner profile. This preview never sends credentials off the device.',
+            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+          ),
+          const SizedBox(height: 24),
+          Form(
+            key: form,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(children: [
+              FormFieldBlock(
+                title: 'Email',
+                child: TextFormField(
+                  controller: email,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  decoration:
+                      const InputDecoration(hintText: 'you@example.com'),
+                  validator: (v) =>
+                      isLikelyEmail(v ?? '') ? null : 'Enter a valid email',
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Password',
+                child: TextFormField(
+                  controller: password,
+                  obscureText: true,
+                  decoration: const InputDecoration(hintText: 'At least 8 characters'),
+                  validator: (v) => (v == null || v.length < 8)
+                      ? 'Enter at least 8 characters'
+                      : null,
+                ),
+              ),
+            ]),
+          ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => const RecoverAccountScreen())),
+                child: const Text('Forgot access?',
+                    style: TextStyle(color: LG.muted))),
+          ),
+          const SizedBox(height: 4),
+          PrimaryCTA(
+              label: _busy ? 'Signing in…' : 'Sign in',
+              loading: _busy,
+              onPressed: _submit),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+              onPressed: _passkeyAttempted
+                  ? null
+                  : () {
+                      setState(() => _passkeyAttempted = true);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                              content: Text(
+                                  'Passkey enrolment is not available yet. Use the passphrase under More → Encryption.')));
+                    },
+              icon: const Icon(Icons.vpn_key_outlined),
+              label: const Text('Use passkey (not available)')),
+          const SizedBox(height: 18),
+          const SecurityNotice(
+            title: 'Server authentication is still gated',
+            message:
+                'Until backend services are connected, any plausible email and 8+ character password will let you proceed the design flow. Lock the device copy through the passphrase in More → Encryption to protect real data.',
+            icon: Icons.info_outline,
+          ),
+          const SizedBox(height: 18),
+          const _PrototypeDisclaimer(),
+        ],
       );
 }
 

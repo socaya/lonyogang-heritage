@@ -49,7 +49,44 @@ class HomeScreen extends StatelessWidget {
       if(assets.isEmpty)EmptySection(title:'Start building your portfolio',detail:'Add an investment, property or savings account.',onAdd:onAdd)
       else ...assets.take(3).map((a)=>Padding(padding:const EdgeInsets.only(bottom:8),child:AssetTile(asset:a,
         onTap:()=>push(context,AssetDetails(store:store,asset:a))))),
+      const SizedBox(height:18),HomeRecentActivity(store:store),
       const SizedBox(height:18),const PrivacyBanner(),
+    ]);
+  }
+}
+
+/// Short summary of the most recent non-reversed ledger entries, rendered on
+/// Home per spec B06. Tap-through opens the transaction detail. Hidden
+/// entirely when the ledger is empty to avoid an uninformative empty card.
+class HomeRecentActivity extends StatelessWidget {
+  final PortfolioStore store;
+  const HomeRecentActivity({super.key,required this.store});
+  @override Widget build(BuildContext context){
+    final events=store.state.events.where((e)=>e.kind!=EventKind.reversal
+      && !eventIsReversed(e,store.state.events)).toList()
+      ..sort((a,b)=>b.occurredAt.compareTo(a.occurredAt));
+    if(events.isEmpty)return const SizedBox.shrink();
+    final recent=events.take(3).toList();
+    return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      SectionTitle('Recent activity',action:TextButton(
+        onPressed:()=>push(context,TransactionsScreen(store:store)),
+        child:const Text('View all'))),
+      ...recent.map((e)=>Padding(padding:const EdgeInsets.only(bottom:8),
+        child:SoftCard(onTap:()=>push(context,TransactionDetailScreen(store:store,event:e)),
+          padding:const EdgeInsets.symmetric(horizontal:14,vertical:14),
+          child:Row(children:[
+            Container(width:40,height:40,decoration:BoxDecoration(color:LG.sageSoft,
+              borderRadius:BorderRadius.circular(12)),
+              child:const Icon(Icons.receipt_long_outlined,color:LG.sage,size:20)),
+            const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+              Text(e.description,maxLines:1,overflow:TextOverflow.ellipsis,
+                style:const TextStyle(fontWeight:FontWeight.w700,fontSize:14)),
+              Text('${e.kind.name} · ${LG.date(e.occurredAt)}',
+                style:const TextStyle(color:LG.muted,fontSize:11)),
+            ])),Text(LG.money(e.amountUgx,compact:true),
+              style:const TextStyle(fontWeight:FontWeight.w800,fontSize:13)),
+            const SizedBox(width:6),const Icon(Icons.chevron_right,color:LG.muted,size:18),
+          ])))),
     ]);
   }
 }
