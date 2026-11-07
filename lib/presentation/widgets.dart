@@ -74,18 +74,43 @@ String assetTitle(AssetKind kind)=>switch(kind){
 class AssetTile extends StatelessWidget {
   final WealthAsset asset;final VoidCallback onTap;
   const AssetTile({super.key,required this.asset,required this.onTap});
-  @override Widget build(BuildContext context)=>SoftCard(onTap:onTap,padding:const EdgeInsets.symmetric(horizontal:14,vertical:15),child:Row(children:[
-    Container(width:42,height:42,decoration:BoxDecoration(color:LG.sageSoft,borderRadius:BorderRadius.circular(12)),
-      child:Icon(assetIcon(asset.kind),color:LG.sage,size:22)),
-    const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text(asset.name,maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:14,fontWeight:FontWeight.w700)),
-      const SizedBox(height:4),Text('${asset.category.isNotEmpty?asset.category:assetTitle(asset.kind)} · ${LG.date(asset.valuedAt)}',
-        maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11,color:LG.muted)),
-    ])),const SizedBox(width:6),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
-      Text(LG.money(asset.attributableUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800,fontSize:13)),
-      if(asset.ownershipBps<10000)Text('${(asset.ownershipBps/100).toStringAsFixed(0)}% owned',
-        style:const TextStyle(fontSize:10,color:LG.sage)),
-    ]),const SizedBox(width:4),const Icon(Icons.chevron_right_rounded,size:20,color:LG.muted)]));
+  bool get _isStale => DateTime.now().difference(asset.valuedAt).inDays > 365;
+  String get _semanticLabel {
+    final parts=<String>[
+      asset.name,
+      assetTitle(asset.kind),
+      'Attributable value ${LG.money(asset.attributableUgx)}',
+      'Valued ${LG.date(asset.valuedAt)}',
+      if(asset.ownershipBps<10000)'${(asset.ownershipBps/100).toStringAsFixed(0)} percent ownership',
+      if(_isStale)'Valuation is stale',
+    ];
+    return parts.join('. ');
+  }
+  @override Widget build(BuildContext context)=>Semantics(
+    container:true,button:true,label:_semanticLabel,
+    child:SoftCard(onTap:onTap,padding:const EdgeInsets.symmetric(horizontal:14,vertical:15),child:Row(children:[
+      Container(width:42,height:42,decoration:BoxDecoration(color:LG.sageSoft,borderRadius:BorderRadius.circular(12)),
+        child:Icon(assetIcon(asset.kind),color:LG.sage,size:22)),
+      const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Row(children:[
+          Flexible(child:Text(asset.name,maxLines:1,overflow:TextOverflow.ellipsis,
+            style:const TextStyle(fontSize:14,fontWeight:FontWeight.w700))),
+          if(_isStale)...[
+            const SizedBox(width:6),
+            Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:2),
+              decoration:BoxDecoration(color:const Color(0xFFFBF3DD),
+                borderRadius:BorderRadius.circular(999)),
+              child:const Text('Stale',style:TextStyle(
+                color:Color(0xFF8C6A1D),fontSize:10,fontWeight:FontWeight.w800))),
+          ],
+        ]),
+        const SizedBox(height:4),Text('${asset.category.isNotEmpty?asset.category:assetTitle(asset.kind)} · ${LG.date(asset.valuedAt)}',
+          maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11,color:LG.muted)),
+      ])),const SizedBox(width:6),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
+        Text(LG.money(asset.attributableUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800,fontSize:13)),
+        if(asset.ownershipBps<10000)Text('${(asset.ownershipBps/100).toStringAsFixed(0)}% owned',
+          style:const TextStyle(fontSize:10,color:LG.sage)),
+      ]),const SizedBox(width:4),const Icon(Icons.chevron_right_rounded,size:20,color:LG.muted)])));
 }
 
 class WealthBreakdown extends StatelessWidget {

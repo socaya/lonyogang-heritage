@@ -26,14 +26,15 @@ class HomeScreen extends StatelessWidget {
           icon:const Icon(Icons.notifications_none_rounded))]),
       const SizedBox(height:32),Text('Good morning,',style:Theme.of(context).textTheme.bodyMedium?.copyWith(color:LG.muted)),
       Text(store.state.ownerName,style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:24),
-      SoftCard(color:LG.navy,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+      Semantics(container:true,label:'Total net worth ${LG.money(total.netWorth)}, owner-attributable assets minus liabilities',
+        child:SoftCard(color:LG.navy,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Row(children:[Text('TOTAL NET WORTH',style:TextStyle(color:Color(0xFFC3D3D6),fontSize:11,fontWeight:FontWeight.w700,letterSpacing:1.1)),
           Spacer(),Icon(Icons.visibility_outlined,color:Color(0xFFC3D3D6),size:18)]),const SizedBox(height:12),
         FittedBox(fit:BoxFit.scaleDown,alignment:Alignment.centerLeft,child:Text(LG.money(total.netWorth),
           style:const TextStyle(fontSize:31,fontWeight:FontWeight.w800,color:Colors.white))),
         const SizedBox(height:10),const Text('Owner-attributable assets minus liabilities',
           style:TextStyle(fontSize:11,color:Color(0xFFB9C9CF))),
-      ])),const SizedBox(height:14),Row(children:[
+      ]))),const SizedBox(height:14),Row(children:[
         Expanded(child:SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           const Text('Total assets',style:TextStyle(color:LG.muted,fontSize:12)),const SizedBox(height:8),
           FittedBox(child:Text(LG.money(total.grossAssets,compact:true),style:const TextStyle(fontSize:19,fontWeight:FontWeight.w800)))]))),
