@@ -8,7 +8,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lonyogang_heritage/core/design.dart';
 import 'package:lonyogang_heritage/data/portfolio_store.dart';
 import 'package:lonyogang_heritage/domain/models.dart';
+import 'package:lonyogang_heritage/presentation/account_screens.dart';
 import 'package:lonyogang_heritage/presentation/analysis_screens.dart';
+import 'package:lonyogang_heritage/presentation/detail_screens.dart';
 import 'package:lonyogang_heritage/presentation/legacy_screens.dart';
 import 'package:lonyogang_heritage/presentation/onboarding_screens.dart';
 import 'package:lonyogang_heritage/presentation/security_screens.dart';
@@ -70,6 +72,13 @@ void main(){
       ('09-allocation',AllocationScreen(store:store)),
       ('10-fx-rates',FxRatesScreen(store:store)),
       ('11-scheduled-contributions',ScheduledContributionsScreen(store:store)),
+      ('12-historical-trend',HistoricalTrendScreen(store:store)),
+      ('13-asset-performance',AssetPerformanceScreen(store:store,asset:sample)),
+      ('14-transaction-detail',TransactionDetailScreen(store:store,
+        event:store.state.events.firstWhere((e)=>e.id=='demo-rent'))),
+      ('15-liability-detail',LiabilityDetailScreen(store:store,
+        liability:store.state.liabilities.firstWhere((l)=>l.id=='mortgage'))),
+      ('16-data-sync-status',DataSyncStatusScreen(store:store)),
       ('20-financial-position',WealthStatementScreen(store:store)),
       ('21-financial-holdings',InvestmentOverviewScreen(store:store)),
       ('22-portfolio-search',PortfolioSearchScreen(store:store)),

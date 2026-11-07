@@ -22,12 +22,14 @@ LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render
 - `AssetForm`, `LiabilityForm`, `EventForm` (in `forms.dart`).
 - `DebtsScreen`, `TransactionsScreen`.
 
-## Reports (lib/presentation/screens.dart, wealth_screens.dart)
-- F01 `ReportsScreen` with new per-asset TWR/XIRR row via `ReturnsList`.
+## Reports (lib/presentation/screens.dart, wealth_screens.dart, analysis_screens.dart)
+- F01 `ReportsScreen` with new per-asset TWR/XIRR row via `ReturnsList` (tap-to-detail).
 - F02 `WealthStatementScreen`.
 - F04 `CashFlowScreen`.
 - F05 `RentalIncomeScreen`.
-- F08 `AllocationScreen` (lib/presentation/analysis_screens.dart) for target weights & drift.
+- F06 `HistoricalTrendScreen` — dated net-worth snapshots synthesized from `wealthHistory`; honest Not-enough-history empty state.
+- F07 `AssetPerformanceScreen` — per-asset TWR/XIRR with cashflow table and valuation sparkline.
+- F08 `AllocationScreen` for target weights & drift.
 
 ## Planning, legacy, documents (lib/presentation/legacy_screens.dart)
 - G01 `GoalsScreen`.
@@ -42,17 +44,23 @@ LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render
 - H03 `NotificationPreferencesScreen` toggles reminder/document/stale rules; a `LocalNotificationScheduler` (lib/data/notifications.dart) schedules real OS notifications via `flutter_local_notifications`.
 - H04 `RemindersScreen` (in `forms.dart`).
 
-## Account, security, data (lib/presentation/legacy_screens.dart, security_screens.dart, analysis_screens.dart)
+## Account, security, data (lib/presentation/legacy_screens.dart, security_screens.dart, analysis_screens.dart, account_screens.dart)
 - I01 `MoreScreen` navigation hub.
 - I02 `ProfileScreen`.
 - I03 `SecurityCenterScreen` — now reports the live vault/biometric/notification state truthfully.
 - I04 `NotificationPreferencesScreen`.
 - I05 `SubscriptionScreen` (information only).
-- I06 `SettingsScreen` for JSON import/export and demo reset.
+- I06 `SettingsScreen` for JSON import/export, demo load, destructive Reset portfolio and Data & sync status entry.
+- I10 `runLocalReset` — destructive confirmActionSheet-gated reset invoked from Settings; calls `PortfolioStore.resetLocal` to clear every record, attachment and passphrase.
+- I11 `DataSyncStatusScreen` — counts, last-saved timestamp, encryption state, Remote state (explicitly not connected), unencrypted-export reminder.
 - `UnlockScreen` — gates the UI when a passphrase is set and the vault is locked.
 - `EncryptionSetupScreen` — enables, re-links or removes the passphrase and biometric stash.
 - `FxRatesScreen` — offline FX reference entries.
 - `ScheduledContributionsScreen`, `ScheduleForm` — recurring contributions with one-tap post-and-advance.
+
+## Entity detail routes (lib/presentation/detail_screens.dart)
+- E02 `LiabilityDetailScreen` — outstanding balance, lender, linked property, edit + archive/restore with confirmActionSheet.
+- E05 `TransactionDetailScreen` — ledger entry context, linked asset, reversal lineage, Reverse action gated by confirmActionSheet. Append-only invariants preserved.
 
 ## Shared component library (lib/presentation/components.dart)
 `AppPage`, `AppHeader`, `StepProgress`, `PrimaryCTA`, `SecurityNotice`, `StatusChip`, `MoneyField`, `DateField`, `PhoneField`, `confirmActionSheet`, `LoadingState`, `ErrorState`, `AppEmptyState`, `ListHeaderRow`, plus pure-Dart helpers `isLikelyEmail`, `isLikelyName`, `isLikelyPhone`, `recordStatusChip`.

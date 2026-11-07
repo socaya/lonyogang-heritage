@@ -23,6 +23,11 @@
 - **New in 0.4.0 (Phase 1+2)**: Shared component library (`AppPage`, `AppHeader`, `StepProgress`, `PrimaryCTA`, `SecurityNotice`, `StatusChip`, `MoneyField`, `DateField`, `PhoneField`, `confirmActionSheet`, `LoadingState`, `ErrorState`, `AppEmptyState`) in `lib/presentation/components.dart`.
 - **New in 0.4.0 (Phase 1+2)**: `SplashScreen` (A01), canonical flat `CreateAccountStep1Screen` / `CreateAccountStep2Screen` / `OtpVerificationScreen` / `RecoverAccountScreen` prototype flow (A07/A08/A09/A10), three-step `PortfolioSetupScreen` (A12), and `NotFoundScreen` (J12) in `lib/presentation/onboarding_screens.dart`.
 - **New in 0.4.0 (Phase 1+2)**: Visual export preview test now captures the new onboarding and 0.4 screens (step 1/2, recover, portfolio setup, not-found, unlock, encryption, allocation, FX, scheduled contributions).
+- **New in 0.4.0 (Phase 3+4+5)**: Pure-Dart `wealthHistory` synthesizes dated net-worth snapshots from the valuation log. `HistoricalTrendScreen` (F06) renders a sparkline + snapshot table with an honest Not-enough-history empty state.
+- **New in 0.4.0 (Phase 3+4+5)**: `AssetPerformanceScreen` (F07) shows per-asset TWR, XIRR, a valuation sparkline and the cashflow table that feeds XIRR. Reachable from Reports' returns list and AssetDetails.
+- **New in 0.4.0 (Phase 3+4+5)**: `TransactionDetailScreen` (E05) and `LiabilityDetailScreen` (E02) provide drill-through detail with confirmActionSheet-gated Reverse / Archive actions. Append-only invariants preserved.
+- **New in 0.4.0 (Phase 3+4+5)**: `PortfolioStore.resetLocal` wipes every record, attachment and vault configuration on this device. `DataSyncStatusScreen` (I11) reports counts, last-saved time, encryption state and remote-sync absence. Reset exposed via Settings; status reachable from Settings and More.
+- **New in 0.4.0 (Phase 3+4+5)**: `PortfolioStore.lastSavedAt` captures the time of the most recent successful persist.
 
 ## Not production implemented
 - Authenticated remote accounts, passkeys, remote recovery, or protected multi-device access. There is no server-side key escrow for the passphrase.
