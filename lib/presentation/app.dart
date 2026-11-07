@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/models.dart';
+import 'components.dart';
 import 'widgets.dart';
 import 'screens.dart';
+import 'security_screens.dart';
+import 'onboarding_screens.dart';
 import 'forms.dart';
 
 class AppRoot extends StatefulWidget {
@@ -14,6 +17,9 @@ class AppRoot extends StatefulWidget {
 class _AppRootState extends State<AppRoot> {
   int tab=0;
   @override Widget build(BuildContext context)=>AnimatedBuilder(animation:widget.store,builder:(context,_) {
+    if(widget.store.vault.hasPassphrase && !widget.store.isUnlocked){
+      return UnlockScreen(store:widget.store);
+    }
     if(!widget.store.state.onboardingDone)return WelcomeScreen(store:widget.store);
     return Scaffold(
       body:SafeArea(child:IndexedStack(index:tab,children:[
@@ -56,36 +62,65 @@ void openCreateSheet(BuildContext context,PortfolioStore store) {
       ]))));
 }
 
-class WelcomeScreen extends StatefulWidget {
+class WelcomeScreen extends StatelessWidget {
   final PortfolioStore store;
-  const WelcomeScreen({super.key,required this.store});
-  @override State<WelcomeScreen> createState()=>_WelcomeScreenState();
-}
-class _WelcomeScreenState extends State<WelcomeScreen> {
-  final name=TextEditingController();
-  final form=GlobalKey<FormState>();
-  @override void dispose(){name.dispose();super.dispose();}
-  @override Widget build(BuildContext context)=>Scaffold(body:SafeArea(child:SingleChildScrollView(
-    padding:const EdgeInsets.symmetric(horizontal:LG.hPad,vertical:30),child:Form(key:form,child:Column(
-      crossAxisAlignment:CrossAxisAlignment.start,children:[
-        const BrandMark(height:52),const SizedBox(height:70),
-        Text('Your wealth.\nOne view.',style:Theme.of(context).textTheme.headlineMedium?.copyWith(fontSize:42,height:1.13)),
-        const SizedBox(height:20),const Text('A home for your investments, property, savings and lasting worth.',
-          style:TextStyle(color:LG.muted,fontSize:16,height:1.55)),
-        const SizedBox(height:34),const PrivacyBanner(),const SizedBox(height:36),
-        const Text('GET STARTED',style:TextStyle(color:LG.sage,fontWeight:FontWeight.w800,letterSpacing:1.5,fontSize:12)),
-        const SizedBox(height:12),const Text('What should we call your portfolio?',style:TextStyle(fontWeight:FontWeight.w700)),
-        const SizedBox(height:8),TextFormField(controller:name,textCapitalization:TextCapitalization.words,
-          textInputAction:TextInputAction.done,decoration:const InputDecoration(hintText:'e.g. My family wealth'),
-          validator:(v)=>v==null||v.trim().length<2?'Enter at least two characters':null),
-        const SizedBox(height:18),ElevatedButton(onPressed:()async{
-          if(!form.currentState!.validate())return;
-          await widget.store.setOwner(name.text);
-        },child:const Row(mainAxisAlignment:MainAxisAlignment.center,children:[Text('Create local portfolio'),SizedBox(width:12),Icon(Icons.arrow_forward)])),
-        const SizedBox(height:14),Center(child:TextButton(onPressed:() async{
-          await widget.store.loadDemo();
-        },child:const Text('Explore with sample data'))),
-        const SizedBox(height:24),const Text('No real account or cloud sign-in is created in this preview.',
-          style:TextStyle(fontSize:12,color:LG.muted),textAlign:TextAlign.center),
-      ])))));
+  const WelcomeScreen({super.key, required this.store});
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        backgroundColor: LG.canvas,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: LG.hPad, vertical: 30),
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const BrandMark(height: 48),
+              const SizedBox(height: 56),
+              Text('Your wealth.\nOne view.',
+                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontSize: 42, height: 1.13)),
+              const SizedBox(height: 18),
+              const Text(
+                  'A home for your investments, property, savings and lasting worth.',
+                  style: TextStyle(color: LG.muted, fontSize: 16, height: 1.55)),
+              const SizedBox(height: 28),
+              const SecurityNotice(
+                title: 'Local preview mode',
+                message:
+                    'Everything stays on this device. Enable a passphrase from More → Encryption once you have real data worth protecting.',
+              ),
+              const SizedBox(height: 32),
+              PrimaryCTA(
+                label: 'Create local portfolio',
+                onPressed: () async {
+                  await Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => PortfolioSetupScreen(store: store)));
+                },
+              ),
+              const SizedBox(height: 10),
+              Center(
+                child: TextButton(
+                  onPressed: () async => store.loadDemo(),
+                  child: const Text('Explore with sample data'),
+                ),
+              ),
+              const SizedBox(height: 4),
+              Center(
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => const CreateAccountStep1Screen())),
+                  child: const Text('View account design preview',
+                      style: TextStyle(color: LG.muted)),
+                ),
+              ),
+              const SizedBox(height: 18),
+              const Center(
+                child: Text(
+                  'No real account or cloud sign-in is created in this preview.',
+                  style: TextStyle(fontSize: 12, color: LG.muted),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ]),
+          ),
+        ),
+      );
 }

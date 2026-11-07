@@ -1,7 +1,7 @@
 name: lonyogang_heritage
 description: LonyoGang Heritage — personal wealth, assets and legacy tracker.
 publish_to: none
-version: 0.3.0+2
+version: 0.4.0+3
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -11,6 +11,13 @@ dependencies:
     sdk: flutter
   intl: ^0.20.2
   shared_preferences: ^2.5.3
+  cryptography: ^2.7.0
+  local_auth: ^2.3.0
+  flutter_local_notifications: ^17.2.4
+  timezone: ^0.9.4
+  file_picker: ^8.1.2
+  path_provider: ^2.1.5
+  open_filex: ^4.5.0
 
 dev_dependencies:
   flutter_test:

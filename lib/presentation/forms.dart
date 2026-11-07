@@ -3,6 +3,8 @@ import 'package:flutter/services.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/models.dart';
+import 'account_screens.dart';
+import 'components.dart';
 import 'widgets.dart';
 import 'screens.dart';
 
@@ -161,33 +163,215 @@ class _EventFormState extends State<EventForm>{
 
 class GoalsScreen extends StatelessWidget {
   final PortfolioStore store;
-  const GoalsScreen({super.key,required this.store});
-  @override Widget build(BuildContext context)=>ScreenPage(title:'Wealth goals',subtitle:'Make long-term progress visible.',children:[
-    if(store.state.goals.isEmpty)const EmptySection(title:'No goals yet',detail:'Create a goal to track your financial priorities.')
-    else ...store.state.goals.map((g)=>Padding(padding:const EdgeInsets.only(bottom:10),child:SoftCard(child:Column(
-      crossAxisAlignment:CrossAxisAlignment.start,children:[Row(children:[Expanded(child:Text(g.name,
-        style:const TextStyle(fontWeight:FontWeight.w800))),IconButton(icon:const Icon(Icons.delete_outline,color:LG.muted),
-        onPressed:()=>store.deleteGoal(g.id))]),
-        const SizedBox(height:10),LinearProgressIndicator(value:g.targetUgx<=0?0:(g.savedUgx/g.targetUgx).clamp(0.0,1.0).toDouble(),
-          minHeight:8,color:LG.sage,backgroundColor:LG.sageSoft,borderRadius:BorderRadius.circular(7)),
-        const SizedBox(height:9),Text('${LG.money(g.savedUgx)} of ${LG.money(g.targetUgx)}',
-          style:const TextStyle(fontSize:12,color:LG.muted))])))),
-    const SizedBox(height:16),ElevatedButton.icon(onPressed:()=>_goalDialog(context,store),icon:const Icon(Icons.add),label:const Text('Add wealth goal')),
-  ]);
+  const GoalsScreen({super.key, required this.store});
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        final goals = store.state.goals;
+        return ScreenPage(
+            title: 'Wealth goals',
+            subtitle: 'Make long-term progress visible.',
+            children: [
+              if (goals.isEmpty)
+                const AppEmptyState(
+                  title: 'No goals yet',
+                  detail: 'Create a goal to track your financial priorities.',
+                  icon: Icons.track_changes_outlined,
+                )
+              else
+                ...goals.map((g) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SoftCard(
+                        onTap: () => push(context, GoalForm(store: store, existing: g)),
+                        child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(children: [
+                                Expanded(
+                                    child: Text(g.name,
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.w800))),
+                                if (g.targetDate != null) ...[
+                                  StatusChip(
+                                      label: 'Due ${LG.date(g.targetDate!)}',
+                                      tone: g.targetDate!.isBefore(DateTime.now())
+                                          ? StatusTone.warn
+                                          : StatusTone.info),
+                                  const SizedBox(width: 6),
+                                ],
+                                const Icon(Icons.chevron_right, color: LG.muted),
+                              ]),
+                              const SizedBox(height: 10),
+                              LinearProgressIndicator(
+                                  value: g.targetUgx <= 0
+                                      ? 0
+                                      : (g.savedUgx / g.targetUgx)
+                                          .clamp(0.0, 1.0)
+                                          .toDouble(),
+                                  minHeight: 8,
+                                  color: LG.sage,
+                                  backgroundColor: LG.sageSoft,
+                                  borderRadius: BorderRadius.circular(7)),
+                              const SizedBox(height: 9),
+                              Text(
+                                  '${LG.money(g.savedUgx)} of ${LG.money(g.targetUgx)}',
+                                  style: const TextStyle(
+                                      fontSize: 12, color: LG.muted)),
+                            ]),
+                      ),
+                    )),
+              const SizedBox(height: 16),
+              ElevatedButton.icon(
+                  onPressed: () => push(context, GoalForm(store: store)),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add wealth goal')),
+            ]);
+      });
 }
-Future<void> _goalDialog(BuildContext context,PortfolioStore store)async{
-  final name=TextEditingController(),target=TextEditingController(),saved=TextEditingController(text:'0');
-  final form=GlobalKey<FormState>();
-  await showDialog<void>(context:context,builder:(c)=>AlertDialog(title:const Text('Create goal'),content:Form(key:form,child:Column(mainAxisSize:MainAxisSize.min,children:[
-    TextFormField(controller:name,decoration:const InputDecoration(labelText:'Goal name'),validator:(v)=>v!.trim().isEmpty?'Required':null),
-    const SizedBox(height:10),TextFormField(controller:target,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Target (UGX)'),
-      validator:(v){final n=parseAmount(v??'');return n==null||n<=0?'Enter positive target':null;}),
-    const SizedBox(height:10),TextFormField(controller:saved,keyboardType:TextInputType.number,decoration:const InputDecoration(labelText:'Saved so far (UGX)'),validator:requireAmount),
-  ])),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('Cancel')),
-    TextButton(onPressed:()async{if(!form.currentState!.validate())return;
-      await store.addGoal(WealthGoal(id:makeId(),name:name.text.trim(),targetUgx:parseAmount(target.text)!,savedUgx:parseAmount(saved.text)!));
-      if(c.mounted)Navigator.pop(c);},child:const Text('Save'))]));
-  name.dispose();target.dispose();saved.dispose();
+
+/// Full-screen goal editor (G02). Previously only a create AlertDialog existed;
+/// this adds a real form with a target date and an Archive-equivalent remove.
+class GoalForm extends StatefulWidget {
+  final PortfolioStore store;
+  final WealthGoal? existing;
+  const GoalForm({super.key, required this.store, this.existing});
+  @override
+  State<GoalForm> createState() => _GoalFormState();
+}
+
+class _GoalFormState extends State<GoalForm> {
+  final form = GlobalKey<FormState>();
+  late final name = TextEditingController(text: widget.existing?.name ?? '');
+  late final target =
+      TextEditingController(text: widget.existing?.targetUgx.toString() ?? '');
+  late final saved = TextEditingController(
+      text: widget.existing?.savedUgx.toString() ?? '0');
+  late DateTime? targetDate = widget.existing?.targetDate;
+  bool saving = false;
+
+  @override
+  void dispose() {
+    name.dispose();
+    target.dispose();
+    saved.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!form.currentState!.validate()) return;
+    final targetUgx = parseAmount(target.text)!;
+    final savedUgx = parseAmount(saved.text) ?? 0;
+    if (savedUgx > targetUgx) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Saved amount cannot exceed the target')));
+      return;
+    }
+    setState(() => saving = true);
+    try {
+      await widget.store.upsertGoal(WealthGoal(
+          id: widget.existing?.id ?? makeId(),
+          name: name.text.trim(),
+          targetUgx: targetUgx,
+          savedUgx: savedUgx,
+          targetDate: targetDate));
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text('Could not save goal: $e')));
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    final existing = widget.existing;
+    if (existing == null) return;
+    final confirm = await confirmActionSheet(context,
+        title: 'Remove this goal?',
+        consequence:
+            'Progress will be deleted. This does not change any linked asset balance.',
+        confirmLabel: 'Remove');
+    if (!confirm) return;
+    await widget.store.deleteGoal(existing.id);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) => AppPage(
+        appBar: const AppHeader(),
+        children: [
+          PageHeading(widget.existing == null ? 'New wealth goal' : 'Edit goal',
+              subtitle:
+                  'A target you want to reach, tracked against the amount you have already set aside.'),
+          Form(
+              key: form,
+              child: Column(children: [
+                FormFieldBlock(
+                    title: 'Goal name',
+                    child: TextFormField(
+                        controller: name,
+                        decoration: const InputDecoration(
+                            hintText: 'e.g. Land purchase, school fees'),
+                        validator: (v) => v == null || v.trim().length < 2
+                            ? 'Enter at least two characters'
+                            : null)),
+                FormFieldBlock(
+                    title: 'Target (UGX)',
+                    child: MoneyField(
+                        controller: target, hint: 'Required target amount')),
+                FormFieldBlock(
+                    title: 'Saved so far (UGX)',
+                    child: MoneyField(
+                        controller: saved,
+                        required: false,
+                        hint: 'Enter 0 if you have not started yet')),
+                FormFieldBlock(
+                    title: 'Target date (optional)',
+                    help: 'Leave blank for an open-ended goal.',
+                    child: SoftCard(
+                        onTap: () async {
+                          final v = await showDatePicker(
+                              context: context,
+                              initialDate: targetDate ??
+                                  DateTime.now().add(const Duration(days: 365)),
+                              firstDate: DateTime.now()
+                                  .subtract(const Duration(days: 30)),
+                              lastDate: DateTime(2100));
+                          if (v != null) setState(() => targetDate = v);
+                        },
+                        child: Row(children: [
+                          const Icon(Icons.event_outlined,
+                              color: LG.sage, size: 18),
+                          const SizedBox(width: 10),
+                          Text(targetDate == null
+                              ? 'No target date set'
+                              : LG.date(targetDate!)),
+                          const Spacer(),
+                          if (targetDate != null)
+                            IconButton(
+                                tooltip: 'Clear target date',
+                                onPressed: () => setState(() => targetDate = null),
+                                icon: const Icon(Icons.close,
+                                    color: LG.muted, size: 18))
+                        ]))),
+              ])),
+          PrimaryCTA(
+              label: saving ? 'Saving…' : 'Save goal',
+              loading: saving,
+              onPressed: _save),
+          if (widget.existing != null) ...[
+            const SizedBox(height: 10),
+            TextButton(
+                onPressed: _delete,
+                child: const Text('Remove goal',
+                    style: TextStyle(color: LG.negative))),
+          ],
+        ],
+      );
 }
 
 class LegacyScreen extends StatelessWidget {
@@ -277,12 +461,27 @@ class SettingsScreen extends StatelessWidget {
             TextButton(onPressed:()=>Navigator.pop(c,true),child:const Text('Load demo'))]));
         if(yes==true)await store.loadDemo();
       }),
-    ])),const SizedBox(height:22),const SectionTitle('About'),
+    ])),const SizedBox(height:22),const SectionTitle('Device state'),
+    SoftCard(child:Column(children:[
+      ListTile(contentPadding:EdgeInsets.zero,
+        leading:const Icon(Icons.storage_outlined,color:LG.sage),
+        title:const Text('Data & sync status'),
+        subtitle:const Text('Counts, last-saved time, encryption and remote status'),
+        trailing:const Icon(Icons.chevron_right,color:LG.muted),
+        onTap:()=>push(context,DataSyncStatusScreen(store:store))),
+      const Divider(),
+      ListTile(contentPadding:EdgeInsets.zero,
+        leading:const Icon(Icons.restart_alt,color:LG.negative),
+        title:const Text('Reset portfolio',style:TextStyle(color:LG.negative,fontWeight:FontWeight.w800)),
+        subtitle:const Text('Remove every local record, attachment and passphrase'),
+        onTap:()=>runLocalReset(context,store)),
+    ])),
+    const SizedBox(height:22),const SectionTitle('About'),
     const SoftCard(child:Column(children:[InfoLabel(label:'App',value:'LonyoGang Heritage'),
-      InfoLabel(label:'Prototype version',value:'0.3.0'),
+      InfoLabel(label:'Prototype version',value:'0.4.0 local alpha'),
       InfoLabel(label:'Default currency',value:'UGX'),
       InfoLabel(label:'Cloud synchronization',value:'Unavailable'),
-      InfoLabel(label:'Encrypted local storage',value:'Not implemented'),
+      InfoLabel(label:'Encrypted local storage',value:'User-configurable (AES-GCM)'),
       InfoLabel(label:'Subscription / payments',value:'Not connected'),
     ])),
   ]);
