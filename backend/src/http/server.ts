@@ -207,6 +207,8 @@ export async function buildServer(
     },
   });
 
+  (app as unknown as { opsSecret?: string }).opsSecret = config.OPS_SHARED_SECRET;
+
   app.get('/healthz', async (_req, reply) => {
     const checks: Record<string, { status: 'ok' | 'degraded' | 'fail'; latencyMs: number; error?: string }> = {};
     const start = (): [bigint] => [process.hrtime.bigint()];

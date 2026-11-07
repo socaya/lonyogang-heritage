@@ -70,6 +70,11 @@ const schema = z.object({
   // Transparency anchor notary. `in_memory` keeps anchors local only;
   // `opentimestamps` submits each tip hash to the public OTS calendars.
   TRANSPARENCY_NOTARY: z.enum(['in_memory', 'opentimestamps']).default('in_memory'),
+
+  // Shared secret required by /ops/* endpoints (push send, admin tools).
+  // The ops caller presents it in the `x-ops-token` header. Leave blank to
+  // disable the ops surface entirely.
+  OPS_SHARED_SECRET: z.string().optional(),
 });
 
 export type AppConfig = z.infer<typeof schema>;

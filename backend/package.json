@@ -14,6 +14,7 @@
     "migrate": "tsx src/scripts/migrate.ts",
     "migrate:reset": "tsx src/scripts/migrate.ts --reset",
     "anchor": "tsx src/scripts/anchor.ts",
+    "ropa": "tsx src/scripts/ropa.ts",
     "lint": "eslint src tests",
     "test": "vitest run",
     "test:watch": "vitest",

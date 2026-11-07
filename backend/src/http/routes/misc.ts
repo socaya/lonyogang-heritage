@@ -225,6 +225,24 @@ export async function registerMiscRoutes(
   });
 
   // ---- Push ----
+  // ---- Ops push send ----
+  app.post('/ops/push/send', async (req, reply) => {
+    const expected = (req.server as unknown as { opsSecret?: string }).opsSecret;
+    const presented = req.headers['x-ops-token'];
+    if (!expected) return reply.code(503).send({ error: 'ops_disabled' });
+    if (presented !== expected) return reply.code(401).send({ error: 'unauthorized' });
+    const body = z
+      .object({
+        accountId: z.string().uuid(),
+        title: z.string().min(1).max(120),
+        body: z.string().min(1).max(500),
+        alertId: z.string().min(1).max(128),
+      })
+      .parse(req.body);
+    const result = await deps.push.send(body);
+    return result;
+  });
+
   app.post('/push/tokens', { preHandler: auth }, async (req, reply) => {
     const body = z
       .object({
