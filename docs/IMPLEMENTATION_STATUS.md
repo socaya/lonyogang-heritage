@@ -28,6 +28,10 @@
 - **New in 0.4.0 (Phase 3+4+5)**: `TransactionDetailScreen` (E05) and `LiabilityDetailScreen` (E02) provide drill-through detail with confirmActionSheet-gated Reverse / Archive actions. Append-only invariants preserved.
 - **New in 0.4.0 (Phase 3+4+5)**: `PortfolioStore.resetLocal` wipes every record, attachment and vault configuration on this device. `DataSyncStatusScreen` (I11) reports counts, last-saved time, encryption state and remote-sync absence. Reset exposed via Settings; status reachable from Settings and More.
 - **New in 0.4.0 (Phase 3+4+5)**: `PortfolioStore.lastSavedAt` captures the time of the most recent successful persist.
+- **New in 0.4.0 (Phase 5+6 polish)**: Full-screen `GoalForm` (G02) replaces the old single-dialog flow — add + edit, optional target date, saved-exceeds-target guard, destructive remove through `confirmActionSheet`.
+- **New in 0.4.0 (Phase 5+6 polish)**: `DocumentDetailScreen` (G09) separates metadata from the attachment lifecycle; `DocumentFormScreen` is now a pure metadata editor.
+- **New in 0.4.0 (Phase 5+6 polish)**: Pure-Dart `buildLocalAlerts` plus `NotificationDetailScreen` (H02); the alert center routes through detail rather than straight to source screens.
+- **New in 0.4.0 (Phase 5+6 polish)**: `AssetTile` shows a Stale pill when the recorded valuation is older than 365 days and carries a descriptive `Semantics` label; `PrimaryCTA` and the Home net-worth hero are also Semantics-annotated for TalkBack/VoiceOver.
 
 ## Not production implemented
 - Authenticated remote accounts, passkeys, remote recovery, or protected multi-device access. There is no server-side key escrow for the passphrase.

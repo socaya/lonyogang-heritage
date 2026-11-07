@@ -11,6 +11,7 @@ import 'package:lonyogang_heritage/domain/models.dart';
 import 'package:lonyogang_heritage/presentation/account_screens.dart';
 import 'package:lonyogang_heritage/presentation/analysis_screens.dart';
 import 'package:lonyogang_heritage/presentation/detail_screens.dart';
+import 'package:lonyogang_heritage/presentation/forms.dart';
 import 'package:lonyogang_heritage/presentation/legacy_screens.dart';
 import 'package:lonyogang_heritage/presentation/onboarding_screens.dart';
 import 'package:lonyogang_heritage/presentation/security_screens.dart';
@@ -79,6 +80,11 @@ void main(){
       ('15-liability-detail',LiabilityDetailScreen(store:store,
         liability:store.state.liabilities.firstWhere((l)=>l.id=='mortgage'))),
       ('16-data-sync-status',DataSyncStatusScreen(store:store)),
+      ('17-document-detail',DocumentDetailScreen(store:store,
+        document:store.state.documents.firstWhere((d)=>d.id=='demo-document'))),
+      ('18-goal-form',GoalForm(store:store)),
+      ('19-notification-detail',NotificationDetailScreen(store:store,
+        alert:buildLocalAlerts(store.state,DateTime.now()).first)),
       ('20-financial-position',WealthStatementScreen(store:store)),
       ('21-financial-holdings',InvestmentOverviewScreen(store:store)),
       ('22-portfolio-search',PortfolioSearchScreen(store:store)),

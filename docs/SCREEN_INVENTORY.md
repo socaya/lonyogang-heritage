@@ -31,16 +31,19 @@ LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render
 - F07 `AssetPerformanceScreen` — per-asset TWR/XIRR with cashflow table and valuation sparkline.
 - F08 `AllocationScreen` for target weights & drift.
 
-## Planning, legacy, documents (lib/presentation/legacy_screens.dart)
-- G01 `GoalsScreen`.
+## Planning, legacy, documents (lib/presentation/legacy_screens.dart, forms.dart, detail_screens.dart)
+- G01 `GoalsScreen` — rows tap to edit.
+- G02 `GoalForm` (full-screen) — add + edit flow with optional target date, saved-exceeds-target guard and destructive remove.
 - G04 `BeneficiariesScreen`, `BeneficiaryFormScreen`.
 - G06 `LegacyScreen` for trusted contacts.
-- G07 `DocumentsScreen`.
-- G08 `DocumentFormScreen` — now handles real AES-GCM encrypted attachments via `file_picker` and `open_filex`; integrity verified with SHA-256 on read.
+- G07 `DocumentsScreen` — rows tap to detail.
+- G08 `DocumentFormScreen` — pure metadata editor (title, category, linked asset, dates, notes).
+- G09 `DocumentDetailScreen` — landing with metadata card, attachment lifecycle (attach via `file_picker`, decrypt + preview via `open_filex`, SHA-256 integrity), Edit metadata CTA, Archive/Restore.
 - G10 `ArchivedRecordsScreen`.
 
 ## Notifications, reminders (lib/presentation/legacy_screens.dart)
-- H01 `NotificationsCenterScreen` derives alerts from state.
+- H01 `NotificationsCenterScreen` derives alerts from state via pure-Dart `buildLocalAlerts`; rows tap to detail.
+- H02 `NotificationDetailScreen` — shows source kind, detail, dated occurrence and an Open-source-record CTA that routes to the originating screen.
 - H03 `NotificationPreferencesScreen` toggles reminder/document/stale rules; a `LocalNotificationScheduler` (lib/data/notifications.dart) schedules real OS notifications via `flutter_local_notifications`.
 - H04 `RemindersScreen` (in `forms.dart`).
 
