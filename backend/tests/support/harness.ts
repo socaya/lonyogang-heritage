@@ -60,7 +60,7 @@ export async function startHarness(): Promise<Harness> {
   const services = assembleServices(config, pool, kms, { otpDispatcher: otp });
   // Stub out S3 — we don't start a real MinIO in the test harness; attachment
   // tests use a null adapter test where the bucket pre-flight is skipped.
-  const app = await buildServer(config, services);
+  const app = await buildServer(config, services, { db: pool, kms });
   await app.ready();
 
   return {

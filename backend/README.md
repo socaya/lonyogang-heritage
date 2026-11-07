@@ -89,6 +89,21 @@ The vitest suite boots a disposable Postgres container through
   `subscription.updated`, …) append to a per-account hash-chained audit
   log.
 
+## API contract
+
+- `GET /openapi.json` serves an OpenAPI 3.1 schema built from the hand-written
+  spec in `src/http/openapi.ts`; the vitest suite diffs it against the
+  live route list so drift is caught in CI.
+- `GET /healthz` is a deep check: probes Postgres, the KMS adapter and the
+  S3 bucket, reports per-dependency latency, and surfaces the DPO contact
+  so operators can keep the compliance notice up to date.
+
+## Compliance
+
+Uganda Data Protection and Privacy Act, 2019 obligations are tracked in
+`../docs/COMPLIANCE_UG_DPPA_2019.md` with a per-right endpoint map, data
+inventory, cross-border declaration and breach runbook.
+
 ## Remaining operational work before production
 
 - Deliver email + SMS OTP via a real provider (SES, SendGrid, Africa's

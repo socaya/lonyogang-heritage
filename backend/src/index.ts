@@ -16,7 +16,7 @@ async function main() {
   await services.attachments.ensureBucket().catch((err) => {
     console.warn('S3 bucket pre-flight failed:', err);
   });
-  const server = await buildServer(config, services);
+  const server = await buildServer(config, services, { db, kms });
   await server.listen({ port: config.PORT, host: '0.0.0.0' });
   const shutdown = async (signal: string) => {
     server.log.info({ signal }, 'shutting down');

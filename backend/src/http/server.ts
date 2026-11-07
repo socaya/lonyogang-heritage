@@ -33,6 +33,8 @@ import {
 import { registerIdentityRoutes } from './routes/identity.js';
 import { registerSyncRoutes } from './routes/sync.js';
 import { registerMiscRoutes } from './routes/misc.js';
+import { buildOpenApi } from './openapi.js';
+import { HeadBucketCommand } from '@aws-sdk/client-s3';
 
 export interface ServerDependencies {
   identity: IdentityService;
@@ -151,7 +153,11 @@ function defaultOtpDispatcher(config: AppConfig): OtpDispatcher {
   return new CompositeOtpDispatcher(children);
 }
 
-export async function buildServer(config: AppConfig, deps: ServerDependencies) {
+export async function buildServer(
+  config: AppConfig,
+  deps: ServerDependencies,
+  options: { db?: Db; kms?: KeyStore } = {},
+) {
   const app = Fastify({
     logger: {
       level: config.LOG_LEVEL,
@@ -179,7 +185,60 @@ export async function buildServer(config: AppConfig, deps: ServerDependencies) {
     },
   });
 
-  app.get('/healthz', async () => ({ status: 'ok' }));
+  app.get('/healthz', async (_req, reply) => {
+    const checks: Record<string, { status: 'ok' | 'degraded' | 'fail'; latencyMs: number; error?: string }> = {};
+    const start = (): [bigint] => [process.hrtime.bigint()];
+    const stop = (t: [bigint]) => Number(process.hrtime.bigint() - t[0]) / 1_000_000;
+
+    // Database
+    const dbTimer = start();
+    try {
+      if (!options.db) throw new Error('no db configured');
+      await options.db.query('select 1');
+      checks['database'] = { status: 'ok', latencyMs: stop(dbTimer) };
+    } catch (err) {
+      checks['database'] = { status: 'fail', latencyMs: stop(dbTimer), error: (err as Error).message };
+    }
+
+    // KMS
+    const kmsTimer = start();
+    try {
+      if (!options.kms) throw new Error('no kms configured');
+      const probe = await options.kms.seal(Buffer.from('healthcheck'));
+      await options.kms.unseal(probe);
+      checks['kms'] = { status: 'ok', latencyMs: stop(kmsTimer) };
+    } catch (err) {
+      checks['kms'] = { status: 'degraded', latencyMs: stop(kmsTimer), error: (err as Error).message };
+    }
+
+    // Object storage (via the attachments service's S3 client).
+    const s3Timer = start();
+    try {
+      await (deps.attachments as unknown as { s3: { send: (c: unknown) => Promise<unknown> } }).s3.send(
+        new HeadBucketCommand({ Bucket: config.S3_BUCKET }),
+      );
+      checks['objectStorage'] = { status: 'ok', latencyMs: stop(s3Timer) };
+    } catch (err) {
+      checks['objectStorage'] = { status: 'degraded', latencyMs: stop(s3Timer), error: (err as Error).message };
+    }
+
+    const statuses = Object.values(checks).map((c) => c.status);
+    const overall: 'ok' | 'degraded' | 'fail' = statuses.includes('fail')
+      ? 'fail'
+      : statuses.includes('degraded')
+        ? 'degraded'
+        : 'ok';
+    await reply
+      .code(overall === 'fail' ? 503 : 200)
+      .send({
+        status: overall,
+        version: '0.5.0-dev',
+        dpoContact: 'privacy@lonyogang.com',
+        checks,
+      });
+  });
+
+  app.get('/openapi.json', async () => buildOpenApi(config));
 
   await registerIdentityRoutes(app, { identity: deps.identity, passkeys: deps.passkeys });
   await registerSyncRoutes(app, {
