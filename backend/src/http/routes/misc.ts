@@ -7,6 +7,7 @@ import type { AggregationService } from '../../services/aggregation.js';
 import type { PaymentsService } from '../../services/payments.js';
 import type { PushService } from '../../services/push.js';
 import type { IdentityService } from '../../services/identity.js';
+import type { TransparencyService } from '../../services/transparency.js';
 import { requireAuth } from '../auth.js';
 
 export async function registerMiscRoutes(
@@ -19,6 +20,7 @@ export async function registerMiscRoutes(
     aggregation: AggregationService;
     payments: PaymentsService;
     push: PushService;
+    transparency: TransparencyService;
   },
 ): Promise<void> {
   const auth = requireAuth(deps.identity.tokens);
@@ -49,6 +51,37 @@ export async function registerMiscRoutes(
       count: verification.count,
       tipHash: verification.tipHash?.toString('base64') ?? null,
       brokenAt: verification.brokenAt ?? null,
+    };
+  });
+
+  app.get('/audit/anchors', { preHandler: auth }, async (req) => {
+    const anchors = await deps.transparency.listAnchors(req.auth!.accountId);
+    return {
+      anchors: anchors.map((a) => ({
+        id: a.id,
+        tipHash: a.tipHash.toString('base64'),
+        entryCount: a.entryCount,
+        verified: a.verified,
+        brokenAt: a.brokenAt,
+        proof: a.proof?.toString('base64') ?? null,
+        source: a.source,
+        createdAt: a.createdAt.toISOString(),
+      })),
+    };
+  });
+
+  app.post('/audit/anchors/run', { preHandler: auth }, async (req) => {
+    // Per-account anchor: an authenticated user can always refresh their
+    // own transparency receipt. The ops-wide anchor job runs on a cron.
+    const anchor = await deps.transparency.anchorAccount(req.auth!.accountId);
+    if (!anchor) return { anchored: false };
+    return {
+      anchored: true,
+      tipHash: anchor.tipHash.toString('base64'),
+      entryCount: anchor.entryCount,
+      verified: anchor.verified,
+      proof: anchor.proof?.toString('base64') ?? null,
+      source: anchor.source,
     };
   });
 

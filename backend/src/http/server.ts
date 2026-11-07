@@ -23,6 +23,13 @@ import {
   SmtpOtpDispatcher,
   type OtpDispatcher,
 } from '../services/otp_dispatcher.js';
+import { ClamAvScanner, NoopVirusScanner, type VirusScanner } from '../services/virus_scanner.js';
+import {
+  InMemoryNotary,
+  OpenTimestampsNotary,
+  TransparencyService,
+  type TransparencyNotary,
+} from '../services/transparency.js';
 import { registerIdentityRoutes } from './routes/identity.js';
 import { registerSyncRoutes } from './routes/sync.js';
 import { registerMiscRoutes } from './routes/misc.js';
@@ -38,10 +45,14 @@ export interface ServerDependencies {
   aggregation: AggregationService;
   payments: PaymentsService;
   push: PushService;
+  virusScanner: VirusScanner;
+  transparency: TransparencyService;
 }
 
 export interface AssembleOverrides {
   otpDispatcher?: OtpDispatcher;
+  virusScanner?: VirusScanner;
+  notary?: TransparencyNotary;
 }
 
 export function assembleServices(
@@ -52,10 +63,13 @@ export function assembleServices(
 ): ServerDependencies {
   const audit = new AuditService(db);
   const otpDispatcher = overrides.otpDispatcher ?? defaultOtpDispatcher(config);
+  const virusScanner = overrides.virusScanner ?? defaultVirusScanner(config);
+  const notary = overrides.notary ?? defaultNotary(config);
   const identity = new IdentityService(db, config, kms, audit, otpDispatcher);
   const passkeys = new PasskeyService(db, config, audit);
   const sync = new SyncService(db, audit);
-  const attachments = new AttachmentService(db, config, audit);
+  const attachments = new AttachmentService(db, config, audit, virusScanner);
+  const transparency = new TransparencyService(db, audit, notary);
   const fx = new FxService(db, config.NODE_ENV === 'test' ? new MockFxProvider() : pickProvider(config), config);
   const recovery = new RecoveryService(db, kms, audit);
   const aggregation = new AggregationService(db, kms, audit);
@@ -81,7 +95,35 @@ export function assembleServices(
   } else {
     push.register(new ConsolePushTransport('apns'));
   }
-  return { identity, audit, passkeys, sync, attachments, fx, recovery, aggregation, payments, push };
+  return {
+    identity,
+    audit,
+    passkeys,
+    sync,
+    attachments,
+    fx,
+    recovery,
+    aggregation,
+    payments,
+    push,
+    virusScanner,
+    transparency,
+  };
+}
+
+function defaultVirusScanner(config: AppConfig): VirusScanner {
+  if (config.CLAMAV_HOST) {
+    return new ClamAvScanner({
+      host: config.CLAMAV_HOST,
+      port: config.CLAMAV_PORT,
+    });
+  }
+  return new NoopVirusScanner();
+}
+
+function defaultNotary(config: AppConfig): TransparencyNotary {
+  if (config.TRANSPARENCY_NOTARY === 'opentimestamps') return new OpenTimestampsNotary();
+  return new InMemoryNotary();
 }
 
 function defaultOtpDispatcher(config: AppConfig): OtpDispatcher {

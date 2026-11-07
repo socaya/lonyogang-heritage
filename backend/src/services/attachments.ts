@@ -12,6 +12,7 @@ import type { AppConfig } from '../config.js';
 import type { Db } from '../db.js';
 import { queryOne } from '../db.js';
 import type { AuditService } from './audit.js';
+import type { VirusScanner } from './virus_scanner.js';
 
 /**
  * Mediates attachment uploads and downloads through S3-compatible object
@@ -27,6 +28,7 @@ export class AttachmentService {
     private readonly db: Db,
     config: AppConfig,
     private readonly audit: AuditService,
+    private readonly scanner: VirusScanner,
   ) {
     this.bucket = config.S3_BUCKET;
     this.s3 = new S3Client({
@@ -85,8 +87,37 @@ export class AttachmentService {
     return { attachmentId, uploadUrl: url, bucketKey };
   }
 
-  /** Confirms a completed upload. Updates `uploaded_at`. */
+  /** Confirms a completed upload. Fetches the ciphertext back from S3 so the
+   *  configured VirusScanner can look at the raw bytes before we expose the
+   *  attachment to the account's library. The scanner usually sees only
+   *  encrypted payloads (and therefore matches nothing), but attachments
+   *  uploaded on legacy clients without a passphrase are still useful to
+   *  guard against. */
   async commit(accountId: string, attachmentId: string): Promise<void> {
+    const row = await queryOne<{ bucket_key: string }>(
+      this.db,
+      `select bucket_key from attachment_blobs
+         where id = $1 and account_id = $2 and uploaded_at is null`,
+      [attachmentId, accountId],
+    );
+    if (!row) throw new Error('attachment not found or already committed');
+    const bytes = await this.fetchBytes(row.bucket_key);
+    const scan = await this.scanner.scan(bytes);
+    if (!scan.clean) {
+      await this.s3.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: row.bucket_key }));
+      await this.db.query(
+        `delete from attachment_blobs where id = $1 and account_id = $2`,
+        [attachmentId, accountId],
+      );
+      await this.audit.record({
+        accountId,
+        actor: { kind: 'service', id: 'virus-scanner' },
+        action: 'attachment.rejected',
+        resource: `attachment:${attachmentId}`,
+        context: { scanner: scan.scanner, signature: scan.signature ?? 'unknown' },
+      });
+      throw new Error(`attachment rejected by scanner: ${scan.signature ?? 'threat detected'}`);
+    }
     const result = await this.db.query(
       `update attachment_blobs set uploaded_at = now()
          where id = $1 and account_id = $2 and uploaded_at is null`,
@@ -98,7 +129,19 @@ export class AttachmentService {
       actor: { kind: 'user', id: accountId },
       action: 'attachment.uploaded',
       resource: `attachment:${attachmentId}`,
+      context: { scanner: scan.scanner },
     });
+  }
+
+  private async fetchBytes(bucketKey: string): Promise<Buffer> {
+    const response = await this.s3.send(
+      new GetObjectCommand({ Bucket: this.bucket, Key: bucketKey }),
+    );
+    const body = response.Body as unknown as AsyncIterable<Uint8Array> | undefined;
+    if (!body) throw new Error('attachment stream not returned');
+    const chunks: Buffer[] = [];
+    for await (const chunk of body) chunks.push(Buffer.from(chunk));
+    return Buffer.concat(chunks);
   }
 
   /** Issues a presigned GET URL for a committed attachment. */
