@@ -32,7 +32,7 @@ void main() {
       final store = PortfolioStore();
       await store.load();
       const existing = WealthGoal(
-          id: 'g1', name: 'Land purchase', targetUgx: 10_000_000, savedUgx: 2_000_000);
+          id: 'g1', name: 'Land purchase', targetUgx: 10000000, savedUgx: 2000000);
       await store.addGoal(existing);
       await pumpPhone(tester, GoalForm(store: store, existing: existing));
       expect(find.text('Edit goal'), findsOneWidget);
@@ -42,7 +42,7 @@ void main() {
       await tester.tap(find.text('Save goal'));
       await tester.pumpAndSettle();
       expect(find.textContaining('cannot exceed the target'), findsOneWidget);
-      expect(store.state.goals.single.savedUgx, 2_000_000);
+      expect(store.state.goals.single.savedUgx, 2000000);
     });
   });
 

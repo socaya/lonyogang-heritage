@@ -9,7 +9,6 @@ import 'data/portfolio_store.dart';
 import 'data/remote_sync.dart';
 import 'data/sync.dart';
 import 'data/sync_outbox.dart';
-import 'domain/models.dart';
 import 'presentation/app.dart';
 import 'presentation/onboarding_screens.dart';
 import 'presentation/online_scope.dart';

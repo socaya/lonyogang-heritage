@@ -1,9 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
-import '../data/remote_sync.dart';
 import '../data/sync.dart';
 import 'components.dart';
 import 'online_account_screen.dart';

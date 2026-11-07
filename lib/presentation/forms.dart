@@ -7,7 +7,6 @@ import 'account_screens.dart';
 import 'components.dart';
 import 'widgets.dart';
 import 'screens.dart';
-import 'wealth_screens.dart';
 
 int? parseAmount(String s)=>int.tryParse(s.replaceAll(RegExp(r'[ ,]'),''));
 String? requireAmount(String? v){final n=parseAmount(v??'');return n==null||n<0?'Enter a valid non-negative UGX amount':null;}

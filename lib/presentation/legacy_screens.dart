@@ -7,6 +7,7 @@ import '../domain/models.dart';
 import 'components.dart';
 import 'detail_screens.dart';
 import 'forms.dart';
+import 'security_screens.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
 
