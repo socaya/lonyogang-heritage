@@ -332,14 +332,6 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           responses: { '204': { description: 'Removed.' } },
         },
       },
-      '/identity/passkeys': {
-        get: {
-          tags: ['identity'],
-          security: [{ bearer: [] }],
-          summary: 'List this account\'s registered passkeys',
-          responses: { '200': { description: 'Passkey list.' } },
-        },
-      },
       '/identity/passkeys/registration': {
         post: {
           tags: ['identity'],
