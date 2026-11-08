@@ -40,6 +40,7 @@ class WealthAsset {
   final int ownershipBps; // 10,000 means 100 percent.
   final int costUgx;
   final String institution;
+  final String accountNumber; // Portfolio / broker / SACCO reference.
   final String location;
   final RecordStatus status;
   final DateTime valuedAt;
@@ -47,23 +48,29 @@ class WealthAsset {
   final bool archived;
 
   const WealthAsset({required this.id, required this.name, required this.kind, this.category = '', required this.valueUgx,
-    this.ownershipBps = 10000, this.costUgx = 0, this.institution = '', this.location = '',
+    this.ownershipBps = 10000, this.costUgx = 0, this.institution = '', this.accountNumber = '',
+    this.location = '',
     this.status = RecordStatus.userEntered, required this.valuedAt, this.notes = '', this.archived = false});
 
   int get attributableUgx => (valueUgx * ownershipBps) ~/ 10000;
   Json toJson() => {'id':id,'name':name,'kind':kind.name,'category':category,'valueUgx':valueUgx,
-    'ownershipBps':ownershipBps,'costUgx':costUgx,'institution':institution,'location':location,
+    'ownershipBps':ownershipBps,'costUgx':costUgx,'institution':institution,
+    'accountNumber':accountNumber,'location':location,
     'status':status.name,'valuedAt':valuedAt.toIso8601String(),'notes':notes,'archived':archived};
   factory WealthAsset.fromJson(Json j) => WealthAsset(
     id:asString(j['id']),name:asString(j['name']),
     kind:AssetKind.values.firstWhere((x)=>x.name==j['kind'],orElse:()=>AssetKind.other),
     category:asString(j['category']),valueUgx:asInt(j['valueUgx']),
     ownershipBps:asInt(j['ownershipBps'],10000).clamp(0,10000).toInt(),costUgx:asInt(j['costUgx']),
-    institution:asString(j['institution']),location:asString(j['location']),
+    institution:asString(j['institution']),accountNumber:asString(j['accountNumber']),
+    location:asString(j['location']),
     status:RecordStatus.values.firstWhere((x)=>x.name==j['status'],orElse:()=>RecordStatus.userEntered),
     valuedAt:readDate(j['valuedAt']),notes:asString(j['notes']),archived:j['archived']==true);
-  WealthAsset copyWith({bool? archived,int? valueUgx,DateTime? valuedAt,RecordStatus? status}) => WealthAsset(id:id,name:name,kind:kind,category:category,valueUgx:valueUgx??this.valueUgx,
-    ownershipBps:ownershipBps,costUgx:costUgx,institution:institution,location:location,status:status??this.status,
+  WealthAsset copyWith({bool? archived,int? valueUgx,DateTime? valuedAt,RecordStatus? status,String? accountNumber,String? institution,String? category}) => WealthAsset(id:id,name:name,kind:kind,
+    category:category??this.category,valueUgx:valueUgx??this.valueUgx,
+    ownershipBps:ownershipBps,costUgx:costUgx,institution:institution??this.institution,
+    accountNumber:accountNumber??this.accountNumber,
+    location:location,status:status??this.status,
     valuedAt:valuedAt??this.valuedAt,notes:notes,archived:archived??this.archived);
 }
 
@@ -179,13 +186,18 @@ class PortfolioState {
   /// center suppresses an entry whose key is present until the underlying
   /// record moves to a later occurrence (e.g. reminder dueAt changes).
   final Set<String> dismissedAlertKeys;
+  /// Institutions the user has entered at least once. Investment / savings
+  /// forms show them as a dropdown so the second write is a tap instead
+  /// of a re-type, while still accepting a new "Other..." entry.
+  final Set<String> knownInstitutions;
   const PortfolioState({this.ownerName='',this.onboardingDone=false,this.assets=const [],this.liabilities=const [],
     this.events=const [],this.goals=const [],this.contacts=const [],this.reminders=const [],
     this.documents=const [],this.beneficiaries=const [],this.valuations=const [],
     this.notificationOptions=const NotificationOptions(),
     this.fxRates=const [],this.scheduled=const [],
     this.targetWeightsBps=const <String,int>{},
-    this.dismissedAlertKeys=const <String>{}});
+    this.dismissedAlertKeys=const <String>{},
+    this.knownInstitutions=const <String>{}});
   Json toJson()=>{'schemaVersion':2,'ownerName':ownerName,'onboardingDone':onboardingDone,
     'assets':assets.map((x)=>x.toJson()).toList(),'liabilities':liabilities.map((x)=>x.toJson()).toList(),
     'events':events.map((x)=>x.toJson()).toList(),'goals':goals.map((x)=>x.toJson()).toList(),
@@ -197,7 +209,8 @@ class PortfolioState {
     'fxRates':fxRates.map((x)=>x.toJson()).toList(),
     'scheduled':scheduled.map((x)=>x.toJson()).toList(),
     'targetWeightsBps':targetWeightsBps,
-    'dismissedAlertKeys':dismissedAlertKeys.toList()};
+    'dismissedAlertKeys':dismissedAlertKeys.toList(),
+    'knownInstitutions':knownInstitutions.toList()};
   factory PortfolioState.fromJson(Json j) {
     final v=asInt(j['schemaVersion']);
     if (v!=1 && v!=2) throw const FormatException('Unsupported portfolio data schema');
@@ -219,6 +232,8 @@ class PortfolioState {
       scheduled:read('scheduled',ScheduledContribution.fromJson),
       targetWeightsBps:weights,
       dismissedAlertKeys:(j['dismissedAlertKeys'] as List<dynamic>? ?? const [])
+          .map((e)=>e.toString()).toSet(),
+      knownInstitutions:(j['knownInstitutions'] as List<dynamic>? ?? const [])
           .map((e)=>e.toString()).toSet(),
       notificationOptions:NotificationOptions.fromJson(j['notificationOptions'] is Map ? Map<String,dynamic>.from(j['notificationOptions'] as Map) : <String,dynamic>{}));
   }

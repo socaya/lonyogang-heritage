@@ -228,7 +228,18 @@ class PortfolioStore extends ChangeNotifier {
             source: asset.status.name)
       ];
     }
-    _state = _replace(assets: list, valuations: history);
+    // Grow the known-institutions set so a subsequent form sees this
+    // name as a pickable option.
+    Set<String>? nextInstitutions;
+    final trimmed = asset.institution.trim();
+    if (trimmed.isNotEmpty &&
+        !_state.knownInstitutions.contains(trimmed)) {
+      nextInstitutions = {..._state.knownInstitutions, trimmed};
+    }
+    _state = _replace(
+        assets: list,
+        valuations: history,
+        knownInstitutions: nextInstitutions);
     await _save();
     await _recordOutbox(
       payloadType: 'asset',
@@ -823,6 +834,7 @@ class PortfolioStore extends ChangeNotifier {
     List<ScheduledContribution>? scheduled,
     Map<String, int>? targetWeightsBps,
     Set<String>? dismissedAlertKeys,
+    Set<String>? knownInstitutions,
   }) =>
       PortfolioState(
           ownerName: ownerName ?? _state.ownerName,
@@ -843,7 +855,9 @@ class PortfolioStore extends ChangeNotifier {
           targetWeightsBps:
               targetWeightsBps ?? _state.targetWeightsBps,
           dismissedAlertKeys:
-              dismissedAlertKeys ?? _state.dismissedAlertKeys);
+              dismissedAlertKeys ?? _state.dismissedAlertKeys,
+          knownInstitutions:
+              knownInstitutions ?? _state.knownInstitutions);
 
   /// Hides a single alert from the notification centre until the underlying
   /// record moves to a later occurrence. Persists through sync so a

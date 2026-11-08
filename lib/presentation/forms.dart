@@ -18,64 +18,422 @@ class AssetForm extends StatefulWidget {
   const AssetForm({super.key,required this.store,required this.kind,this.existing});
   @override State<AssetForm> createState()=>_AssetFormState();
 }
-class _AssetFormState extends State<AssetForm>{
-  final key=GlobalKey<FormState>();
-  late final name=TextEditingController(text:widget.existing?.name??'');
-  late final category=TextEditingController(text:widget.existing?.category??'');
-  late final amount=TextEditingController(text:widget.existing?.valueUgx.toString()??'');
-  late final owned=TextEditingController(text:((widget.existing?.ownershipBps??10000)/100).toStringAsFixed(0));
-  late final cost=TextEditingController(text:widget.existing?.costUgx.toString()??'');
-  late final institution=TextEditingController(text:widget.existing?.institution??'');
-  late final location=TextEditingController(text:widget.existing?.location??'');
-  late final notes=TextEditingController(text:widget.existing?.notes??'');
-  late DateTime date=widget.existing?.valuedAt??DateTime.now();
-  late RecordStatus status=widget.existing?.status??RecordStatus.userEntered;
-  bool saving=false;
-  @override void dispose(){for(final c in [name,category,amount,owned,cost,institution,location,notes]){c.dispose();}super.dispose();}
-  @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:Text(widget.existing==null?'Add ${assetTitle(widget.kind).toLowerCase()}':'Edit asset')),
-    body:SafeArea(child:Form(key:key,child:ListView(padding:const EdgeInsets.symmetric(horizontal:22,vertical:16),children:[
-      PageHeading(widget.existing==null?'New ${assetTitle(widget.kind).toLowerCase()}':'Update ${widget.existing!.name}',
-        subtitle:'Capture value, ownership and the date of the source.'),
-      FormFieldBlock(title:'Asset name',child:TextFormField(controller:name,decoration:const InputDecoration(hintText:'e.g. Unit trust / Rental house'),
-        validator:(v)=>v==null||v.trim().isEmpty?'Required':null)),
-      FormFieldBlock(title:'Type or category',child:TextFormField(controller:category,decoration:const InputDecoration(hintText:'e.g. Government bonds'))),
-      FormFieldBlock(title:'Current value (UGX)',help:'Full market or account value before your ownership share.',
-        child:TextFormField(controller:amount,keyboardType:TextInputType.number,
-          inputFormatters:[FilteringTextInputFormatter.digitsOnly],decoration:const InputDecoration(hintText:'0'),validator:requireAmount)),
-      FormFieldBlock(title:'Ownership share (%)',child:TextFormField(controller:owned,
-        keyboardType:const TextInputType.numberWithOptions(decimal:true),decoration:const InputDecoration(hintText:'100'),
-        validator:(s){final d=double.tryParse(s??'');return d==null||d<0||d>100?'Enter 0–100%':null;})),
-      FormFieldBlock(title:'Acquisition / original cost (UGX)',child:TextFormField(controller:cost,
-        keyboardType:TextInputType.number,decoration:const InputDecoration(hintText:'Optional; enter 0 if unknown'),
-        validator:(v)=>v!.trim().isEmpty?null:requireAmount(v))),
-      if(widget.kind==AssetKind.property)FormFieldBlock(title:'Property location',child:TextFormField(
-        controller:location,decoration:const InputDecoration(hintText:'District / area')))
-      else FormFieldBlock(title:'Institution or provider',child:TextFormField(controller:institution,
-        decoration:const InputDecoration(hintText:'Bank, SACCO, fund or other provider'))),
-      FormFieldBlock(title:'Valuation date',child:SoftCard(onTap:()async{final d=await showDatePicker(context:context,
-        firstDate:DateTime(1990),lastDate:DateTime.now().add(const Duration(days:365)),initialDate:date);
-        if(d!=null)setState(()=>date=d);},child:Row(children:[const Icon(Icons.calendar_today_outlined,color:LG.sage,size:18),
-          const SizedBox(width:12),Text(LG.date(date)),const Spacer(),const Icon(Icons.chevron_right,color:LG.muted)]))),
-      FormFieldBlock(title:'Valuation status',child:DropdownButtonFormField<RecordStatus>(initialValue:status,
-        items:RecordStatus.values.map((x)=>DropdownMenuItem(value:x,child:Text(x.name))).toList(),
-        onChanged:(v)=>setState(()=>status=v??status))),
-      FormFieldBlock(title:'Notes (optional)',child:TextFormField(controller:notes,maxLines:3,
-        decoration:const InputDecoration(hintText:'Valuation source, relevant context...'))),
-      const SizedBox(height:10),ElevatedButton(onPressed:saving?null:save,child:Text(saving?'Saving...':'Save asset')),
-      const SizedBox(height:24),
-    ]))));
+/// Category options per asset kind. "Other…" at the tail opens a free
+/// text entry so the dropdown doesn't block an entry we didn't list.
+const Map<AssetKind, List<String>> _kCategoryOptions = {
+  AssetKind.investment: [
+    'Equities / shares',
+    'Mutual fund',
+    'Unit trust',
+    'Treasury bills',
+    'Treasury bonds',
+    'Corporate bonds',
+    'SACCO shares',
+    'Private equity',
+    'Crypto',
+  ],
+  AssetKind.savings: [
+    'Current account',
+    'Savings account',
+    'Fixed deposit',
+    'SACCO savings',
+    'Mobile money',
+  ],
+  AssetKind.property: [
+    'Residential',
+    'Commercial',
+    'Land',
+    'Agricultural',
+    'Mixed-use',
+  ],
+  AssetKind.other: [
+    'Vehicle',
+    'Equipment',
+    'Collectible',
+    'Intellectual property',
+  ],
+};
+
+/// Common Ugandan institutions pre-populated on the dropdown. Users can
+/// still enter a name not in the list via the "Other…" option and that
+/// value is remembered via PortfolioState.knownInstitutions.
+const List<String> _kDefaultInstitutions = [
+  'Stanbic Bank Uganda',
+  'Centenary Bank',
+  'DFCU Bank',
+  'Standard Chartered Uganda',
+  'Absa Bank Uganda',
+  'Equity Bank Uganda',
+  'KCB Bank Uganda',
+  'Bank of Africa Uganda',
+  'Housing Finance Bank',
+  'Post Bank Uganda',
+  'MTN MoMo',
+  'Airtel Money',
+  'Bank of Uganda (Treasuries)',
+  'Uganda Securities Exchange',
+  'Britam Asset Managers',
+  'ICEA Lion Asset Management',
+  'Sanlam Investments',
+  'Old Mutual Investment Group',
+  'Mazima Retirement Plan',
+];
+
+/// Sentinel label shown at the bottom of the dropdown so the user can
+/// type a value that isn't in the list.
+const String _kOtherSentinel = '__other__';
+
+class _AssetFormState extends State<AssetForm> {
+  final key = GlobalKey<FormState>();
+  late final name =
+      TextEditingController(text: widget.existing?.name ?? '');
+  late final customCategory = TextEditingController(
+      text: _isCustomCategory(widget.existing?.category)
+          ? widget.existing!.category
+          : '');
+  late final amount = TextEditingController(
+      text: widget.existing == null
+          ? ''
+          : widget.existing!.valueUgx.toString());
+  late final owned = TextEditingController(
+      text: ((widget.existing?.ownershipBps ?? 10000) / 100)
+          .toStringAsFixed(0));
+  late final cost = TextEditingController(
+      text: widget.existing == null ? '' : widget.existing!.costUgx.toString());
+  late final customInstitution = TextEditingController(
+      text: _isCustomInstitution(widget.existing?.institution)
+          ? widget.existing!.institution
+          : '');
+  late final accountNumber = TextEditingController(
+      text: widget.existing?.accountNumber ?? '');
+  late final location =
+      TextEditingController(text: widget.existing?.location ?? '');
+  late final notes =
+      TextEditingController(text: widget.existing?.notes ?? '');
+  late String category = _initialCategoryChoice();
+  late String institution = _initialInstitutionChoice();
+  late DateTime date = widget.existing?.valuedAt ?? DateTime.now();
+  late RecordStatus status =
+      widget.existing?.status ?? RecordStatus.userEntered;
+  bool saving = false;
+
+  bool _isCustomCategory(String? value) {
+    if (value == null || value.isEmpty) return false;
+    final options = _kCategoryOptions[widget.kind] ?? const [];
+    return !options.contains(value);
+  }
+
+  bool _isCustomInstitution(String? value) {
+    if (value == null || value.isEmpty) return false;
+    final known = {
+      ..._kDefaultInstitutions,
+      ...widget.store.state.knownInstitutions,
+    };
+    return !known.contains(value);
+  }
+
+  String _initialCategoryChoice() {
+    final existing = widget.existing?.category ?? '';
+    final options = _kCategoryOptions[widget.kind] ?? const [];
+    if (options.contains(existing)) return existing;
+    if (existing.isNotEmpty) return _kOtherSentinel;
+    return '';
+  }
+
+  String _initialInstitutionChoice() {
+    final existing = widget.existing?.institution ?? '';
+    if (existing.isEmpty) return '';
+    final known = {
+      ..._kDefaultInstitutions,
+      ...widget.store.state.knownInstitutions,
+    };
+    if (known.contains(existing)) return existing;
+    return _kOtherSentinel;
+  }
+
+  @override
+  void dispose() {
+    for (final c in [
+      name,
+      customCategory,
+      amount,
+      owned,
+      cost,
+      customInstitution,
+      accountNumber,
+      location,
+      notes
+    ]) {
+      c.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final categoryOptions = _kCategoryOptions[widget.kind] ?? const [];
+    final institutions = <String>{
+      ..._kDefaultInstitutions,
+      ...widget.store.state.knownInstitutions,
+    }.toList()
+      ..sort();
+    final showInstitution = widget.kind != AssetKind.property;
+    final showAccountNumber = widget.kind == AssetKind.investment ||
+        widget.kind == AssetKind.savings;
+    return Scaffold(
+      appBar: AppBar(
+          title: Text(widget.existing == null
+              ? 'Add ${assetTitle(widget.kind).toLowerCase()}'
+              : 'Edit asset')),
+      body: SafeArea(
+        child: Form(
+          key: key,
+          child: ListView(
+            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+            children: [
+              PageHeading(
+                  widget.existing == null
+                      ? 'New ${assetTitle(widget.kind).toLowerCase()}'
+                      : 'Update ${widget.existing!.name}',
+                  subtitle:
+                      'Capture value, ownership and the date of the source.'),
+              FormFieldBlock(
+                title: 'Asset name',
+                child: TextFormField(
+                  controller: name,
+                  decoration: const InputDecoration(
+                      hintText: 'e.g. Unit trust / Rental house'),
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Required'
+                      : null,
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Type or category',
+                child: DropdownButtonFormField<String>(
+                  initialValue: category.isEmpty ? null : category,
+                  isExpanded: true,
+                  items: [
+                    ...categoryOptions.map((o) =>
+                        DropdownMenuItem(value: o, child: Text(o))),
+                    const DropdownMenuItem(
+                        value: _kOtherSentinel, child: Text('Other…')),
+                  ],
+                  onChanged: (v) => setState(() => category = v ?? ''),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Pick a category' : null,
+                ),
+              ),
+              if (category == _kOtherSentinel)
+                FormFieldBlock(
+                  title: 'Custom category',
+                  child: TextFormField(
+                    controller: customCategory,
+                    decoration:
+                        const InputDecoration(hintText: 'Describe the category'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Describe the category'
+                        : null,
+                  ),
+                ),
+              FormFieldBlock(
+                title: 'Current value (UGX)',
+                help:
+                    'Full market or account value before your ownership share. Decimals are rounded to the nearest shilling.',
+                child: TextFormField(
+                  controller: amount,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                  ],
+                  decoration: const InputDecoration(hintText: '0'),
+                  validator: _validateDecimalAmount,
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Ownership share (%)',
+                child: TextFormField(
+                  controller: owned,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true),
+                  decoration: const InputDecoration(hintText: '100'),
+                  validator: (s) {
+                    final d = double.tryParse(s ?? '');
+                    return d == null || d < 0 || d > 100
+                        ? 'Enter 0–100%'
+                        : null;
+                  },
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Acquisition / original cost (UGX)',
+                child: TextFormField(
+                  controller: cost,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                  ],
+                  decoration: const InputDecoration(
+                      hintText: 'Optional; enter 0 if unknown'),
+                  validator: (v) =>
+                      v == null || v.trim().isEmpty ? null : _validateDecimalAmount(v),
+                ),
+              ),
+              if (widget.kind == AssetKind.property)
+                FormFieldBlock(
+                  title: 'Property location',
+                  child: TextFormField(
+                    controller: location,
+                    decoration:
+                        const InputDecoration(hintText: 'District / area'),
+                  ),
+                ),
+              if (showInstitution) ...[
+                FormFieldBlock(
+                  title: 'Institution or provider',
+                  help:
+                      'Pick from your previous choices or add a new one via "Other…".',
+                  child: DropdownButtonFormField<String>(
+                    initialValue: institution.isEmpty ? null : institution,
+                    isExpanded: true,
+                    items: [
+                      ...institutions.map((o) =>
+                          DropdownMenuItem(value: o, child: Text(o))),
+                      const DropdownMenuItem(
+                          value: _kOtherSentinel, child: Text('Other…')),
+                    ],
+                    onChanged: (v) => setState(() => institution = v ?? ''),
+                    validator: (v) => v == null || v.isEmpty
+                        ? 'Pick an institution'
+                        : null,
+                  ),
+                ),
+                if (institution == _kOtherSentinel)
+                  FormFieldBlock(
+                    title: 'New institution name',
+                    child: TextFormField(
+                      controller: customInstitution,
+                      decoration: const InputDecoration(
+                          hintText: 'Bank, SACCO, fund or other provider'),
+                      validator: (v) => v == null || v.trim().isEmpty
+                          ? 'Enter the institution name'
+                          : null,
+                    ),
+                  ),
+              ],
+              if (showAccountNumber)
+                FormFieldBlock(
+                  title: 'Portfolio / account number',
+                  help:
+                      'Reference held by the institution. Stored encrypted on this device.',
+                  child: TextFormField(
+                    controller: accountNumber,
+                    decoration: const InputDecoration(
+                        hintText: 'e.g. CSD-12345 or your account number'),
+                  ),
+                ),
+              FormFieldBlock(
+                title: 'Valuation date',
+                child: SoftCard(
+                  onTap: () async {
+                    final d = await showDatePicker(
+                        context: context,
+                        firstDate: DateTime(1990),
+                        lastDate: DateTime.now()
+                            .add(const Duration(days: 365)),
+                        initialDate: date);
+                    if (d != null) setState(() => date = d);
+                  },
+                  child: Row(children: [
+                    const Icon(Icons.calendar_today_outlined,
+                        color: LG.sage, size: 18),
+                    const SizedBox(width: 12),
+                    Text(LG.date(date)),
+                    const Spacer(),
+                    const Icon(Icons.chevron_right, color: LG.muted),
+                  ]),
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Valuation status',
+                child: DropdownButtonFormField<RecordStatus>(
+                  initialValue: status,
+                  items: RecordStatus.values
+                      .map((x) =>
+                          DropdownMenuItem(value: x, child: Text(x.name)))
+                      .toList(),
+                  onChanged: (v) => setState(() => status = v ?? status),
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Notes (optional)',
+                child: TextFormField(
+                  controller: notes,
+                  maxLines: 3,
+                  decoration: const InputDecoration(
+                      hintText: 'Valuation source, relevant context...'),
+                ),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: saving ? null : save,
+                child: Text(saving ? 'Saving...' : 'Save asset'),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Accepts "1,500.50" / "1500.5" / "1500" etc. Rounds to the nearest
+  /// whole UGX shilling because the backend model stores integers.
+  static String? _validateDecimalAmount(String? v) {
+    if (v == null || v.trim().isEmpty) return 'Enter a value';
+    final parsed = double.tryParse(v.replaceAll(',', ''));
+    if (parsed == null || parsed < 0) return 'Enter a valid UGX amount';
+    return null;
+  }
+
+  static int _parseDecimalToInt(String v) =>
+      double.parse(v.replaceAll(',', '')).round();
+
   Future<void> save() async {
-    if(!key.currentState!.validate())return;
-    setState(()=>saving=true);
-    try{
-      final a=WealthAsset(id:widget.existing?.id??makeId(),name:name.text.trim(),kind:widget.kind,
-        category:category.text.trim(),valueUgx:parseAmount(amount.text)!,
-        ownershipBps:(double.parse(owned.text)*100).round(),costUgx:parseAmount(cost.text)??0,
-        institution:institution.text.trim(),location:location.text.trim(),status:status,valuedAt:date,notes:notes.text.trim());
+    if (!key.currentState!.validate()) return;
+    setState(() => saving = true);
+    try {
+      final resolvedCategory = category == _kOtherSentinel
+          ? customCategory.text.trim()
+          : category;
+      final resolvedInstitution = institution == _kOtherSentinel
+          ? customInstitution.text.trim()
+          : institution;
+      final a = WealthAsset(
+          id: widget.existing?.id ?? makeId(),
+          name: name.text.trim(),
+          kind: widget.kind,
+          category: resolvedCategory,
+          valueUgx: _parseDecimalToInt(amount.text),
+          ownershipBps: (double.parse(owned.text) * 100).round(),
+          costUgx: cost.text.trim().isEmpty
+              ? 0
+              : _parseDecimalToInt(cost.text),
+          institution: resolvedInstitution,
+          accountNumber: accountNumber.text.trim(),
+          location: location.text.trim(),
+          status: status,
+          valuedAt: date,
+          notes: notes.text.trim());
       await widget.store.upsertAsset(a);
-      if(mounted)Navigator.pop(context);
-    }catch(e){if(mounted)snack(context,'Could not save asset: $e');}
-    finally{if(mounted)setState(()=>saving=false);}
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) snack(context, 'Could not save asset: $e');
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
   }
 }
 
