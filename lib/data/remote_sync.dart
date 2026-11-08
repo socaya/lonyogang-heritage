@@ -441,6 +441,29 @@ class RemoteSyncService implements SyncService {
     return rows;
   }
 
+  /// Pulls the N most recent audit entries for this account.
+  Future<List<RemoteAuditEntry>> listAuditEntries({int limit = 50}) async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/audit/entries').replace(
+        queryParameters: {'limit': '${limit.clamp(1, 500)}'});
+    final text = await _request('GET', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    return (decoded['entries'] as List<dynamic>? ?? const [])
+        .map((e) => RemoteAuditEntry.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Returns the end-to-end Merkle verification result over the chain.
+  Future<RemoteAuditChain> verifyAuditChain() async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/audit/chain');
+    final text = await _request('GET', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    return RemoteAuditChain.fromJson(decoded);
+  }
+
   /// Fetches the live subscription row for this account.
   Future<RemoteSubscription> getSubscription() async {
     final creds = await credentialsLoader();
@@ -503,6 +526,57 @@ class RemoteSyncSession {
             : DateTime.parse((j['revoked_at'] ?? j['revokedAt']) as String),
         expiresAt: DateTime.parse(
             (j['expires_at'] ?? j['expiresAt']) as String),
+      );
+}
+
+/// A single audit entry returned by `GET /audit/entries`.
+class RemoteAuditEntry {
+  final String id;
+  final String action;
+  final String? resource;
+  final DateTime createdAt;
+  final Map<String, dynamic>? context;
+  final String hashBase64;
+  final String? prevHashBase64;
+  const RemoteAuditEntry({
+    required this.id,
+    required this.action,
+    required this.resource,
+    required this.createdAt,
+    required this.context,
+    required this.hashBase64,
+    required this.prevHashBase64,
+  });
+  factory RemoteAuditEntry.fromJson(Map<String, dynamic> j) =>
+      RemoteAuditEntry(
+        id: j['id'] as String,
+        action: j['action'] as String,
+        resource: j['resource'] as String?,
+        createdAt: DateTime.parse(j['createdAt'] as String),
+        context: j['context'] as Map<String, dynamic>?,
+        hashBase64: j['hash'] as String,
+        prevHashBase64: j['prevHash'] as String?,
+      );
+}
+
+/// Chain-verification result returned by `GET /audit/chain`.
+class RemoteAuditChain {
+  final bool verified;
+  final int count;
+  final String? tipHashBase64;
+  final String? brokenAt;
+  const RemoteAuditChain({
+    required this.verified,
+    required this.count,
+    required this.tipHashBase64,
+    required this.brokenAt,
+  });
+  factory RemoteAuditChain.fromJson(Map<String, dynamic> j) =>
+      RemoteAuditChain(
+        verified: j['verified'] == true,
+        count: (j['count'] as num?)?.toInt() ?? 0,
+        tipHashBase64: j['tipHash'] as String?,
+        brokenAt: j['brokenAt'] as String?,
       );
 }
 

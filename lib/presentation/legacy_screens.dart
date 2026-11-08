@@ -11,6 +11,7 @@ import 'forms.dart';
 import 'online_privacy_screen.dart';
 import 'online_scope.dart';
 import 'security_screens.dart';
+import 'transparency_screen.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
 
@@ -732,14 +733,22 @@ class SecurityCenterScreen extends StatelessWidget {
       // show.
       Builder(builder:(context){
         final scope=OnlineScope.maybeOf(context);
-        final baseUri=scope?.sync?.baseUri;
-        if(baseUri==null||scope==null)return const SizedBox.shrink();
-        return OutlinedButton.icon(
-          onPressed:()=>openWealthPage(context,OnlinePrivacyScreen(
-            baseUri:baseUri,
-            credentials:scope.credentials)),
-          icon:const Icon(Icons.policy_outlined),
-          label:const Text('Online privacy & data rights'));
+        final remote=scope?.sync;
+        final baseUri=remote?.baseUri;
+        if(baseUri==null||scope==null||remote==null)return const SizedBox.shrink();
+        return Column(children:[
+          OutlinedButton.icon(
+            onPressed:()=>openWealthPage(context,OnlinePrivacyScreen(
+              baseUri:baseUri,
+              credentials:scope.credentials)),
+            icon:const Icon(Icons.policy_outlined),
+            label:const Text('Online privacy & data rights')),
+          const SizedBox(height:10),
+          OutlinedButton.icon(
+            onPressed:()=>openWealthPage(context,TransparencyScreen(sync:remote)),
+            icon:const Icon(Icons.verified_outlined),
+            label:const Text('Audit transparency')),
+        ]);
       }),
       const SizedBox(height:18),const Text(
         'This device is the only place holding your passphrase or derived key — there is no server-side recovery. Keep an unencrypted JSON export in a safe physical location.',
