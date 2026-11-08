@@ -441,6 +441,26 @@ class RemoteSyncService implements SyncService {
     return rows;
   }
 
+  /// Updates subject-controlled fields on the profile — display name,
+  /// phone, marketing consent. Each field is optional; nulls are passed
+  /// through so the caller can clear a value explicitly.
+  Future<void> patchMe({
+    String? displayName,
+    String? phone,
+    bool? marketingConsent,
+  }) async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/me');
+    final payload = <String, dynamic>{};
+    if (displayName != null) payload['displayName'] = displayName;
+    if (phone != null) payload['phone'] = phone;
+    if (marketingConsent != null) {
+      payload['marketingConsent'] = marketingConsent;
+    }
+    await _request('PATCH', uri, creds, body: jsonEncode(payload));
+  }
+
   /// Pulls the N most recent audit entries for this account.
   Future<List<RemoteAuditEntry>> listAuditEntries({int limit = 50}) async {
     final creds = await credentialsLoader();

@@ -29,7 +29,10 @@ class TotpEnrolScreen extends StatefulWidget {
 }
 
 class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
-  final _http = HttpClient();
+  // Match the remote_sync + attachment_syncer posture so a hung backend
+  // can't block this screen indefinitely.
+  static const Duration _deadline = Duration(seconds: 20);
+  final _http = HttpClient()..connectionTimeout = const Duration(seconds: 10);
   String? _secret;
   String? _otpauthUrl;
   String? _error;
@@ -53,8 +56,8 @@ class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
       final req = await _http.postUrl(uri);
       req.headers.set('authorization', 'Bearer ${creds.accessToken}');
       req.headers.contentType = ContentType.json;
-      final res = await req.close();
-      final body = await res.transform(utf8.decoder).join();
+      final res = await req.close().timeout(_deadline);
+      final body = await res.transform(utf8.decoder).join().timeout(_deadline);
       if (res.statusCode < 200 || res.statusCode >= 300) {
         throw HttpException('HTTP ${res.statusCode}: $body', uri: uri);
       }

@@ -220,6 +220,43 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
               onRetry: _load,
             ),
           const SizedBox(height: 20),
+          Builder(builder: (context) {
+            final remote = OnlineScope.maybeOf(context)?.sync;
+            if (remote == null || _profile == null) return const SizedBox.shrink();
+            final consented = _profile!['marketingConsentAt'] != null;
+            return Column(children: [
+              SoftCard(
+                child: Row(children: [
+                  const Icon(Icons.campaign_outlined, color: LG.sage),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Marketing updates (occasional emails about new features)',
+                      style: TextStyle(fontSize: 13),
+                    ),
+                  ),
+                  Switch(
+                    value: consented,
+                    onChanged: _working
+                        ? null
+                        : (v) async {
+                            setState(() => _working = true);
+                            try {
+                              await remote.patchMe(marketingConsent: v);
+                              await _load();
+                            } catch (err) {
+                              if (!mounted) return;
+                              setState(() => _error = '$err');
+                            } finally {
+                              if (mounted) setState(() => _working = false);
+                            }
+                          },
+                  ),
+                ]),
+              ),
+              const SizedBox(height: 10),
+            ]);
+          }),
           PrimaryCTA(
             label: _working ? 'Working…' : 'Download DSAR export',
             loading: _working,
