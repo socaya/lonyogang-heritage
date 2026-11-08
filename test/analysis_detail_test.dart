@@ -15,7 +15,7 @@ void main() {
 
   Future<void> pumpPhone(WidgetTester tester, Widget child) async {
     tester.view.physicalSize = const Size(1080, 2400);
-    tester.view.devicePixelRatio = 3;
+    tester.view.devicePixelRatio = 2;
     addTearDown(() {
       tester.view.resetPhysicalSize();
       tester.view.resetDevicePixelRatio();

@@ -347,10 +347,12 @@ class _GoalFormState extends State<GoalForm> {
                           const Icon(Icons.event_outlined,
                               color: LG.sage, size: 18),
                           const SizedBox(width: 10),
-                          Text(targetDate == null
-                              ? 'No target date set'
-                              : LG.date(targetDate!)),
-                          const Spacer(),
+                          Expanded(
+                              child: Text(
+                                  targetDate == null
+                                      ? 'No target date set'
+                                      : LG.date(targetDate!),
+                                  overflow: TextOverflow.ellipsis)),
                           if (targetDate != null)
                             IconButton(
                                 tooltip: 'Clear target date',
