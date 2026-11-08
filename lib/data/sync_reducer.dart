@@ -5,6 +5,7 @@ import 'package:cryptography/cryptography.dart';
 
 import '../core/crypto.dart';
 import '../domain/models.dart';
+import 'attachment_syncer.dart';
 import 'portfolio_store.dart';
 import 'remote_sync.dart';
 import 'sync_outbox.dart';
@@ -26,7 +27,8 @@ import 'sync_outbox.dart';
 /// history).
 class SyncReducer {
   final PortfolioStore store;
-  SyncReducer(this.store);
+  final AttachmentSyncer? attachmentSyncer;
+  SyncReducer(this.store, {this.attachmentSyncer});
 
   Future<bool> apply(RemoteSyncEventRecord record) async {
     final vaultKey = store.vault.activeKey;
@@ -72,6 +74,10 @@ class SyncReducer {
             valuation.source,
             notes: valuation.notes);
         return true;
+      case 'document_record':
+        final document = DocumentRecord.fromJson(json);
+        await _applyDocument(document);
+        return true;
       default:
         // Unknown payload type — ignore for forward-compat; the server may
         // route newer entities we don't yet understand.
@@ -95,6 +101,49 @@ class SyncReducer {
     // Overridden only when payload_type is not an append-only record and
     // the id already exists.
     return false;
+  }
+
+  /// Applies an incoming document record. When its attachment carries a
+  /// serverId we haven't materialized locally, download and decrypt it so
+  /// the user can preview it as if the attach happened on this device.
+  Future<void> _applyDocument(DocumentRecord remote) async {
+    final existing = store.state.documents.firstWhere(
+      (d) => d.id == remote.id,
+      orElse: () => const DocumentRecord(id: '', title: '', category: ''),
+    );
+    final effective = await _materializeAttachmentIfMissing(remote, existing);
+    await store.upsertDocument(effective);
+  }
+
+  Future<DocumentRecord> _materializeAttachmentIfMissing(
+      DocumentRecord remote, DocumentRecord existing) async {
+    final attachment = remote.attachment;
+    final syncer = attachmentSyncer;
+    if (attachment == null || attachment.serverId == null || syncer == null) {
+      return remote;
+    }
+    // Already materialized on this device under the same serverId: keep
+    // whatever local relativePath we have so previews still open.
+    if (existing.attachment?.serverId == attachment.serverId &&
+        existing.attachment?.relativePath.isNotEmpty == true) {
+      return remote.copyWith(attachment: existing.attachment);
+    }
+    try {
+      final ciphertext = await syncer.downloadCiphertext(attachment.serverId!);
+      final stored = await store.attachments.writeCiphertext(
+        documentId: remote.id,
+        ciphertext: ciphertext,
+        filename: attachment.originalFilename,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        sha256Hex: attachment.sha256Hex,
+        serverId: attachment.serverId!,
+      );
+      return remote.copyWith(attachment: stored);
+    } catch (_) {
+      // Leave the ref untouched so retry on the next sync can pick it up.
+      return remote;
+    }
   }
 
   Future<void> _replaceBeneficiaries(List<BeneficiaryRecord> replacement) async {

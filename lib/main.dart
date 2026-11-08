@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'core/design.dart';
+import 'data/attachment_syncer.dart';
 import 'data/credentials_store.dart';
 import 'data/notifications.dart';
 import 'data/portfolio_store.dart';
@@ -20,15 +21,22 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final outbox = SyncOutbox();
-  final store = PortfolioStore(outbox: outbox);
   final NotificationScheduler scheduler =
       kIsWeb ? NoopNotificationScheduler() : LocalNotificationScheduler();
   final credentials = CredentialsStore();
   final backendBase = Uri.tryParse(
     const String.fromEnvironment('LONYOGANG_BACKEND_URL', defaultValue: ''),
   );
-  final reducer = SyncReducer(store);
-  final SyncService sync = backendBase == null || backendBase.toString().isEmpty
+  final hasBackend = backendBase != null && backendBase.toString().isNotEmpty;
+  final AttachmentSyncer? attachmentSyncer = hasBackend
+      ? AttachmentSyncer(baseUri: backendBase, credentials: credentials)
+      : null;
+  final store = PortfolioStore(
+    outbox: outbox,
+    attachmentSyncer: attachmentSyncer,
+  );
+  final reducer = SyncReducer(store, attachmentSyncer: attachmentSyncer);
+  final SyncService sync = !hasBackend
       ? NoopSyncService()
       : RemoteSyncService(
           baseUri: backendBase,

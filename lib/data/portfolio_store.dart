@@ -4,6 +4,7 @@ import '../domain/models.dart';
 import '../domain/finance.dart';
 import 'vault.dart';
 import 'attachment_store.dart';
+import 'attachment_syncer.dart';
 import 'sync_outbox.dart';
 
 /// Local, offline-first repository. In 0.3 this wrote cleartext to
@@ -11,8 +12,13 @@ import 'sync_outbox.dart';
 /// — when a passphrase is set — persist an AES-GCM envelope and mediate all
 /// reads and writes through [Vault]. Nothing is pushed to a server.
 class PortfolioStore extends ChangeNotifier {
-  PortfolioStore({Vault? vault, AttachmentStore? attachments, this.outbox, String? deviceId})
-      : vault = vault ?? Vault(),
+  PortfolioStore({
+    Vault? vault,
+    AttachmentStore? attachments,
+    this.outbox,
+    this.attachmentSyncer,
+    String? deviceId,
+  })  : vault = vault ?? Vault(),
         attachments = attachments ?? AttachmentStore(),
         deviceId = deviceId ?? _newDeviceId() {
     this.vault.addListener(notifyListeners);
@@ -21,6 +27,7 @@ class PortfolioStore extends ChangeNotifier {
   final Vault vault;
   final AttachmentStore attachments;
   final SyncOutbox? outbox;
+  final AttachmentSyncer? attachmentSyncer;
   final String deviceId;
 
   static int _deviceIdCounter = 0;
@@ -313,6 +320,10 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(documents: docs);
     await _save();
+    await _recordOutbox(
+      payloadType: 'document_record',
+      payload: document.toJson(),
+    );
   }
 
   Future<void> archiveDocument(DocumentRecord document) async =>
@@ -367,7 +378,24 @@ class PortfolioStore extends ChangeNotifier {
         filename: filename,
         mimeType: mimeType,
         key: key);
-    final updated = document.copyWith(attachment: ref);
+    AttachmentRef effective = ref;
+    final syncer = attachmentSyncer;
+    if (syncer != null) {
+      try {
+        final ciphertext = await attachments.readCiphertext(ref);
+        final sha = _hexToBytes(ref.sha256Hex);
+        final serverId = await syncer.uploadCiphertext(
+          bytes: ciphertext,
+          sha256: sha,
+          mimeType: mimeType,
+        );
+        effective = ref.withServerId(serverId);
+      } catch (_) {
+        // Upload failure is tolerated: the local attachment stays usable.
+        // The next sync or a manual retry will carry it to the server.
+      }
+    }
+    final updated = document.copyWith(attachment: effective);
     await upsertDocument(updated);
     return updated;
   }
@@ -376,7 +404,25 @@ class PortfolioStore extends ChangeNotifier {
     final ref = document.attachment;
     if (ref == null) return;
     await attachments.delete(ref);
+    final syncer = attachmentSyncer;
+    final serverId = ref.serverId;
+    if (syncer != null && serverId != null) {
+      try {
+        await syncer.deleteRemote(serverId);
+      } catch (_) {
+        // Best-effort; the server's unused attachment will be swept by
+        // the operator cleanup job.
+      }
+    }
     await upsertDocument(document.copyWith(clearAttachment: true));
+  }
+
+  static List<int> _hexToBytes(String hex) {
+    final out = <int>[];
+    for (var i = 0; i + 1 < hex.length; i += 2) {
+      out.add(int.parse(hex.substring(i, i + 2), radix: 16));
+    }
+    return out;
   }
 
   Future<void> upsertBeneficiary(BeneficiaryRecord person) async {

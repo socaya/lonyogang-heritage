@@ -276,7 +276,10 @@ class DocumentRecord {
 }
 
 /// Reference to an encrypted-at-rest file in the app's private documents
-/// directory. The hash lets us verify integrity before decryption.
+/// directory. The hash lets us verify integrity before decryption. When
+/// [serverId] is non-null the same ciphertext has been uploaded to the
+/// online backend under that id so other devices can pull it; the server
+/// treats the bytes as opaque.
 class AttachmentRef {
   final String originalFilename;
   final String mimeType;
@@ -284,19 +287,26 @@ class AttachmentRef {
   final int sizeBytes;
   final String sha256Hex;
   final DateTime addedAt;
+  final String? serverId;
   const AttachmentRef({required this.originalFilename,required this.mimeType,
     required this.relativePath,required this.sizeBytes,required this.sha256Hex,
-    required this.addedAt});
+    required this.addedAt,this.serverId});
   Json toJson()=>{'originalFilename':originalFilename,'mimeType':mimeType,
     'relativePath':relativePath,'sizeBytes':sizeBytes,'sha256Hex':sha256Hex,
-    'addedAt':addedAt.toIso8601String()};
+    'addedAt':addedAt.toIso8601String(),
+    if(serverId!=null)'serverId':serverId};
   factory AttachmentRef.fromJson(Json j)=>AttachmentRef(
     originalFilename:asString(j['originalFilename']),
     mimeType:asString(j['mimeType'],'application/octet-stream'),
     relativePath:asString(j['relativePath']),
     sizeBytes:asInt(j['sizeBytes']),
     sha256Hex:asString(j['sha256Hex']),
-    addedAt:readDate(j['addedAt']));
+    addedAt:readDate(j['addedAt']),
+    serverId:j['serverId'] as String?);
+  AttachmentRef withServerId(String id)=>AttachmentRef(
+    originalFilename:originalFilename,mimeType:mimeType,
+    relativePath:relativePath,sizeBytes:sizeBytes,sha256Hex:sha256Hex,
+    addedAt:addedAt,serverId:id);
 }
 
 /// A planning note, NOT a registered beneficiary nomination or legal instrument.

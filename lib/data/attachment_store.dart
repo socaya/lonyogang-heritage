@@ -78,6 +78,46 @@ class AttachmentStore {
     if (file.existsSync()) file.deleteSync();
   }
 
+  /// Returns the raw ciphertext for [ref] without decrypting. Used by the
+  /// AttachmentSyncer so it can push the exact bytes the server will later
+  /// hand back to another device.
+  Future<Uint8List> readCiphertext(AttachmentRef ref) async {
+    final dir = await _dir();
+    final file = File('${dir.path}/${ref.relativePath}');
+    return file.readAsBytes();
+  }
+
+  /// Writes previously-encrypted [ciphertext] pulled from the server into
+  /// the local attachments directory under a fresh relative path. The
+  /// returned AttachmentRef can then be stored on the DocumentRecord.
+  Future<AttachmentRef> writeCiphertext({
+    required String documentId,
+    required Uint8List ciphertext,
+    required String filename,
+    required String mimeType,
+    required int sizeBytes,
+    required String sha256Hex,
+    required String serverId,
+  }) async {
+    final dir = await _dir();
+    final relative = '$documentId-${DateTime.now().microsecondsSinceEpoch}.bin';
+    final file = File('${dir.path}/$relative');
+    await file.writeAsBytes(ciphertext, flush: true);
+    return AttachmentRef(
+      originalFilename: filename,
+      mimeType: mimeType,
+      relativePath: relative,
+      sizeBytes: sizeBytes,
+      sha256Hex: sha256Hex,
+      addedAt: DateTime.now(),
+      serverId: serverId,
+    );
+  }
+
+  /// Expose the hex helper so callers computing a hash elsewhere can
+  /// render it in the same format we persist.
+  static String hex(List<int> bytes) => _hex(bytes);
+
   /// Materializes the decrypted bytes into a temporary file so that
   /// [OpenFilex] (or similar) can hand them to the OS viewer. The caller
   /// is responsible for best-effort deletion of the returned file.
