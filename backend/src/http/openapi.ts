@@ -508,6 +508,31 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
             '400': { description: 'Unknown kind or bad query.' },
           },
         },
+        delete: {
+          tags: ['resources'],
+          security: [{ bearer: [] }],
+          summary:
+            'Tombstone every live row of this kind in one call (bulk clear)',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['deviceId'],
+                  properties: {
+                    deviceId: { type: 'string', format: 'uuid' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { description: '`{cleared: <count>}`.' },
+            '400': { description: 'Unknown kind or bad body.' },
+            '429': { description: 'Write rate-limit hit.' },
+          },
+        },
       },
       '/resources/{kind}/{id}': {
         get: {

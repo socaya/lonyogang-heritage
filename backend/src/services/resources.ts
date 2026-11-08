@@ -194,6 +194,36 @@ export class ResourcesService {
     });
   }
 
+  /// Tombstones every live row of one kind for one account. Used by
+  /// bulk operations like "clear all dismissed alerts" where the client
+  /// does not want to walk every id. Returns the count tombstoned.
+  async clearKind(
+    accountId: string,
+    kind: ResourceKind,
+    deviceId: string,
+  ): Promise<number> {
+    const result = await this.db.query(
+      `update resources
+          set deleted_at = now(),
+              device_id = $3,
+              version = version + 1,
+              updated_at = now()
+        where account_id = $1 and kind = $2 and deleted_at is null`,
+      [accountId, kind, deviceId],
+    );
+    const cleared = result.rowCount ?? 0;
+    if (cleared > 0) {
+      await this.audit.record({
+        accountId,
+        actor: { kind: 'user', id: accountId },
+        action: 'resource.kind_cleared',
+        resource: `kind:${kind}`,
+        context: { cleared },
+      });
+    }
+    return cleared;
+  }
+
   /** For tests + health probes: counts live resources per kind. */
   async countByKind(accountId: string): Promise<Record<string, number>> {
     const rows = await queryMany<{ kind: string; c: number }>(

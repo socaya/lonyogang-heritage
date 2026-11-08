@@ -529,6 +529,30 @@ class RemoteSyncService implements SyncService {
     return RemoteResource.fromJson(jsonDecode(text) as Map<String, dynamic>);
   }
 
+  /// Tombstones every live row of a kind in one call. Returns the count
+  /// cleared. Used for bulk operations (e.g. "clear all alert
+  /// dismissals") where issuing one DELETE per id would be wasteful.
+  Future<int> clearResourceKind({
+    required String kind,
+    required String deviceId,
+  }) async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/resources/$kind');
+    final request = await _http.openUrl('DELETE', uri);
+    request.headers.set('authorization', 'Bearer ${creds.accessToken}');
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({'deviceId': deviceId}));
+    final response = await request.close().timeout(requestDeadline);
+    final text =
+        await response.transform(utf8.decoder).join().timeout(requestDeadline);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw HttpException('Clear failed: ${response.statusCode}', uri: uri);
+    }
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    return (decoded['cleared'] as num?)?.toInt() ?? 0;
+  }
+
   /// Tombstones a resource server-side. Sync pulls on other devices will
   /// see `deletedAt` and drop their local copy.
   Future<void> deleteResource({

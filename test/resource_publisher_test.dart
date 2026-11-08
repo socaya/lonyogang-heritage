@@ -17,6 +17,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _RecordingBackend {
   final List<_Call> puts = [];
   final List<_Call> deletes = [];
+  final List<String> clears = [];
   late final HttpServer server;
 
   static Future<_RecordingBackend> start() async {
@@ -32,6 +33,17 @@ class _RecordingBackend {
   Uri get baseUri => Uri.parse('http://${server.address.host}:${server.port}');
 
   Future<void> _handle(HttpRequest req) async {
+    // Kind-wide clear (DELETE /resources/:kind, no id).
+    final kindOnly = RegExp(r'^/resources/([^/]+)$').firstMatch(req.uri.path);
+    if (kindOnly != null && req.method == 'DELETE') {
+      await utf8.decoder.bind(req).join();
+      clears.add(kindOnly.group(1)!);
+      req.response.statusCode = 200;
+      req.response.headers.contentType = ContentType.json;
+      req.response.write(jsonEncode({'cleared': 1}));
+      await req.response.close();
+      return;
+    }
     final m = RegExp(r'^/resources/([^/]+)/([^/]+)$').firstMatch(req.uri.path);
     if (m == null) {
       req.response.statusCode = 404;
@@ -131,6 +143,24 @@ void main() {
     expect(backend.puts.first.kind, 'asset');
     expect(backend.puts.first.id, 'asset-1');
     expect(backend.puts.first.body['integrity']?['ownership_bps'], 10000);
+  });
+
+  test('clearDismissedAlerts fans out to DELETE /resources/alert_dismissal (kind-wide)',
+      () async {
+    final outbox = SyncOutbox();
+    final store = PortfolioStore(
+      outbox: outbox,
+      resourcePublisher: ResourcePublisher(remote: remote),
+    );
+    await store.load();
+    await store.setOwner('Owner');
+    await store.enablePassphrase('passphrase-of-length-12');
+    await store.dismissAlert('reminder:r1:2026-11-10T00:00:00.000');
+    await store.clearDismissedAlerts();
+    for (var i = 0; i < 20 && backend.clears.isEmpty; i += 1) {
+      await Future<void>.delayed(const Duration(milliseconds: 25));
+    }
+    expect(backend.clears, contains('alert_dismissal'));
   });
 
   test('deleteGoal fans out to DELETE /resources/goal/:id', () async {

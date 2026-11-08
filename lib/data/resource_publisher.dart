@@ -35,8 +35,6 @@ class ResourcePublisher {
     switch (kind) {
       case 'beneficiary_batch':
         return 'all';
-      case 'alert_dismissal_clear':
-        return 'all';
       case 'goal_delete':
       case 'trusted_contact_delete':
       case 'reminder_delete':
@@ -58,6 +56,10 @@ class ResourcePublisher {
     'trusted_contact_delete',
     'reminder_delete',
     'schedule_delete',
+  };
+
+  /// Payload types that clear an entire kind rather than one row.
+  static const Set<String> _clearKindKinds = {
     'alert_dismissal_clear',
   };
 
@@ -89,9 +91,13 @@ class ResourcePublisher {
     required String deviceId,
   }) async {
     try {
+      final restKind = _restKind(kind);
+      if (_clearKindKinds.contains(kind)) {
+        await remote.clearResourceKind(kind: restKind, deviceId: deviceId);
+        return;
+      }
       final id = _resolveId(kind, payload);
       if (id == null) return;
-      final restKind = _restKind(kind);
       if (_deleteKinds.contains(kind)) {
         await remote.deleteResource(
             kind: restKind, id: id, deviceId: deviceId);

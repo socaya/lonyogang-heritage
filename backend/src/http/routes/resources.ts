@@ -203,4 +203,33 @@ export async function registerResourceRoutes(
       return reply.code(204).send();
     },
   );
+
+  // Kind-wide clear. Used for bulk operations (e.g. "clear all alert
+  // dismissals") where the client does not want to issue one DELETE
+  // per id. Tombstones every live row of the kind and returns the
+  // count cleared.
+  app.delete(
+    '/resources/:kind',
+    { preHandler: auth, config: writeLimit },
+    async (req, reply) => {
+      const parsedParams = z
+        .object({ kind: kindSchema })
+        .safeParse(req.params);
+      if (!parsedParams.success) {
+        return reply.code(400).send({ error: 'bad_kind' });
+      }
+      const body = z
+        .object({ deviceId: z.string().uuid() })
+        .safeParse(req.body ?? {});
+      if (!body.success) {
+        return reply.code(400).send({ error: 'bad_body' });
+      }
+      const cleared = await deps.resources.clearKind(
+        req.auth!.accountId,
+        parsedParams.data.kind,
+        body.data.deviceId,
+      );
+      return reply.code(200).send({ cleared });
+    },
+  );
 }
