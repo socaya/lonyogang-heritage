@@ -341,9 +341,20 @@ List<WealthSnapshot> wealthHistory(
     final history = allValuations
         .where((v) => v.assetId == asset.id && !v.asOf.isAfter(date))
         .toList();
-    final fullValue = history.isNotEmpty
-        ? history.last.fullValueUgx
-        : (!asset.valuedAt.isAfter(date) ? asset.valueUgx : 0);
+    final lastObservedAt = history.isNotEmpty ? history.last.asOf : null;
+    // Use the asset's current value when its own valuedAt is the most
+    // recent observation on or before [date] — otherwise fall back to the
+    // freshest valuation record.
+    final useCurrent = !asset.valuedAt.isAfter(date) &&
+        (lastObservedAt == null || !asset.valuedAt.isBefore(lastObservedAt));
+    final int fullValue;
+    if (useCurrent) {
+      fullValue = asset.valueUgx;
+    } else if (history.isNotEmpty) {
+      fullValue = history.last.fullValueUgx;
+    } else {
+      fullValue = 0;
+    }
     return (fullValue * asset.ownershipBps) ~/ 10000;
   }
 

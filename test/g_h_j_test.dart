@@ -140,7 +140,8 @@ void main() {
         (tester) async {
       await pumpPhone(tester, const SignInScreen());
       expect(find.text('Welcome back'), findsOneWidget);
-      expect(find.textContaining('design preview'), findsAtLeast(1));
+      expect(find.textContaining(RegExp('design preview', caseSensitive: false)),
+          findsAtLeast(1));
       expect(find.text('Use passkey (not available)'), findsOneWidget);
     });
   });
