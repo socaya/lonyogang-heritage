@@ -151,7 +151,10 @@ export class AuditService {
         resource: r.resource,
         context: r.context,
       });
-      const expected = createHash('sha256').update(last ?? Buffer.alloc(0)).update(canonical).digest();
+      const expected: Buffer = createHash('sha256')
+        .update(last ?? Buffer.alloc(0))
+        .update(canonical)
+        .digest();
       if (!expected.equals(r.hash)) {
         return { verified: false, tipHash: last, count: rows.length, brokenAt: r.id };
       }

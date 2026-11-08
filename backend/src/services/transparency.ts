@@ -44,6 +44,7 @@ export class TransparencyService {
     let verified = 0;
     for (const { id } of accounts) {
       const result = await this.anchorAccount(id);
+      if (!result) continue;
       anchored += 1;
       if (result.verified) verified += 1;
     }

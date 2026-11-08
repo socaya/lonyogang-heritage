@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +11,7 @@ import 'data/portfolio_store.dart';
 import 'data/remote_sync.dart';
 import 'data/sync.dart';
 import 'data/sync_outbox.dart';
+import 'data/sync_reducer.dart';
 import 'presentation/app.dart';
 import 'presentation/onboarding_screens.dart';
 import 'presentation/online_scope.dart';
@@ -24,6 +27,7 @@ Future<void> main() async {
   final backendBase = Uri.tryParse(
     const String.fromEnvironment('LONYOGANG_BACKEND_URL', defaultValue: ''),
   );
+  final reducer = SyncReducer(store);
   final SyncService sync = backendBase == null || backendBase.toString().isEmpty
       ? NoopSyncService()
       : RemoteSyncService(
@@ -31,10 +35,8 @@ Future<void> main() async {
           credentialsLoader: credentials.load,
           credentialsSaver: credentials.save,
           outboxLoader: outbox.snapshot,
-          pullHandler: (_) async {
-            // Pull handler is a hook for a future reducer that decrypts an
-            // incoming event and merges it into the store. The current build
-            // stores ciphertext and only re-plays its own writes.
+          pullHandler: (record) async {
+            await reducer.apply(record);
           },
         );
   runApp(LonyoGangApp(
@@ -68,17 +70,40 @@ class LonyoGangApp extends StatefulWidget {
 
 class _LonyoGangAppState extends State<LonyoGangApp> {
   bool _schedulerReady = false;
+  Timer? _syncTimer;
+  Timer? _syncDebounce;
 
   @override
   void initState() {
     super.initState();
     widget.store.addListener(_syncScheduler);
+    widget.store.addListener(_scheduleRemoteSync);
+    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _runRemoteSync());
   }
 
   @override
   void dispose() {
     widget.store.removeListener(_syncScheduler);
+    widget.store.removeListener(_scheduleRemoteSync);
+    _syncTimer?.cancel();
+    _syncDebounce?.cancel();
     super.dispose();
+  }
+
+  void _scheduleRemoteSync() {
+    _syncDebounce?.cancel();
+    _syncDebounce = Timer(const Duration(seconds: 2), _runRemoteSync);
+  }
+
+  Future<void> _runRemoteSync() async {
+    final sync = widget.sync;
+    if (sync == null) return;
+    try {
+      await sync.sync();
+    } catch (_) {
+      // Transient network issues are swallowed; the status surface in
+      // DataSyncStatusScreen renders the resulting state.
+    }
   }
 
   Future<void> _syncScheduler() async {

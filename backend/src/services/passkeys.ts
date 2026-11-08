@@ -5,11 +5,15 @@ import {
   generateAuthenticationOptions,
   verifyAuthenticationResponse,
 } from '@simplewebauthn/server';
-import type {
-  AuthenticationResponseJSON,
-  RegistrationResponseJSON,
-} from '@simplewebauthn/types';
 import type { AppConfig } from '../config.js';
+
+// @simplewebauthn/server v10 ships its typed response shapes inline; the
+// public surface we need is the string-tagged JSON object the client sends.
+type AuthenticationResponseJSON = Parameters<typeof verifyAuthenticationResponse>[0]['response'];
+type RegistrationResponseJSON = Parameters<typeof verifyRegistrationResponse>[0]['response'];
+type AuthenticatorTransportFuture = NonNullable<
+  NonNullable<Parameters<typeof generateAuthenticationOptions>[0]['allowCredentials']>[number]['transports']
+>[number];
 import type { Db } from '../db.js';
 import { queryMany, queryOne, withTx } from '../db.js';
 import type { AuditService } from './audit.js';
@@ -56,7 +60,7 @@ export class PasskeyService {
       },
       excludeCredentials: existing.map((e) => ({
         id: e.credential_id.toString('base64url'),
-        transports: (e.transports as unknown) as AuthenticatorTransport[] | undefined,
+        transports: (e.transports as unknown) as AuthenticatorTransportFuture[] | undefined,
       })),
     });
     await this.persistChallenge(accountId, Buffer.from(options.challenge, 'base64url'), 'registration');
@@ -79,9 +83,16 @@ export class PasskeyService {
     if (!verification.verified || !verification.registrationInfo) {
       throw new Error('Passkey registration did not verify');
     }
-    const info = verification.registrationInfo;
-    const credentialIdBuf = Buffer.from(info.credential.id, 'base64url');
-    const publicKeyBuf = Buffer.from(info.credential.publicKey);
+    const info = verification.registrationInfo as unknown as {
+      credentialID: string;
+      credentialPublicKey: Uint8Array;
+      counter: number;
+      aaguid?: string;
+      credentialDeviceType?: string;
+      credentialBackedUp?: boolean;
+    };
+    const credentialIdBuf = Buffer.from(info.credentialID, 'base64url');
+    const publicKeyBuf = Buffer.from(info.credentialPublicKey);
     await this.db.query(
       `insert into passkeys (account_id, credential_id, public_key, counter, transports, aaguid, friendly_name)
        values ($1, $2, $3, $4, $5, $6, $7)`,
@@ -89,9 +100,9 @@ export class PasskeyService {
         input.accountId,
         credentialIdBuf,
         publicKeyBuf,
-        info.credential.counter,
-        info.credential.transports ?? [],
-        info.aaguid,
+        info.counter,
+        input.response.response.transports ?? [],
+        info.aaguid ?? null,
         input.friendlyName ?? null,
       ],
     );
@@ -105,7 +116,9 @@ export class PasskeyService {
   }
 
   async authenticationOptions(accountEmail?: string) {
-    let allowCredentials: { id: string; transports?: AuthenticatorTransport[] }[] | undefined;
+    let allowCredentials:
+      | { id: string; transports?: AuthenticatorTransportFuture[] }[]
+      | undefined;
     let accountId: string | null = null;
     if (accountEmail) {
       const account = await queryOne<{ id: string }>(
@@ -122,7 +135,7 @@ export class PasskeyService {
         );
         allowCredentials = creds.map((c) => ({
           id: c.credential_id.toString('base64url'),
-          transports: (c.transports as unknown) as AuthenticatorTransport[],
+          transports: (c.transports as unknown) as AuthenticatorTransportFuture[],
         }));
       }
     }
@@ -154,14 +167,14 @@ export class PasskeyService {
       expectedChallenge: challenge.toString('base64url'),
       expectedOrigin: this.config.RP_ORIGIN,
       expectedRPID: this.config.RP_ID,
-      credential: {
-        id: passkey.credential_id.toString('base64url'),
-        publicKey: new Uint8Array(passkey.public_key),
+      authenticator: {
+        credentialID: passkey.credential_id.toString('base64url'),
+        credentialPublicKey: new Uint8Array(passkey.public_key),
         counter: Number(passkey.counter),
-        transports: (passkey.transports as unknown) as AuthenticatorTransport[] | undefined,
+        transports: (passkey.transports as unknown) as AuthenticatorTransportFuture[] | undefined,
       },
       requireUserVerification: false,
-    });
+    } as unknown as Parameters<typeof verifyAuthenticationResponse>[0]);
     if (!verification.verified) throw new Error('Passkey assertion did not verify');
     await this.db.query(
       `update passkeys set counter = $1, last_used_at = now() where id = $2`,
