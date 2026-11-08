@@ -62,6 +62,8 @@ LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render
 - `EncryptionSetupScreen` — enables, re-links or removes the passphrase and biometric stash.
 - `FxRatesScreen` — offline FX reference entries.
 - `ScheduledContributionsScreen`, `ScheduleForm` — recurring contributions with one-tap post-and-advance.
+- `SessionsScreen` (`lib/presentation/sessions_screen.dart`) — lists every device session, shows user-agent + opened/refreshed/revoked timestamps, revokes a session with a confirmActionSheet. Reachable from OnlinePrivacyScreen when an online session is wired.
+- `PasswordResetCompleteScreen` (`lib/presentation/onboarding_screens.dart`) — closes the `/identity/password/reset/complete` loop inside the app, reachable from the RecoverAccountScreen "I already have a reset code" link.
 
 ## Entity detail routes (lib/presentation/detail_screens.dart)
 - E02 `LiabilityDetailScreen` — outstanding balance, lender, linked property, edit + archive/restore with confirmActionSheet.
