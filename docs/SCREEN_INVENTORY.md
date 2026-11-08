@@ -64,6 +64,9 @@ LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render
 - `ScheduledContributionsScreen`, `ScheduleForm` — recurring contributions with one-tap post-and-advance.
 - `SessionsScreen` (`lib/presentation/sessions_screen.dart`) — lists every device session, shows user-agent + opened/refreshed/revoked timestamps, revokes a session with a confirmActionSheet. Reachable from OnlinePrivacyScreen when an online session is wired.
 - `PasswordResetCompleteScreen` (`lib/presentation/onboarding_screens.dart`) — closes the `/identity/password/reset/complete` loop inside the app, reachable from the RecoverAccountScreen "I already have a reset code" link.
+- `TransparencyScreen` (`lib/presentation/transparency_screen.dart`) — verified/broken hero over `GET /audit/chain`, per-row hash+prev_hash from `GET /audit/entries`, anchor history and on-demand `POST /audit/anchors/run`. Reachable from SecurityCenterScreen when an online session is wired.
+- `SubscriptionScreen` — now reads the live `/billing/subscription` row when a backend is configured and shows tier/status/renewal/provider plus the attachment quota that comes with the tier; retains the honest preview panel for no-backend builds.
+- `OnlinePrivacyScreen` — marketing-consent toggle writes `PATCH /me` and re-fetches the profile so the "granted at" label updates. Entry points to TOTP enrol, Sessions, and account erasure (password re-auth prompted).
 
 ## Entity detail routes (lib/presentation/detail_screens.dart)
 - E02 `LiabilityDetailScreen` — outstanding balance, lender, linked property, edit + archive/restore with confirmActionSheet.
