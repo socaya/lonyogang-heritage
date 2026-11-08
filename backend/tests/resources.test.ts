@@ -124,6 +124,43 @@ describe('resources REST layer', () => {
     expect(after.statusCode).toBe(404);
   });
 
+  it('paginates with hasMore + nextSince so clients can drain large sets',
+      async () => {
+    const accessToken = await authed(`page-${Date.now()}@example.com`);
+    const h = { authorization: `Bearer ${accessToken}` };
+    for (let i = 0; i < 3; i += 1) {
+      const put = await harness.app.inject({
+        method: 'PUT',
+        url: `/resources/ledger_event/evt-${i}`,
+        headers: h,
+        payload: {
+          ciphertext: Buffer.from(`ciphertext-${i}`).toString('base64'),
+          deviceId: '00000000-0000-0000-0000-000000000083',
+        },
+      });
+      expect(put.statusCode).toBe(200);
+    }
+    const first = await harness.app.inject({
+      method: 'GET',
+      url: '/resources/ledger_event?limit=2',
+      headers: h,
+    });
+    const firstBody = first.json<{ resources: unknown[]; hasMore: boolean; nextSince: string | null }>();
+    expect(firstBody.resources).toHaveLength(2);
+    expect(firstBody.hasMore).toBe(true);
+    expect(firstBody.nextSince).not.toBeNull();
+
+    const second = await harness.app.inject({
+      method: 'GET',
+      url: `/resources/ledger_event?limit=2&since=${encodeURIComponent(firstBody.nextSince!)}`,
+      headers: h,
+    });
+    const secondBody = second.json<{ resources: unknown[]; hasMore: boolean }>();
+    // One row left after the first two.
+    expect(secondBody.resources).toHaveLength(1);
+    expect(secondBody.hasMore).toBe(false);
+  });
+
   it('rejects an oversized ciphertext up front', async () => {
     const accessToken = await authed(`big-${Date.now()}@example.com`);
     const h = { authorization: `Bearer ${accessToken}` };

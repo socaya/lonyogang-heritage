@@ -96,6 +96,51 @@ class _FakeBackend {
         });
         return;
       }
+      if (method == 'GET' && path.startsWith('/resources/liability')) {
+        // Simulate two-page pagination: first call returns one row + hasMore,
+        // second call (threaded `since`) returns the final row.
+        final since = req.uri.queryParameters['since'];
+        if (since == null) {
+          _writeJson(req, {
+            'resources': [
+              {
+                'kind': 'liability',
+                'id': 'l1',
+                'ciphertext': 'AAEC',
+                'integrity': null,
+                'prevHash': null,
+                'deviceId': '00000000-0000-0000-0000-000000000070',
+                'version': 1,
+                'createdAt': '2026-11-05T09:00:00.000Z',
+                'updatedAt': '2026-11-05T09:00:00.000Z',
+                'deletedAt': null,
+              },
+            ],
+            'hasMore': true,
+            'nextSince': '2026-11-05T09:00:00.000Z',
+          });
+        } else {
+          _writeJson(req, {
+            'resources': [
+              {
+                'kind': 'liability',
+                'id': 'l2',
+                'ciphertext': 'AAID',
+                'integrity': null,
+                'prevHash': null,
+                'deviceId': '00000000-0000-0000-0000-000000000070',
+                'version': 1,
+                'createdAt': '2026-11-06T09:00:00.000Z',
+                'updatedAt': '2026-11-06T09:00:00.000Z',
+                'deletedAt': null,
+              },
+            ],
+            'hasMore': false,
+            'nextSince': '2026-11-06T09:00:00.000Z',
+          });
+        }
+        return;
+      }
       if (method == 'GET' && path.startsWith('/resources/asset')) {
         _writeJson(req, {
           'resources': [
@@ -112,6 +157,8 @@ class _FakeBackend {
               'deletedAt': null,
             },
           ],
+          'hasMore': false,
+          'nextSince': '2026-11-07T09:00:00.000Z',
         });
         return;
       }
@@ -265,6 +312,18 @@ void main() {
     try {
       final providers = await buildSync(b).listBankProviders();
       expect(providers, ['mock', 'stanbic']);
+    } finally {
+      await b.close();
+    }
+  });
+
+  test('listResources drains every page until hasMore is false', () async {
+    final b = await _FakeBackend.start();
+    try {
+      final rows = await buildSync(b).listResources('liability');
+      // Two pages × one row each.
+      expect(rows, hasLength(2));
+      expect(rows.map((r) => r.id).toList(), ['l1', 'l2']);
     } finally {
       await b.close();
     }

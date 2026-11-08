@@ -92,16 +92,28 @@ export async function registerResourceRoutes(
     if (!query.success) {
       return reply.code(400).send({ error: 'bad_query' });
     }
+    const limit = query.data.limit ?? 500;
+    // Ask for one extra row so we can tell the caller whether another
+    // page is available without a count query.
     const rows = await deps.resources.listByKind(
       req.auth!.accountId,
       parsedParams.data.kind,
       {
         since: query.data.since ? new Date(query.data.since) : undefined,
-        limit: query.data.limit,
+        limit: limit + 1,
         includeDeleted: query.data.includeDeleted,
       },
     );
-    return { resources: rows.map(toWire) };
+    const hasMore = rows.length > limit;
+    const page = hasMore ? rows.slice(0, limit) : rows;
+    return {
+      resources: page.map(toWire),
+      hasMore,
+      // Clients loop by passing `nextSince = resources[last].updatedAt`.
+      nextSince: page.length > 0
+        ? page[page.length - 1]!.updatedAt.toISOString()
+        : null,
+    };
   });
 
   app.get('/resources/:kind/:id', { preHandler: auth, config: readLimit }, async (req, reply) => {

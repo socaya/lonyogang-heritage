@@ -461,9 +461,13 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
         get: {
           tags: ['resources'],
           security: [{ bearer: [] }],
-          summary: 'List current resources of a kind (ciphertext bodies)',
+          summary:
+            'List current resources of a kind with hasMore + nextSince pagination',
           responses: {
-            '200': { description: 'Resource list.' },
+            '200': {
+              description:
+                '`{resources, hasMore, nextSince}` — loop with `?since=<nextSince>` until `hasMore=false`.',
+            },
             '400': { description: 'Unknown kind or bad query.' },
           },
         },

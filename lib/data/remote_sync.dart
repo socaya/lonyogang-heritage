@@ -441,11 +441,10 @@ class RemoteSyncService implements SyncService {
     return rows;
   }
 
-  /// Lists the current state of one resource kind. The server returns the
-  /// encrypted ciphertext verbatim; the caller decrypts under the vault
-  /// content key and hands the plaintext to the matching reducer so a
-  /// web client can rebuild local state without replaying every event.
-  Future<List<RemoteResource>> listResources(
+  /// Returns one page of the current state for one resource kind. Use
+  /// [listAllResources] if the caller wants to drain every page in one
+  /// shot; this method is for pollers that want to paginate manually.
+  Future<RemoteResourcePage> listResourcesPage(
     String kind, {
     DateTime? since,
     int limit = 500,
@@ -462,9 +461,46 @@ class RemoteSyncService implements SyncService {
         _baseUri.resolve('/resources/$kind').replace(queryParameters: query);
     final text = await _request('GET', uri, creds);
     final decoded = jsonDecode(text) as Map<String, dynamic>;
-    return (decoded['resources'] as List<dynamic>? ?? const [])
-        .map((e) => RemoteResource.fromJson(e as Map<String, dynamic>))
-        .toList();
+    return RemoteResourcePage(
+      resources: (decoded['resources'] as List<dynamic>? ?? const [])
+          .map((e) => RemoteResource.fromJson(e as Map<String, dynamic>))
+          .toList(),
+      hasMore: decoded['hasMore'] == true,
+      nextSince: decoded['nextSince'] == null
+          ? null
+          : DateTime.parse(decoded['nextSince'] as String),
+    );
+  }
+
+  /// Convenience: drains every page for a kind by looping on `hasMore`
+  /// and threading `nextSince` forward. The hydrator uses this so large
+  /// accounts (thousands of valuations, hundreds of events) are not
+  /// silently truncated at the server's per-page cap.
+  Future<List<RemoteResource>> listResources(
+    String kind, {
+    DateTime? since,
+    int pageSize = 500,
+    bool includeDeleted = false,
+  }) async {
+    final collected = <RemoteResource>[];
+    DateTime? cursor = since;
+    // Safety ceiling — a single kind should not produce more than this.
+    for (var i = 0; i < 1000; i += 1) {
+      final page = await listResourcesPage(
+        kind,
+        since: cursor,
+        limit: pageSize,
+        includeDeleted: includeDeleted,
+      );
+      collected.addAll(page.resources);
+      if (!page.hasMore || page.nextSince == null) break;
+      if (cursor != null && page.nextSince!.isAtSameMomentAs(cursor)) {
+        // Guard against a server that keeps returning the same cursor.
+        break;
+      }
+      cursor = page.nextSince;
+    }
+    return collected;
   }
 
   /// Upserts a single resource ciphertext. Supply [expectedVersion] when
@@ -684,6 +720,19 @@ class RemoteSyncSession {
         expiresAt: DateTime.parse(
             (j['expires_at'] ?? j['expiresAt']) as String),
       );
+}
+
+/// One paginated page returned by `GET /resources/:kind`. Callers loop
+/// by threading `nextSince` forward until `hasMore` is false.
+class RemoteResourcePage {
+  final List<RemoteResource> resources;
+  final bool hasMore;
+  final DateTime? nextSince;
+  const RemoteResourcePage({
+    required this.resources,
+    required this.hasMore,
+    required this.nextSince,
+  });
 }
 
 /// A row returned by the per-entity resource REST layer.
