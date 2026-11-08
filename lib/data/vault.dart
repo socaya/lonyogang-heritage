@@ -220,9 +220,16 @@ class Vault extends ChangeNotifier {
     if (stash == null || salt == null) {
       throw StateError('No biometric stash is configured');
     }
-    final key = await VaultCrypto.deriveKey(_deviceSecret(), salt);
-    final envelope = (jsonDecode(stash) as Map).cast<String, String>();
-    return VaultCrypto.decryptString(envelope, key);
+    try {
+      final key = await VaultCrypto.deriveKey(_deviceSecret(), salt);
+      final envelope = (jsonDecode(stash) as Map).cast<String, String>();
+      return await VaultCrypto.decryptString(envelope, key);
+    } catch (err) {
+      // Stash is present but corrupted (user swapped device, crypto library
+      // rejects the bytes, etc.). Surface a stable error so the caller can
+      // fall back to the passphrase flow instead of crashing.
+      throw StateError('Biometric stash could not be decrypted: $err');
+    }
   }
 
   Future<String> unlockWithBiometricStash() async {

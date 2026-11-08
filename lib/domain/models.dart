@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 /// Values are stored in integer UGX units: never binary floating-point currency.
 /// Native-currency holdings require a separately implemented sourced FX policy.
@@ -16,8 +17,19 @@ int asInt(Object? value, [int fallback = 0]) => switch (value) {
     };
 String asString(Object? value, [String fallback = '']) => value is String ? value : fallback;
 DateTime readDate(Object? v) => DateTime.tryParse(asString(v)) ?? DateTime(2020);
-String makeId() => '${DateTime.now().microsecondsSinceEpoch}-${_idCounter++}';
-int _idCounter = 0;
+
+final Random _idRng = Random.secure();
+int _idCounter = _idRng.nextInt(1 << 32);
+// Ids must be globally unique inside a single install so sync reconciliation
+// can treat an id as a key. Microsecond resolution plus a per-process
+// random-seeded counter and a random tail gives enough entropy that two
+// writes in the same microsecond can't collide.
+String makeId() {
+  _idCounter = (_idCounter + 1) & 0xffffffff;
+  final tail = _idRng.nextInt(1 << 32).toRadixString(16).padLeft(8, '0');
+  return '${DateTime.now().microsecondsSinceEpoch.toRadixString(16)}-'
+      '${_idCounter.toRadixString(16)}-$tail';
+}
 
 class WealthAsset {
   final String id;

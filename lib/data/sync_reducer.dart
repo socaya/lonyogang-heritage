@@ -60,7 +60,18 @@ class SyncReducer {
         await store.postEvent(event);
         return true;
       case 'beneficiary_batch':
-        final list = (json['beneficiaries'] as List<dynamic>? ?? const [])
+        final raw = json['beneficiaries'];
+        if (raw is! List) return false;
+        // Empty batches are legal (user genuinely deleted everyone), but we
+        // insist on an explicit integrity tag so a reducer bug on the peer
+        // can't accidentally wipe the local list. A real emission from
+        // portfolio_store always ships `integrity.combined_bps`; an empty
+        // emission ships combined_bps: 0.
+        if (raw.isEmpty) {
+          final integrity = record.integrity;
+          if (integrity == null || integrity['combined_bps'] != 0) return false;
+        }
+        final list = raw
             .map((e) => BeneficiaryRecord.fromJson(
                 Map<String, dynamic>.from(e as Map)))
             .toList();
@@ -108,6 +119,13 @@ class SyncReducer {
       case 'reminder_delete':
         final id = json['id']?.toString() ?? '';
         if (id.isNotEmpty) await store.removeReminder(id);
+        return true;
+      case 'schedule':
+        await store.upsertSchedule(ScheduledContribution.fromJson(json));
+        return true;
+      case 'schedule_delete':
+        final id = json['id']?.toString() ?? '';
+        if (id.isNotEmpty) await store.deleteSchedule(id);
         return true;
       default:
         // Unknown payload type — ignore for forward-compat; the server may

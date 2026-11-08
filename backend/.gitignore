@@ -1,6 +1,9 @@
 node_modules
 dist
 coverage
+# Only pnpm-lock.yaml is tracked; npm install is used only for ad-hoc local
+# work and must not clobber the source-of-truth lockfile.
+package-lock.json
 .env
 .env.local
 .env.*.local

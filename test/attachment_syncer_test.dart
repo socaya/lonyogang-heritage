@@ -113,8 +113,13 @@ class _FakeBackend {
 }
 
 void main() {
-  TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() async {
+    // flutter_test shims HttpClient to return 400 by default after
+    // ensureInitialized runs. Re-install a passthrough override *after* the
+    // binding has set up SharedPreferences's platform channel so real HTTP
+    // works again against the loopback fake backend.
+    TestWidgetsFlutterBinding.ensureInitialized();
+    HttpOverrides.global = _PassthroughHttpOverrides();
     SharedPreferences.setMockInitialValues({});
     final store = CredentialsStore();
     await store.save(const RemoteSyncCredentials(
@@ -162,7 +167,10 @@ void main() {
       final fetched = await syncer.downloadCiphertext(id);
       expect(fetched, bytes);
       await syncer.deleteRemote(id);
-      expectLater(syncer.downloadCiphertext(id), throwsA(isA<HttpException>()));
+      await expectLater(
+        syncer.downloadCiphertext(id),
+        throwsA(isA<HttpException>()),
+      );
       syncer.close();
     } finally {
       await backend.close();
@@ -191,4 +199,13 @@ void main() {
       await backend.close();
     }
   });
+}
+
+/// HttpOverrides that returns a plain HttpClient — bypasses the default
+/// flutter_test override which returns an HTTP 400 for every request.
+class _PassthroughHttpOverrides extends HttpOverrides {
+  @override
+  HttpClient createHttpClient(SecurityContext? context) {
+    return super.createHttpClient(context);
+  }
 }

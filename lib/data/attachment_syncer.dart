@@ -17,12 +17,24 @@ class AttachmentSyncer {
     required Uri baseUri,
     required this.credentials,
     HttpClient? httpClient,
+    Duration connectTimeout = const Duration(seconds: 10),
+    this.controlDeadline = const Duration(seconds: 30),
+    this.transferDeadline = const Duration(minutes: 5),
   })  : _baseUri = baseUri,
-        _http = httpClient ?? HttpClient();
+        _http = httpClient ??
+            (HttpClient()..connectionTimeout = connectTimeout);
 
   final Uri _baseUri;
   final CredentialsStore credentials;
   final HttpClient _http;
+
+  /// Wraps presign/commit/delete calls. These are small JSON exchanges; 30s
+  /// is generous but still finite so a hung backend can't block the UI.
+  final Duration controlDeadline;
+
+  /// Wraps the large PUT/GET of the ciphertext itself. 5 min accommodates
+  /// slow mobile uplinks on the 25 MB cap without being unbounded.
+  final Duration transferDeadline;
 
   /// Uploads [bytes] (already AES-GCM encrypted by the vault) and returns
   /// the server-assigned attachment id. The caller is expected to persist
@@ -42,8 +54,9 @@ class AttachmentSyncer {
       'sha256': base64Encode(sha256),
       'mimeType': mimeType,
     }));
-    final presignRes = await presignReq.close();
-    final presignBody = await presignRes.transform(utf8.decoder).join();
+    final presignRes = await presignReq.close().timeout(controlDeadline);
+    final presignBody =
+        await presignRes.transform(utf8.decoder).join().timeout(controlDeadline);
     if (presignRes.statusCode < 200 || presignRes.statusCode >= 300) {
       throw HttpException(
           'presign HTTP ${presignRes.statusCode}: $presignBody',
@@ -58,8 +71,8 @@ class AttachmentSyncer {
     putReq.headers.contentType = ContentType.parse(mimeType);
     putReq.headers.set('content-length', bytes.length.toString());
     putReq.add(bytes);
-    final putRes = await putReq.close();
-    await putRes.drain<void>();
+    final putRes = await putReq.close().timeout(transferDeadline);
+    await putRes.drain<void>().timeout(transferDeadline);
     if (putRes.statusCode < 200 || putRes.statusCode >= 300) {
       throw HttpException('upload HTTP ${putRes.statusCode}', uri: uploadUrl);
     }
@@ -68,8 +81,8 @@ class AttachmentSyncer {
     final commitUri = _baseUri.resolve('/sync/attachments/$attachmentId/commit');
     final commitReq = await _http.postUrl(commitUri);
     _applyAuth(commitReq, creds);
-    final commitRes = await commitReq.close();
-    await commitRes.drain<void>();
+    final commitRes = await commitReq.close().timeout(controlDeadline);
+    await commitRes.drain<void>().timeout(controlDeadline);
     if (commitRes.statusCode != 204 && commitRes.statusCode != 200) {
       throw HttpException('commit HTTP ${commitRes.statusCode}', uri: commitUri);
     }
@@ -84,8 +97,9 @@ class AttachmentSyncer {
     final presignUri = _baseUri.resolve('/sync/attachments/$serverId');
     final presignReq = await _http.getUrl(presignUri);
     _applyAuth(presignReq, creds);
-    final presignRes = await presignReq.close();
-    final presignBody = await presignRes.transform(utf8.decoder).join();
+    final presignRes = await presignReq.close().timeout(controlDeadline);
+    final presignBody =
+        await presignRes.transform(utf8.decoder).join().timeout(controlDeadline);
     if (presignRes.statusCode < 200 || presignRes.statusCode >= 300) {
       throw HttpException(
           'presign HTTP ${presignRes.statusCode}: $presignBody',
@@ -94,14 +108,12 @@ class AttachmentSyncer {
     final presign = jsonDecode(presignBody) as Map<String, dynamic>;
     final downloadUrl = Uri.parse(presign['downloadUrl'] as String);
     final getReq = await _http.getUrl(downloadUrl);
-    final getRes = await getReq.close();
+    final getRes = await getReq.close().timeout(transferDeadline);
     if (getRes.statusCode < 200 || getRes.statusCode >= 300) {
       throw HttpException('download HTTP ${getRes.statusCode}', uri: downloadUrl);
     }
     final chunks = <int>[];
-    await for (final chunk in getRes) {
-      chunks.addAll(chunk);
-    }
+    await getRes.forEach(chunks.addAll).timeout(transferDeadline);
     return Uint8List.fromList(chunks);
   }
 
@@ -112,8 +124,8 @@ class AttachmentSyncer {
     final uri = _baseUri.resolve('/sync/attachments/$serverId');
     final req = await _http.deleteUrl(uri);
     _applyAuth(req, creds);
-    final res = await req.close();
-    await res.drain<void>();
+    final res = await req.close().timeout(controlDeadline);
+    await res.drain<void>().timeout(controlDeadline);
   }
 
   Future<RemoteSyncCredentials> _requireCreds() async {

@@ -137,8 +137,20 @@ class RemoteSyncService implements SyncService {
     required this.outboxLoader,
     required this.pullHandler,
     HttpClient? httpClient,
+    Duration connectTimeout = const Duration(seconds: 10),
+    Duration idleTimeout = const Duration(seconds: 20),
+    this.requestDeadline = const Duration(seconds: 30),
   })  : _baseUri = baseUri,
-        _http = httpClient ?? HttpClient();
+        _http = httpClient ??
+            (HttpClient()
+              ..connectionTimeout = connectTimeout
+              ..idleTimeout = idleTimeout);
+
+  /// Overall deadline applied to each end-to-end HTTP exchange. Wraps
+  /// `request.close()` + body read so a stalled TCP connection or a server
+  /// that accepts the socket but never writes a response can't hang the
+  /// sync forever.
+  final Duration requestDeadline;
 
   final Uri _baseUri;
   Uri get baseUri => _baseUri;
@@ -241,8 +253,11 @@ class RemoteSyncService implements SyncService {
     request.headers.set('authorization', 'Bearer ${creds.accessToken}');
     request.headers.contentType = ContentType.json;
     if (body != null) request.write(body);
-    final response = await request.close();
-    final text = await response.transform(utf8.decoder).join();
+    final response = await request.close().timeout(requestDeadline);
+    final text = await response
+        .transform(utf8.decoder)
+        .join()
+        .timeout(requestDeadline);
     if (response.statusCode == 401 && allowRefresh) {
       final refreshed = await _refreshTokens(creds);
       await credentialsSaver(refreshed);
@@ -259,8 +274,11 @@ class RemoteSyncService implements SyncService {
     final request = await _http.postUrl(uri);
     request.headers.contentType = ContentType.json;
     request.write(jsonEncode({'refreshToken': creds.refreshToken}));
-    final response = await request.close();
-    final text = await response.transform(utf8.decoder).join();
+    final response = await request.close().timeout(requestDeadline);
+    final text = await response
+        .transform(utf8.decoder)
+        .join()
+        .timeout(requestDeadline);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw HttpException('Refresh failed: $text', uri: uri);
     }
@@ -288,8 +306,8 @@ class RemoteSyncService implements SyncService {
       if (phone != null) 'phone': phone,
       if (displayName != null) 'displayName': displayName,
     }));
-    final response = await request.close();
-    final text = await response.transform(utf8.decoder).join();
+    final response = await request.close().timeout(requestDeadline);
+    final text = await response.transform(utf8.decoder).join().timeout(requestDeadline);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw HttpException('Sign-up failed: $text', uri: uri);
     }
@@ -311,8 +329,8 @@ class RemoteSyncService implements SyncService {
     final request = await _http.postUrl(uri);
     request.headers.contentType = ContentType.json;
     request.write(jsonEncode({'accountId': accountId, 'channel': channel, 'code': code}));
-    final response = await request.close();
-    final text = await response.transform(utf8.decoder).join();
+    final response = await request.close().timeout(requestDeadline);
+    final text = await response.transform(utf8.decoder).join().timeout(requestDeadline);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw HttpException('Verify failed: $text', uri: uri);
     }
@@ -328,8 +346,8 @@ class RemoteSyncService implements SyncService {
     final request = await _http.postUrl(uri);
     request.headers.contentType = ContentType.json;
     request.write(jsonEncode({'accountId': accountId, 'channel': channel}));
-    final response = await request.close();
-    final text = await response.transform(utf8.decoder).join();
+    final response = await request.close().timeout(requestDeadline);
+    final text = await response.transform(utf8.decoder).join().timeout(requestDeadline);
     if (response.statusCode != 202 && response.statusCode != 200) {
       throw HttpException('Resend failed: $text', uri: uri);
     }
@@ -352,8 +370,8 @@ class RemoteSyncService implements SyncService {
       'deviceId': deviceId,
       if (totpCode != null) 'totpCode': totpCode,
     }));
-    final response = await request.close();
-    final text = await response.transform(utf8.decoder).join();
+    final response = await request.close().timeout(requestDeadline);
+    final text = await response.transform(utf8.decoder).join().timeout(requestDeadline);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw HttpException('Sign-in failed: $text', uri: uri);
     }

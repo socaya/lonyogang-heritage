@@ -487,10 +487,19 @@ class PortfolioStore extends ChangeNotifier {
   }
 
   Future<void> deleteBeneficiary(String id) async {
-    _state = _replace(
-        beneficiaries:
-            _state.beneficiaries.where((x) => x.id != id).toList());
+    final remaining =
+        _state.beneficiaries.where((x) => x.id != id).toList();
+    _state = _replace(beneficiaries: remaining);
     await _save();
+    // Beneficiaries sync as a full batch so a second device sees the
+    // deletion as the absence of an id — not emitting here would leave
+    // the deleted person alive on every other install.
+    final total = remaining.fold<int>(0, (sum, x) => sum + x.intendedShareBps);
+    await _recordOutbox(
+      payloadType: 'beneficiary_batch',
+      payload: {'beneficiaries': remaining.map((e) => e.toJson()).toList()},
+      integrity: {'combined_bps': total},
+    );
   }
 
   Future<void> recordValuation(
@@ -568,20 +577,28 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(scheduled: list);
     await _save();
+    await _recordOutbox(payloadType: 'schedule', payload: schedule.toJson());
   }
 
   Future<void> pauseSchedule(String id, {required bool active}) async {
-    _state = _replace(
-        scheduled: _state.scheduled
-            .map((s) => s.id == id ? s.withActive(active) : s)
-            .toList());
+    final updated = _state.scheduled
+        .map((s) => s.id == id ? s.withActive(active) : s)
+        .toList();
+    _state = _replace(scheduled: updated);
     await _save();
+    for (final s in updated) {
+      if (s.id == id) {
+        await _recordOutbox(payloadType: 'schedule', payload: s.toJson());
+        return;
+      }
+    }
   }
 
   Future<void> deleteSchedule(String id) async {
     _state = _replace(
         scheduled: _state.scheduled.where((s) => s.id != id).toList());
     await _save();
+    await _recordOutbox(payloadType: 'schedule_delete', payload: {'id': id});
   }
 
   /// Posts a ledger event for the scheduled contribution and advances its

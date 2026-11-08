@@ -28,7 +28,7 @@ void main() {
       id: 'remote-asset-1',
       name: 'Imported plot',
       kind: AssetKind.property,
-      valueUgx: 42_000_000,
+      valueUgx: 42000000,
       ownershipBps: 10000,
       valuedAt: DateTime(2026, 11, 1),
     );

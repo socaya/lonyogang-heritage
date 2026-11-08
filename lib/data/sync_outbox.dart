@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
@@ -17,6 +18,11 @@ import 'remote_sync.dart';
 class SyncOutbox extends ChangeNotifier {
   static const _prefsKey = 'lonyogang_sync_outbox_v1';
   static const contentKeyInfo = 'content-key-v1';
+  // Hard cap so a device that stays offline forever (or a reducer bug that
+  // keeps replaying entries) can't bloat SharedPreferences without bound.
+  // The oldest entries are dropped once the cap is reached; the server pull
+  // will re-hydrate them on next connection.
+  static const int maxEntries = 5000;
 
   final List<_OutboxEntry> _entries = [];
   bool _loaded = false;
@@ -35,8 +41,11 @@ class SyncOutbox extends ChangeNotifier {
         for (final item in list) {
           _entries.add(_OutboxEntry.fromJson(item as Map<String, dynamic>));
         }
-      } catch (_) {
-        // Corrupted cache — drop and move on. The server pull will re-hydrate.
+      } catch (err) {
+        // Corrupted cache — log so a dev tailing the console knows we lost
+        // state, then move on. The server pull will re-hydrate what the
+        // server already received; anything still queued is genuinely lost.
+        debugPrint('[sync_outbox] dropped corrupted cache: $err');
       }
     }
     _loaded = true;
@@ -64,7 +73,7 @@ class SyncOutbox extends ChangeNotifier {
     final bytes = utf8.encode(jsonEncode(payload));
     final ciphertext = await VaultCrypto.encryptBytes(bytes, contentKey);
     final entry = _OutboxEntry(
-      id: _ulid(),
+      id: _ulid(deviceId),
       payloadType: payloadType,
       ciphertext: ciphertext,
       integrity: integrity,
@@ -72,6 +81,15 @@ class SyncOutbox extends ChangeNotifier {
       deviceId: deviceId,
     );
     _entries.add(entry);
+    // Retention cap: oldest entries first. In practice the outbox drains on
+    // every sync, so hitting this cap requires either an offline binge or
+    // the server rejecting every push — both deserve the data loss over
+    // runaway disk.
+    if (_entries.length > maxEntries) {
+      final overflow = _entries.length - maxEntries;
+      debugPrint('[sync_outbox] trimming $overflow stale entries (cap $maxEntries)');
+      _entries.removeRange(0, overflow);
+    }
     await _persist();
     notifyListeners();
   }
@@ -122,11 +140,28 @@ class SyncOutbox extends ChangeNotifier {
     );
   }
 
-  static int _counter = 0;
-  static String _ulid() {
+  static int _counter = Random.secure().nextInt(1 << 16);
+  static final String _processSuffix = () {
+    final rand = Random.secure();
+    final buf = StringBuffer();
+    for (int i = 0; i < 4; i++) {
+      buf.write(rand.nextInt(36).toRadixString(36));
+    }
+    return buf.toString();
+  }();
+
+  /// Monotonic-ish event id.
+  ///
+  /// We mix in a per-process random suffix and the device id so two
+  /// outboxes writing at the same millisecond on different installs (or a
+  /// user reinstalling the app) can never collide on the same id — a
+  /// collision would let one device's push silently delete another's row
+  /// at the server.
+  static String _ulid(String deviceId) {
     _counter = (_counter + 1) & 0xffff;
     final ms = DateTime.now().millisecondsSinceEpoch;
-    return '${ms.toRadixString(32)}-${_counter.toRadixString(32).padLeft(4, '0')}';
+    final devScope = deviceId.length >= 4 ? deviceId.substring(0, 4) : deviceId;
+    return '${ms.toRadixString(32)}-$devScope-$_processSuffix-${_counter.toRadixString(32).padLeft(4, '0')}';
   }
 }
 

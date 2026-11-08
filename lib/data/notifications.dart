@@ -89,19 +89,25 @@ List<ScheduledAlert> computeScheduledAlerts(
   }
 
   if (opts.staleValuations) {
+    // Two complementary cases:
+    //   - still fresh → schedule a reminder for the moment it crosses the
+    //     staleAfter window;
+    //   - already stale → fire a "please re-value" alert right now so the
+    //     user is not left ignorant about a year-old number.
     for (final a in state.assets.where((x) => !x.archived)) {
       final aging = now.difference(a.valuedAt);
-      if (aging > staleAfter) continue;
-      final fire = a.valuedAt.add(staleAfter);
-      if (fire.isAfter(now)) {
-        out.add(ScheduledAlert(
-          id: 'stale-${a.id}',
-          title: 'Valuation getting stale',
-          body: '${a.name} has not been revalued in a year',
-          fireAt: fire,
-          kind: AlertKind.staleValuation,
-        ));
-      }
+      final fireAt = aging > staleAfter ? now : a.valuedAt.add(staleAfter);
+      out.add(ScheduledAlert(
+        id: 'stale-${a.id}',
+        title: aging > staleAfter
+            ? 'Valuation overdue'
+            : 'Valuation getting stale',
+        body: aging > staleAfter
+            ? '${a.name} has not been revalued in over a year'
+            : '${a.name} has not been revalued in a year',
+        fireAt: fireAt,
+        kind: AlertKind.staleValuation,
+      ));
     }
   }
 

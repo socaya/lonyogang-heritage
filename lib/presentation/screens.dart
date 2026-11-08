@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
-import '../data/sync_outbox.dart';
 import '../domain/finance.dart';
 import '../domain/models.dart';
 import 'widgets.dart';
