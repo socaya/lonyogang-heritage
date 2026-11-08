@@ -694,6 +694,7 @@ class PortfolioStore extends ChangeNotifier {
     List<FxRate>? fxRates,
     List<ScheduledContribution>? scheduled,
     Map<String, int>? targetWeightsBps,
+    Set<String>? dismissedAlertKeys,
   }) =>
       PortfolioState(
           ownerName: ownerName ?? _state.ownerName,
@@ -712,5 +713,29 @@ class PortfolioStore extends ChangeNotifier {
           fxRates: fxRates ?? _state.fxRates,
           scheduled: scheduled ?? _state.scheduled,
           targetWeightsBps:
-              targetWeightsBps ?? _state.targetWeightsBps);
+              targetWeightsBps ?? _state.targetWeightsBps,
+          dismissedAlertKeys:
+              dismissedAlertKeys ?? _state.dismissedAlertKeys);
+
+  /// Hides a single alert from the notification centre until the underlying
+  /// record moves to a later occurrence. Persists through sync so a
+  /// dismissal on one device sticks on the next.
+  Future<void> dismissAlert(String key) async {
+    if (_state.dismissedAlertKeys.contains(key)) return;
+    _state = _replace(
+        dismissedAlertKeys: {..._state.dismissedAlertKeys, key});
+    await _save();
+    await _recordOutbox(
+        payloadType: 'alert_dismissal', payload: {'key': key});
+  }
+
+  /// Clears every suppression. Exposed on the notification-preferences
+  /// screen so a user who dismissed a reminder too eagerly can get it back.
+  Future<void> clearDismissedAlerts() async {
+    if (_state.dismissedAlertKeys.isEmpty) return;
+    _state = _replace(dismissedAlertKeys: const <String>{});
+    await _save();
+    await _recordOutbox(
+        payloadType: 'alert_dismissal_clear', payload: const <String, dynamic>{});
+  }
 }

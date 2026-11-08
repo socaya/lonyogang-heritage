@@ -203,9 +203,4 @@ void main() {
 
 /// HttpOverrides that returns a plain HttpClient — bypasses the default
 /// flutter_test override which returns an HTTP 400 for every request.
-class _PassthroughHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context);
-  }
-}
+class _PassthroughHttpOverrides extends HttpOverrides {}

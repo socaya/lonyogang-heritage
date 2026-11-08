@@ -7,6 +7,8 @@ import '../domain/models.dart';
 import 'components.dart';
 import 'detail_screens.dart';
 import 'forms.dart';
+import 'online_privacy_screen.dart';
+import 'online_scope.dart';
 import 'security_screens.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
@@ -147,11 +149,15 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                   title: 'Issue date',
                   child: SoftCard(
                       onTap: () async {
+                        // Issue dates are always in the past: a document
+                        // can't have been issued tomorrow. Clamp the picker
+                        // so an accidental tap into next year is impossible.
+                        final today = DateTime.now();
                         final v = await showDatePicker(
                             context: context,
-                            initialDate: issued ?? DateTime.now(),
+                            initialDate: issued ?? today,
                             firstDate: DateTime(1950),
-                            lastDate: DateTime(2100));
+                            lastDate: today);
                         if (v != null) setState(() => issued = v);
                       },
                       child: Row(children: [
@@ -213,6 +219,11 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                 expires!.isBefore(issued!)) {
               ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
                   content: Text('Expiry cannot precede issue date')));
+              return;
+            }
+            if (issued != null && issued!.isAfter(DateTime.now())) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Issue date cannot be in the future')));
               return;
             }
             setState(() => saving = true);
@@ -362,12 +373,21 @@ class LocalAlert {
   });
 }
 
+/// Composes a dismissal key the way `buildLocalAlerts` does — exported so
+/// the UI can dismiss the exact same alert it's currently showing.
+String localAlertKey(LocalAlertSource source, String sourceId, DateTime occurrence) {
+  return '${source.name}:$sourceId:${occurrence.toIso8601String()}';
+}
+
 List<LocalAlert> buildLocalAlerts(PortfolioState state, DateTime now) {
   final out = <LocalAlert>[];
+  bool isDismissed(LocalAlertSource s, String id, DateTime occ) =>
+      state.dismissedAlertKeys.contains(localAlertKey(s, id, occ));
   if (state.notificationOptions.upcomingReminders) {
     for (final r in state.reminders.where((x) => !x.completed)) {
       final delta = r.dueAt.difference(now).inDays;
       if (delta <= 30) {
+        if (isDismissed(LocalAlertSource.reminder, r.id, r.dueAt)) continue;
         out.add(LocalAlert(
           source: LocalAlertSource.reminder,
           sourceId: r.id,
@@ -384,6 +404,7 @@ List<LocalAlert> buildLocalAlerts(PortfolioState state, DateTime now) {
     for (final d in state.documents.where((x) => !x.archived && x.expiresAt != null)) {
       final delta = d.expiresAt!.difference(now).inDays;
       if (delta <= 60) {
+        if (isDismissed(LocalAlertSource.documentExpiry, d.id, d.expiresAt!)) continue;
         out.add(LocalAlert(
           source: LocalAlertSource.documentExpiry,
           sourceId: d.id,
@@ -399,6 +420,7 @@ List<LocalAlert> buildLocalAlerts(PortfolioState state, DateTime now) {
   if (state.notificationOptions.staleValuations) {
     for (final a in state.assets.where((x) => !x.archived)) {
       if (now.difference(a.valuedAt).inDays > 365) {
+        if (isDismissed(LocalAlertSource.staleValuation, a.id, a.valuedAt)) continue;
         out.add(LocalAlert(
           source: LocalAlertSource.staleValuation,
           sourceId: a.id,
@@ -446,37 +468,54 @@ class NotificationsCenterScreen extends StatelessWidget {
               else
                 ...alerts.map((a) => Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: SoftCard(
-                        onTap: () => openWealthPage(
-                            context,
-                            NotificationDetailScreen(store: store, alert: a)),
-                        child: Row(children: [
-                          Container(
-                              width: 44,
-                              height: 44,
-                              decoration: BoxDecoration(
-                                  color: a.urgent
-                                      ? const Color(0xFFF8EAE7)
-                                      : LG.sageSoft,
-                                  borderRadius: BorderRadius.circular(12)),
-                              child: Icon(a.icon,
-                                  color: a.urgent ? LG.negative : LG.sage)),
-                          const SizedBox(width: 12),
-                          Expanded(
-                              child: Column(
-                                  crossAxisAlignment:
-                                      CrossAxisAlignment.start,
-                                  children: [
-                                Text(a.title,
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.w700)),
-                                const SizedBox(height: 4),
-                                Text(a.detail,
-                                    style: const TextStyle(
-                                        color: LG.muted, fontSize: 12)),
-                              ])),
-                          const Icon(Icons.chevron_right, color: LG.muted),
-                        ]),
+                      child: Semantics(
+                        label: '${a.title}, ${a.detail}',
+                        button: true,
+                        child: SoftCard(
+                          onTap: () => openWealthPage(
+                              context,
+                              NotificationDetailScreen(store: store, alert: a)),
+                          child: Row(children: [
+                            Container(
+                                width: 44,
+                                height: 44,
+                                decoration: BoxDecoration(
+                                    color: a.urgent
+                                        ? const Color(0xFFF8EAE7)
+                                        : LG.sageSoft,
+                                    borderRadius: BorderRadius.circular(12)),
+                                child: Icon(a.icon,
+                                    color: a.urgent ? LG.negative : LG.sage)),
+                            const SizedBox(width: 12),
+                            Expanded(
+                                child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                  Text(a.title,
+                                      style: const TextStyle(
+                                          fontWeight: FontWeight.w700)),
+                                  const SizedBox(height: 4),
+                                  Text(a.detail,
+                                      style: const TextStyle(
+                                          color: LG.muted, fontSize: 12)),
+                                ])),
+                            IconButton(
+                                tooltip: 'Dismiss',
+                                visualDensity: VisualDensity.compact,
+                                icon: const Icon(Icons.close_rounded,
+                                    color: LG.muted, size: 20),
+                                onPressed: () async {
+                                  final messenger =
+                                      ScaffoldMessenger.maybeOf(context);
+                                  await store.dismissAlert(localAlertKey(
+                                      a.source, a.sourceId, a.occurrence));
+                                  messenger?.showSnackBar(const SnackBar(
+                                      content: Text('Alert dismissed')));
+                                }),
+                            const Icon(Icons.chevron_right, color: LG.muted),
+                          ]),
+                        ),
                       ),
                     )),
               const SizedBox(height: 22),
@@ -684,6 +723,23 @@ class SecurityCenterScreen extends StatelessWidget {
       const SizedBox(height:10),
       OutlinedButton.icon(onPressed:()=>openWealthPage(context,SettingsScreen(store:store)),
         icon:const Icon(Icons.settings_backup_restore),label:const Text('Data management settings')),
+      const SizedBox(height:10),
+      // Online privacy (data-subject rights, erasure, export) belongs on the
+      // security surface: a user looking for "how do I delete my data" starts
+      // here, not under Account. Only surface the entry when the device has
+      // an online session configured — otherwise the screen has nothing to
+      // show.
+      Builder(builder:(context){
+        final scope=OnlineScope.maybeOf(context);
+        final baseUri=scope?.sync?.baseUri;
+        if(baseUri==null||scope==null)return const SizedBox.shrink();
+        return OutlinedButton.icon(
+          onPressed:()=>openWealthPage(context,OnlinePrivacyScreen(
+            baseUri:baseUri,
+            credentials:scope.credentials)),
+          icon:const Icon(Icons.policy_outlined),
+          label:const Text('Online privacy & data rights'));
+      }),
       const SizedBox(height:18),const Text(
         'This device is the only place holding your passphrase or derived key — there is no server-side recovery. Keep an unencrypted JSON export in a safe physical location.',
         style:TextStyle(color:LG.muted,fontSize:12,height:1.55)),

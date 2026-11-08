@@ -463,6 +463,15 @@ class _ScheduleFormState extends State<ScheduleForm> {
                   ElevatedButton(
                       onPressed: () async {
                         if (!form.currentState!.validate()) return;
+                        final earliest =
+                            DateTime.now().subtract(const Duration(days: 30));
+                        if (nextFire.isBefore(earliest)) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                  content: Text(
+                                      'Next due date can be at most 30 days in the past')));
+                          return;
+                        }
                         final n = int.parse(amount.text.replaceAll(',', ''));
                         await widget.store.upsertSchedule(ScheduledContribution(
                             id: widget.existing?.id ?? makeId(),

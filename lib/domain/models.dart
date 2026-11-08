@@ -175,12 +175,17 @@ class PortfolioState {
   final List<ScheduledContribution> scheduled;
   /// Target weights by asset id, stored as basis points (10,000 = 100%).
   final Map<String,int> targetWeightsBps;
+  /// Dismissed alerts, keyed `source:sourceId:isoOccurrence`. The notification
+  /// center suppresses an entry whose key is present until the underlying
+  /// record moves to a later occurrence (e.g. reminder dueAt changes).
+  final Set<String> dismissedAlertKeys;
   const PortfolioState({this.ownerName='',this.onboardingDone=false,this.assets=const [],this.liabilities=const [],
     this.events=const [],this.goals=const [],this.contacts=const [],this.reminders=const [],
     this.documents=const [],this.beneficiaries=const [],this.valuations=const [],
     this.notificationOptions=const NotificationOptions(),
     this.fxRates=const [],this.scheduled=const [],
-    this.targetWeightsBps=const <String,int>{}});
+    this.targetWeightsBps=const <String,int>{},
+    this.dismissedAlertKeys=const <String>{}});
   Json toJson()=>{'schemaVersion':2,'ownerName':ownerName,'onboardingDone':onboardingDone,
     'assets':assets.map((x)=>x.toJson()).toList(),'liabilities':liabilities.map((x)=>x.toJson()).toList(),
     'events':events.map((x)=>x.toJson()).toList(),'goals':goals.map((x)=>x.toJson()).toList(),
@@ -191,7 +196,8 @@ class PortfolioState {
     'notificationOptions':notificationOptions.toJson(),
     'fxRates':fxRates.map((x)=>x.toJson()).toList(),
     'scheduled':scheduled.map((x)=>x.toJson()).toList(),
-    'targetWeightsBps':targetWeightsBps};
+    'targetWeightsBps':targetWeightsBps,
+    'dismissedAlertKeys':dismissedAlertKeys.toList()};
   factory PortfolioState.fromJson(Json j) {
     final v=asInt(j['schemaVersion']);
     if (v!=1 && v!=2) throw const FormatException('Unsupported portfolio data schema');
@@ -212,6 +218,8 @@ class PortfolioState {
       fxRates:read('fxRates',FxRate.fromJson),
       scheduled:read('scheduled',ScheduledContribution.fromJson),
       targetWeightsBps:weights,
+      dismissedAlertKeys:(j['dismissedAlertKeys'] as List<dynamic>? ?? const [])
+          .map((e)=>e.toString()).toSet(),
       notificationOptions:NotificationOptions.fromJson(j['notificationOptions'] is Map ? Map<String,dynamic>.from(j['notificationOptions'] as Map) : <String,dynamic>{}));
   }
   String encode()=>jsonEncode(toJson());

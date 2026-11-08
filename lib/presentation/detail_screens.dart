@@ -477,6 +477,9 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                                   '${_sizeHuman(attachment.sizeBytes)} · ${attachment.mimeType}',
                                   style: const TextStyle(
                                       color: LG.muted, fontSize: 12)),
+                              const SizedBox(height: 4),
+                              _AttachmentSyncBadge(
+                                  uploaded: attachment.serverId != null),
                             ])),
                         IconButton(
                             tooltip: 'Remove file',
@@ -552,5 +555,39 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
     if (bytes < 1024) return '$bytes B';
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+}
+
+/// Small pill that tells the user whether an attachment still only lives on
+/// this device or has been copied to the backend. Mirrors the serverId flag
+/// on the AttachmentRef — populated only after the three-phase sync commits.
+class _AttachmentSyncBadge extends StatelessWidget {
+  final bool uploaded;
+  const _AttachmentSyncBadge({required this.uploaded});
+
+  @override
+  Widget build(BuildContext context) {
+    final Color bg = uploaded ? LG.sageSoft : const Color(0xFFF2EFE5);
+    final Color fg = uploaded ? LG.sage : LG.gold;
+    final IconData icon =
+        uploaded ? Icons.cloud_done_outlined : Icons.phone_iphone_rounded;
+    final String label = uploaded ? 'Uploaded to backend' : 'Local only';
+    return Semantics(
+      label: 'Attachment sync status: $label',
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: bg,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 12, color: fg),
+          const SizedBox(width: 6),
+          Text(label,
+              style: TextStyle(
+                  color: fg, fontSize: 11, fontWeight: FontWeight.w600)),
+        ]),
+      ),
+    );
   }
 }

@@ -127,6 +127,13 @@ class SyncReducer {
         final id = json['id']?.toString() ?? '';
         if (id.isNotEmpty) await store.deleteSchedule(id);
         return true;
+      case 'alert_dismissal':
+        final key = json['key']?.toString() ?? '';
+        if (key.isNotEmpty) await store.dismissAlert(key);
+        return true;
+      case 'alert_dismissal_clear':
+        await store.clearDismissedAlerts();
+        return true;
       default:
         // Unknown payload type — ignore for forward-compat; the server may
         // route newer entities we don't yet understand.
