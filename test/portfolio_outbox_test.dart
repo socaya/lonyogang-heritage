@@ -124,6 +124,23 @@ void main() {
     expect(afterRemove, hasLength(1));
   });
 
+  test('setTargetWeight emits a target_weights event with the full map',
+      () async {
+    final outbox = SyncOutbox();
+    final store = PortfolioStore(outbox: outbox);
+    await store.load();
+    await store.setOwner('Owner');
+    await store.enablePassphrase('passphrase-of-length-12');
+    await store.setTargetWeight('asset-1', 6000);
+    await store.setTargetWeight('asset-2', 4000);
+    final events = (await outbox.snapshot())
+        .where((e) => e.payloadType == 'target_weights')
+        .toList();
+    // Two upserts → two events; the latter carries combined 10000.
+    expect(events, hasLength(2));
+    expect(events.last.integrity?['combined_bps'], 10000);
+  });
+
   test('schedule upsert + pause + delete each emit their own event', () async {
     final outbox = SyncOutbox();
     final store = PortfolioStore(outbox: outbox);

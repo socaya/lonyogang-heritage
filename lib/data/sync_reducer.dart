@@ -137,6 +137,17 @@ class SyncReducer {
       case 'fx_rate':
         await store.upsertFxRate(FxRate.fromJson(json));
         return true;
+      case 'target_weights':
+        {
+          final raw = json['weights'];
+          if (raw is! Map) return false;
+          final weights = <String, int>{};
+          raw.forEach((k, v) {
+            if (v is num) weights[k.toString()] = v.toInt();
+          });
+          await store.replaceTargetWeights(weights);
+          return true;
+        }
       case 'fx_rate_delete':
         {
           final id = json['id']?.toString() ?? '';

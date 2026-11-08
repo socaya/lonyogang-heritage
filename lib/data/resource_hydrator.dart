@@ -22,6 +22,7 @@ const List<String> _hydrationOrder = [
   'fx_rate',
   'beneficiary_batch',
   'alert_dismissal',
+  'target_weights',
 ];
 
 /// Progress ticks emitted by [ResourceHydrator.hydrate]. The UI uses this

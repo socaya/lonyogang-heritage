@@ -658,6 +658,17 @@ class PortfolioStore extends ChangeNotifier {
     await upsertSchedule(advanced);
   }
 
+  /// Replaces the full target-weight map in one shot. Used by the sync
+  /// reducer when a peer device publishes a new allocation plan.
+  Future<void> replaceTargetWeights(Map<String, int> weights) async {
+    final sanitised = <String, int>{};
+    weights.forEach((k, v) {
+      if (v > 0 && v <= 10000) sanitised[k] = v;
+    });
+    _state = _replace(targetWeightsBps: sanitised);
+    await _save();
+  }
+
   Future<void> setTargetWeight(String assetId, int bps) async {
     if (bps < 0 || bps > 10000) {
       throw ArgumentError('Target weight must be between 0 and 100%');
@@ -670,6 +681,14 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(targetWeightsBps: weights);
     await _save();
+    // Sync the whole map as one row — target weights only make sense as
+    // a coherent allocation, mirroring the beneficiary_batch shape.
+    final combined = weights.values.fold<int>(0, (acc, v) => acc + v);
+    await _recordOutbox(
+      payloadType: 'target_weights',
+      payload: {'id': 'all', 'weights': weights},
+      integrity: {'combined_bps': combined},
+    );
   }
 
   /// Portable JSON export is intentionally user-initiated and clearly warns
