@@ -125,7 +125,7 @@ class DataSyncStatusScreen extends StatelessWidget {
               const SizedBox(height: 18),
               const SectionTitle('Remote state'),
               _RemoteStatusCard(sync: sync),
-              _OnlineAccountCta(sync: sync),
+              _OnlineAccountCta(sync: sync, store: store),
               _ResourceHydrateCta(store: store),
               const SizedBox(height: 18),
               const SecurityNotice(
@@ -193,7 +193,8 @@ class _RemoteStatusCard extends StatelessWidget {
 /// never advertises a service that cannot actually run.
 class _OnlineAccountCta extends StatelessWidget {
   final SyncService? sync;
-  const _OnlineAccountCta({required this.sync});
+  final PortfolioStore store;
+  const _OnlineAccountCta({required this.sync, required this.store});
   @override
   Widget build(BuildContext context) {
     final scope = OnlineScope.maybeOf(context);
@@ -225,6 +226,7 @@ class _OnlineAccountCta extends StatelessWidget {
                       builder: (_) => OnlinePrivacyScreen(
                             baseUri: remote.baseUri,
                             credentials: scope.credentials,
+                            store: store,
                           )));
                 },
                 icon: const Icon(Icons.policy_outlined),

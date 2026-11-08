@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 
 import '../core/design.dart';
 import '../data/credentials_store.dart';
+import '../data/portfolio_store.dart';
 import '../data/remote_sync.dart';
 import 'components.dart';
 import 'online_scope.dart';
@@ -22,10 +23,15 @@ import 'widgets.dart';
 class OnlinePrivacyScreen extends StatefulWidget {
   final Uri baseUri;
   final CredentialsStore credentials;
+  /// Optional — when supplied the screen also mirrors a server
+  /// displayName edit back onto PortfolioStore.ownerName so the home
+  /// screen greeting updates without needing a round-trip sync.
+  final PortfolioStore? store;
   const OnlinePrivacyScreen({
     super.key,
     required this.baseUri,
     required this.credentials,
+    this.store,
   });
   @override
   State<OnlinePrivacyScreen> createState() => _OnlinePrivacyScreenState();
@@ -162,6 +168,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
     setState(() => _working = true);
     try {
       await remote.patchMe(displayName: value);
+      await widget.store?.setOwner(value);
       await _load();
     } catch (err) {
       if (!mounted) return;

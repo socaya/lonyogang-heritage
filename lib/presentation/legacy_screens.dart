@@ -740,7 +740,8 @@ class SecurityCenterScreen extends StatelessWidget {
           OutlinedButton.icon(
             onPressed:()=>openWealthPage(context,OnlinePrivacyScreen(
               baseUri:baseUri,
-              credentials:scope.credentials)),
+              credentials:scope.credentials,
+              store:store)),
             icon:const Icon(Icons.policy_outlined),
             label:const Text('Online privacy & data rights')),
           const SizedBox(height:10),
