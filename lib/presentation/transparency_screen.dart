@@ -20,9 +20,11 @@ class TransparencyScreen extends StatefulWidget {
 
 class _TransparencyScreenState extends State<TransparencyScreen> {
   bool _loading = true;
+  bool _anchoring = false;
   String? _error;
   RemoteAuditChain? _chain;
   List<RemoteAuditEntry> _entries = const [];
+  List<RemoteAuditAnchor> _anchors = const [];
 
   @override
   void initState() {
@@ -38,14 +40,36 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
     try {
       final chain = await widget.sync.verifyAuditChain();
       final entries = await widget.sync.listAuditEntries(limit: 100);
+      final anchors = await widget.sync.listAuditAnchors();
+      anchors.sort((a, b) => b.createdAt.compareTo(a.createdAt));
       setState(() {
         _chain = chain;
         _entries = entries;
+        _anchors = anchors;
       });
     } catch (err) {
       setState(() => _error = '$err');
     } finally {
       if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _runAnchor() async {
+    setState(() => _anchoring = true);
+    try {
+      final anchor = await widget.sync.runAuditAnchor();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text(anchor == null
+              ? 'No new entries to anchor.'
+              : 'Anchor recorded over ${anchor.entryCount} entries.')));
+      await _load();
+    } catch (err) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Anchor run failed: $err')));
+    } finally {
+      if (mounted) setState(() => _anchoring = false);
     }
   }
 
@@ -101,6 +125,57 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                 ),
               ]),
             ),
+            const SizedBox(height: 22),
+            Row(children: [
+              const Expanded(child: SectionTitle('Transparency anchors')),
+              TextButton.icon(
+                onPressed: _anchoring ? null : _runAnchor,
+                icon: const Icon(Icons.push_pin_outlined, size: 18),
+                label: Text(_anchoring ? 'Anchoring…' : 'Anchor now'),
+              ),
+            ]),
+            if (_anchors.isEmpty)
+              const SoftCard(
+                child: Text(
+                    'No anchors yet. Press "Anchor now" to freeze the current chain tip or wait for the scheduled job.',
+                    style: TextStyle(color: LG.muted, fontSize: 12)),
+              )
+            else
+              ..._anchors.map((a) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: SoftCard(
+                      child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(children: [
+                              Icon(
+                                  a.verified
+                                      ? Icons.push_pin
+                                      : Icons.priority_high,
+                                  color: a.verified ? LG.sage : LG.negative,
+                                  size: 18),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '${a.entryCount} entries · tip ${_shortHash(a.tipHashBase64)}',
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w700,
+                                      fontSize: 13),
+                                ),
+                              ),
+                            ]),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Anchored ${LG.date(a.createdAt)}'
+                              '${a.source == null ? '' : ' · source ${a.source}'}'
+                              '${a.proofBase64 == null ? '' : ' · proof attached'}'
+                              '${a.brokenAt == null ? '' : ' · broken at ${a.brokenAt}'}',
+                              style: const TextStyle(
+                                  color: LG.muted, fontSize: 11),
+                            ),
+                          ]),
+                    ),
+                  )),
             const SizedBox(height: 22),
             const SectionTitle('Recent activity'),
             if (_entries.isEmpty)

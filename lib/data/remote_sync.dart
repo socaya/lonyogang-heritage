@@ -454,6 +454,40 @@ class RemoteSyncService implements SyncService {
         .toList();
   }
 
+  /// Lists transparency anchors this account has accumulated. An anchor
+  /// freezes the chain tip at a point in time and (optionally) carries an
+  /// OpenTimestamps proof linking it to a public commitment.
+  Future<List<RemoteAuditAnchor>> listAuditAnchors() async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/audit/anchors');
+    final text = await _request('GET', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    return (decoded['anchors'] as List<dynamic>? ?? const [])
+        .map((e) => RemoteAuditAnchor.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Triggers an on-demand anchor over the current chain tip. The
+  /// server's cron keeps a regular cadence; this gives the user a
+  /// user-driven safety net before an important event.
+  Future<RemoteAuditAnchor?> runAuditAnchor() async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/audit/anchors/run');
+    final text = await _request('POST', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    if (decoded['anchored'] == false) return null;
+    return RemoteAuditAnchor.fromJson({
+      ...decoded,
+      // The route returns the anchor inline but without id / createdAt — fill
+      // them with best-effort defaults so the model is still consistent.
+      'id': decoded['id'] ?? '',
+      'createdAt':
+          decoded['createdAt'] ?? DateTime.now().toUtc().toIso8601String(),
+    });
+  }
+
   /// Returns the end-to-end Merkle verification result over the chain.
   Future<RemoteAuditChain> verifyAuditChain() async {
     final creds = await credentialsLoader();
@@ -556,6 +590,40 @@ class RemoteAuditEntry {
         context: j['context'] as Map<String, dynamic>?,
         hashBase64: j['hash'] as String,
         prevHashBase64: j['prevHash'] as String?,
+      );
+}
+
+/// A transparency anchor row.
+class RemoteAuditAnchor {
+  final String id;
+  final String tipHashBase64;
+  final int entryCount;
+  final bool verified;
+  final String? brokenAt;
+  final String? proofBase64;
+  final String? source;
+  final DateTime createdAt;
+  const RemoteAuditAnchor({
+    required this.id,
+    required this.tipHashBase64,
+    required this.entryCount,
+    required this.verified,
+    required this.brokenAt,
+    required this.proofBase64,
+    required this.source,
+    required this.createdAt,
+  });
+  factory RemoteAuditAnchor.fromJson(Map<String, dynamic> j) =>
+      RemoteAuditAnchor(
+        id: (j['id'] ?? '').toString(),
+        tipHashBase64: (j['tipHash'] ?? '').toString(),
+        entryCount: (j['entryCount'] as num?)?.toInt() ?? 0,
+        verified: j['verified'] == true,
+        brokenAt: j['brokenAt'] as String?,
+        proofBase64: j['proof'] as String?,
+        source: j['source'] as String?,
+        createdAt: DateTime.parse(
+            (j['createdAt'] ?? DateTime.now().toUtc().toIso8601String()) as String),
       );
 }
 
