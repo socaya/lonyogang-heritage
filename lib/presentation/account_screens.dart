@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
+import '../data/remote_sync.dart';
+import '../data/resource_hydrator.dart';
 import '../data/sync.dart';
+import '../data/sync_reducer.dart';
 import 'components.dart';
 import 'online_account_screen.dart';
 import 'online_privacy_screen.dart';
@@ -123,6 +126,7 @@ class DataSyncStatusScreen extends StatelessWidget {
               const SectionTitle('Remote state'),
               _RemoteStatusCard(sync: sync),
               _OnlineAccountCta(sync: sync),
+              _ResourceHydrateCta(store: store),
               const SizedBox(height: 18),
               const SecurityNotice(
                 title: 'No silent cloud backup',
@@ -231,6 +235,78 @@ class _OnlineAccountCta extends StatelessWidget {
         );
       },
     );
+  }
+}
+
+/// "Rehydrate from server" entry. Pulls every supported resource kind
+/// from /resources/:kind and feeds each row through the SyncReducer so
+/// the local portfolio converges with the server's view. Useful on a
+/// fresh install, or after a conflict the user wants to resolve by
+/// trusting the server's state.
+class _ResourceHydrateCta extends StatefulWidget {
+  final PortfolioStore store;
+  const _ResourceHydrateCta({required this.store});
+  @override
+  State<_ResourceHydrateCta> createState() => _ResourceHydrateCtaState();
+}
+
+class _ResourceHydrateCtaState extends State<_ResourceHydrateCta> {
+  bool _busy = false;
+  String? _status;
+
+  @override
+  Widget build(BuildContext context) {
+    final scope = OnlineScope.maybeOf(context);
+    final remote = scope?.sync;
+    if (remote == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(top: 12),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+        OutlinedButton.icon(
+          onPressed: _busy || !widget.store.isUnlocked
+              ? null
+              : () => _run(remote),
+          icon: const Icon(Icons.cloud_download_outlined),
+          label: Text(_busy ? 'Rehydrating…' : 'Rehydrate from server'),
+        ),
+        if (_status != null) ...[
+          const SizedBox(height: 6),
+          Text(_status!,
+              style: const TextStyle(color: LG.muted, fontSize: 12)),
+        ],
+      ]),
+    );
+  }
+
+  Future<void> _run(RemoteSyncService remote) async {
+    final confirmed = await confirmActionSheet(
+      context,
+      title: 'Rehydrate from server?',
+      consequence:
+          'Pulls every record the server has on file for this account and merges it into the local portfolio under the vault content key. Existing local entries with the same id will be overwritten with the server copy.',
+      confirmLabel: 'Rehydrate',
+    );
+    if (!confirmed) return;
+    setState(() {
+      _busy = true;
+      _status = 'Starting…';
+    });
+    try {
+      final hydrator = ResourceHydrator(
+        remote: remote,
+        reducer: SyncReducer(widget.store,
+            attachmentSyncer: widget.store.attachmentSyncer),
+      );
+      final result = await hydrator.hydrate(onProgress: (tick) {
+        setState(() => _status = '${tick.kind}: +${tick.applied}');
+      });
+      setState(() => _status =
+          'Done: ${result.applied} applied, ${result.skipped} skipped');
+    } catch (err) {
+      setState(() => _status = 'Rehydration failed: $err');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }
 
