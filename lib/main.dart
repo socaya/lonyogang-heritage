@@ -90,7 +90,8 @@ class LonyoGangApp extends StatefulWidget {
   State<LonyoGangApp> createState() => _LonyoGangAppState();
 }
 
-class _LonyoGangAppState extends State<LonyoGangApp> {
+class _LonyoGangAppState extends State<LonyoGangApp>
+    with WidgetsBindingObserver {
   bool _schedulerReady = false;
   Timer? _syncTimer;
   Timer? _syncDebounce;
@@ -98,18 +99,55 @@ class _LonyoGangAppState extends State<LonyoGangApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     widget.store.addListener(_syncScheduler);
     widget.store.addListener(_scheduleRemoteSync);
-    _syncTimer = Timer.periodic(const Duration(minutes: 2), (_) => _runRemoteSync());
+    _startSyncTimer();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     widget.store.removeListener(_syncScheduler);
     widget.store.removeListener(_scheduleRemoteSync);
     _syncTimer?.cancel();
     _syncDebounce?.cancel();
     super.dispose();
+  }
+
+  void _startSyncTimer() {
+    _syncTimer?.cancel();
+    _syncTimer = Timer.periodic(
+      const Duration(minutes: 2),
+      (_) => _runRemoteSync(),
+    );
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.detached:
+        // Pause the sync cadence while we're not visible so the radio
+        // and battery aren't drained by background pulls. The debounce
+        // timer is cancelled too — we'll start a fresh cycle on resume.
+        _syncTimer?.cancel();
+        _syncTimer = null;
+        _syncDebounce?.cancel();
+        _syncDebounce = null;
+        break;
+      case AppLifecycleState.resumed:
+        // Fire one immediate sync to catch up on anything missed while
+        // backgrounded, then resume the 2-minute cadence.
+        unawaited(_runRemoteSync());
+        _startSyncTimer();
+        break;
+      case AppLifecycleState.inactive:
+        // Brief transition (e.g. phone call overlay) — keep the timer.
+        break;
+    }
   }
 
   void _scheduleRemoteSync() {
