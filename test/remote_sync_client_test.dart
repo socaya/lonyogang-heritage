@@ -71,6 +71,17 @@ class _FakeBackend {
         });
         return;
       }
+      if (method == 'GET' && path == '/me') {
+        _writeJson(req, {
+          'email': 'owner@example.com',
+          'displayName': 'Namesake',
+          'phone': null,
+          'status': 'active',
+          'verifiedAt': '2026-11-01T09:00:00.000Z',
+          'marketingConsentAt': null,
+        });
+        return;
+      }
       if (method == 'PATCH' && path == '/me') {
         final body = await utf8.decoder.bind(req).join();
         final parsed = jsonDecode(body) as Map<String, dynamic>;
@@ -300,6 +311,17 @@ void main() {
       expect(sub.status, 'active');
       expect(sub.currentPeriodEnd, isNotNull);
       expect(sub.provider, 'stripe');
+    } finally {
+      await b.close();
+    }
+  });
+
+  test('fetchMe returns the server-known profile shape', () async {
+    final b = await _FakeBackend.start();
+    try {
+      final me = await buildSync(b).fetchMe();
+      expect(me['displayName'], 'Namesake');
+      expect(me['status'], 'active');
     } finally {
       await b.close();
     }

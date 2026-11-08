@@ -179,6 +179,21 @@ class _LonyoGangAppState extends State<LonyoGangApp> {
                   // Hydration is best-effort; fall through to the event stream.
                 }
               }
+              // Populate the local ownerName from the server-known
+              // displayName so a fresh install renders "Hi, <name>"
+              // right away instead of the empty-state greeting.
+              try {
+                final me = await remote.fetchMe();
+                final name = me['displayName']?.toString().trim();
+                if (name != null &&
+                    name.isNotEmpty &&
+                    widget.store.state.ownerName.isEmpty) {
+                  await widget.store.setOwner(name);
+                }
+              } catch (_) {
+                // Profile fetch failed → leave ownerName as-is; the
+                // user can still edit it from Profile.
+              }
               await remote.sync();
             },
       child: MaterialApp(

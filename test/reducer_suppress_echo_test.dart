@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:typed_data';
 
-import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lonyogang_heritage/core/crypto.dart';
 import 'package:lonyogang_heritage/data/portfolio_store.dart';

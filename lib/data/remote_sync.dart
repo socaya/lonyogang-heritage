@@ -604,6 +604,17 @@ class RemoteSyncService implements SyncService {
         .toList();
   }
 
+  /// Fetches the authenticated account profile. Used by the sign-in
+  /// hook to pull the server-known display name back onto the device
+  /// so a fresh install shows the user's name immediately.
+  Future<Map<String, dynamic>> fetchMe() async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/me');
+    final text = await _request('GET', uri, creds);
+    return jsonDecode(text) as Map<String, dynamic>;
+  }
+
   /// Updates subject-controlled fields on the profile — display name,
   /// phone, marketing consent. Each field is optional; nulls are passed
   /// through so the caller can clear a value explicitly.
