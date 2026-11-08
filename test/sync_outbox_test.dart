@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
+import 'package:cryptography/cryptography.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lonyogang_heritage/core/crypto.dart';
 import 'package:lonyogang_heritage/data/sync_outbox.dart';
@@ -99,6 +101,32 @@ void main() {
     final bIds = (await b.snapshot()).map((e) => e.id).toSet();
 
     expect(aIds.intersection(bIds), isEmpty);
+  });
+
+  test('each new entry is chained to the previous ciphertext via prevHash',
+      () async {
+    final vaultKey = await VaultCrypto.deriveKey(
+        'passphrase-of-length-12', List<int>.filled(16, 11));
+    final outbox = SyncOutbox();
+    for (var i = 0; i < 3; i += 1) {
+      await outbox.record(
+        payloadType: 'asset',
+        payload: {'id': 'a$i'},
+        integrity: null,
+        vaultKey: vaultKey,
+        deviceId: '00000000-0000-0000-0000-000000000090',
+      );
+    }
+    final events = await outbox.snapshot();
+    // First entry has no predecessor on this device.
+    expect(events[0].prevHash, isNull);
+    expect(events[1].prevHash, isNotNull);
+    expect(events[2].prevHash, isNotNull);
+    // Each prevHash equals SHA-256(prior ciphertext).
+    final h1 = await Sha256().hash(events[0].payload);
+    expect(events[1].prevHash, Uint8List.fromList(h1.bytes));
+    final h2 = await Sha256().hash(events[1].payload);
+    expect(events[2].prevHash, Uint8List.fromList(h2.bytes));
   });
 
   test('deriveContentKey yields a stable 32-byte key per vault key', () async {

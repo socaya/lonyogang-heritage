@@ -886,11 +886,43 @@ class RecoverAccountScreen extends StatefulWidget {
 class _RecoverAccountScreenState extends State<RecoverAccountScreen> {
   final form = GlobalKey<FormState>();
   final destination = TextEditingController();
+  bool _busy = false;
 
   @override
   void dispose() {
     destination.dispose();
     super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!form.currentState!.validate()) return;
+    final scope = OnlineScope.maybeOf(context);
+    final remote = scope?.sync;
+    setState(() => _busy = true);
+    try {
+      // Only email is accepted by /identity/password/reset/begin today;
+      // the phone branch is still spec-only. For either input we respond
+      // with the same privacy-preserving UX so the UI never discloses
+      // which channels the user actually configured.
+      if (remote != null && isLikelyEmail(destination.text.trim())) {
+        await remote.beginPasswordReset(email: destination.text.trim());
+      } else {
+        // Small artificial delay so the preview/no-backend case matches
+        // the wall-clock shape of the real one; prevents the UI from
+        // revealing "backend configured" through a conspicuous timing gap.
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+      }
+    } catch (_) {
+      // Silent failure is the spec-mandated behaviour: never tell the
+      // caller whether an account exists or whether the server reached
+      // the mailer. Any error becomes the same UX as success.
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    Navigator.of(context).pop();
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text(
+            'If an account matches, recovery instructions have been sent.')));
   }
 
   @override
@@ -931,14 +963,9 @@ class _RecoverAccountScreenState extends State<RecoverAccountScreen> {
           ),
           const SizedBox(height: 22),
           PrimaryCTA(
-            label: 'Send recovery instructions',
-            onPressed: () async {
-              if (!form.currentState!.validate()) return;
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-                  content: Text(
-                      'If an account exists, recovery steps will be sent once the server is connected.')));
-            },
+            label: _busy ? 'Sending…' : 'Send recovery instructions',
+            loading: _busy,
+            onPressed: _submit,
           ),
           const SizedBox(height: 18),
           const _PrototypeDisclaimer(),

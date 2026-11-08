@@ -353,6 +353,47 @@ class RemoteSyncService implements SyncService {
     }
   }
 
+  /// Starts the password reset flow. The server always returns 202 to avoid
+  /// leaking which emails belong to real accounts, so this method succeeds
+  /// silently on both valid and invalid inputs.
+  Future<void> beginPasswordReset({required String email}) async {
+    final uri = _baseUri.resolve('/identity/password/reset/begin');
+    final request = await _http.postUrl(uri);
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({'email': email}));
+    final response = await request.close().timeout(requestDeadline);
+    await response.drain<void>().timeout(requestDeadline);
+    // 202 is the documented happy path; 429 means rate-limited (still a
+    // non-leaking response from the user's perspective — same UX, just
+    // without a fresh email). We only raise on genuine server errors.
+    if (response.statusCode >= 500) {
+      throw HttpException('Reset begin failed: ${response.statusCode}', uri: uri);
+    }
+  }
+
+  /// Completes a password reset. Returns normally on 204; raises on any
+  /// non-success code.
+  Future<void> completePasswordReset({
+    required String email,
+    required String token,
+    required String newPassword,
+  }) async {
+    final uri = _baseUri.resolve('/identity/password/reset/complete');
+    final request = await _http.postUrl(uri);
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({
+      'email': email,
+      'token': token,
+      'newPassword': newPassword,
+    }));
+    final response = await request.close().timeout(requestDeadline);
+    final text =
+        await response.transform(utf8.decoder).join().timeout(requestDeadline);
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw HttpException('Reset complete failed: $text', uri: uri);
+    }
+  }
+
   /// Convenience: signs in with email + password (+ optional TOTP) and
   /// persists the resulting credentials.
   Future<RemoteSyncCredentials> signIn({

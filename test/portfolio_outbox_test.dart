@@ -76,4 +76,46 @@ void main() {
         .firstWhere((e) => e.payloadType == 'beneficiary_batch');
     expect(entry.integrity?['combined_bps'], 6000);
   });
+
+  test('deleting a beneficiary ships the surviving batch with new combined_bps',
+      () async {
+    final outbox = SyncOutbox();
+    final store = PortfolioStore(outbox: outbox);
+    await store.load();
+    await store.setOwner('Owner');
+    await store.enablePassphrase('passphrase-of-length-12');
+    await store.upsertBeneficiary(const BeneficiaryRecord(
+      id: 'a', name: 'A', relationship: 'Spouse', intendedShareBps: 4000,
+    ));
+    await store.upsertBeneficiary(const BeneficiaryRecord(
+      id: 'b', name: 'B', relationship: 'Child', intendedShareBps: 3000,
+    ));
+    await store.deleteBeneficiary('a');
+    // The last beneficiary_batch should reflect the surviving set.
+    final batches = (await outbox.snapshot())
+        .where((e) => e.payloadType == 'beneficiary_batch')
+        .toList();
+    expect(batches.last.integrity?['combined_bps'], 3000);
+  });
+
+  test('schedule upsert + pause + delete each emit their own event', () async {
+    final outbox = SyncOutbox();
+    final store = PortfolioStore(outbox: outbox);
+    await store.load();
+    await store.setOwner('Owner');
+    await store.enablePassphrase('passphrase-of-length-12');
+    final schedule = ScheduledContribution(
+      id: 's1',
+      name: 'SACCO',
+      amountUgx: 100000,
+      frequency: ContributionFrequency.monthly,
+      nextFire: DateTime(2026, 11, 20),
+    );
+    await store.upsertSchedule(schedule);
+    await store.pauseSchedule('s1', active: false);
+    await store.deleteSchedule('s1');
+    final types = (await outbox.snapshot()).map((e) => e.payloadType).toList();
+    expect(types.where((t) => t == 'schedule').length, 2);
+    expect(types.contains('schedule_delete'), isTrue);
+  });
 }
