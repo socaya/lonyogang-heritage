@@ -5,6 +5,7 @@ import '../data/portfolio_store.dart';
 import '../data/sync.dart';
 import 'components.dart';
 import 'online_account_screen.dart';
+import 'online_privacy_screen.dart';
 import 'online_scope.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
@@ -194,19 +195,41 @@ class _OnlineAccountCta extends StatelessWidget {
     final scope = OnlineScope.maybeOf(context);
     final remote = scope?.sync;
     if (remote == null) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(top: 16),
-      child: PrimaryCTA(
-        label: 'Connect online account',
-        showArrow: false,
-        onPressed: () async {
-          await Navigator.of(context).push(MaterialPageRoute<void>(
-              builder: (_) => OnlineAccountScreen(
-                    sync: remote,
-                    credentials: scope!.credentials,
-                  )));
-        },
-      ),
+    return FutureBuilder<bool>(
+      future: scope!.credentials.load().then((c) => c != null),
+      builder: (context, snap) {
+        final signedIn = snap.data ?? false;
+        return Padding(
+          padding: const EdgeInsets.only(top: 16),
+          child: Column(children: [
+            PrimaryCTA(
+              label: signedIn ? 'Switch online account' : 'Connect online account',
+              showArrow: false,
+              onPressed: () async {
+                await Navigator.of(context).push(MaterialPageRoute<void>(
+                    builder: (_) => OnlineAccountScreen(
+                          sync: remote,
+                          credentials: scope.credentials,
+                        )));
+              },
+            ),
+            if (signedIn) ...[
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: () async {
+                  await Navigator.of(context).push(MaterialPageRoute<void>(
+                      builder: (_) => OnlinePrivacyScreen(
+                            baseUri: remote.baseUri,
+                            credentials: scope.credentials,
+                          )));
+                },
+                icon: const Icon(Icons.policy_outlined),
+                label: const Text('Online privacy & data-subject rights'),
+              ),
+            ],
+          ]),
+        );
+      },
     );
   }
 }

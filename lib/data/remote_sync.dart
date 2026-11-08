@@ -141,6 +141,7 @@ class RemoteSyncService implements SyncService {
         _http = httpClient ?? HttpClient();
 
   final Uri _baseUri;
+  Uri get baseUri => _baseUri;
   final HttpClient _http;
   final Future<RemoteSyncCredentials?> Function() credentialsLoader;
   final Future<void> Function(RemoteSyncCredentials) credentialsSaver;
