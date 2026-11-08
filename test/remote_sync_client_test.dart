@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:lonyogang_heritage/data/credentials_store.dart';
@@ -14,6 +15,8 @@ import 'package:shared_preferences/shared_preferences.dart';
 class _FakeBackend {
   late final HttpServer server;
   int meMarketingConsentCalls = 0;
+  int resourcePuts = 0;
+  int resourceDeletes = 0;
 
   static Future<_FakeBackend> start() async {
     final backend = _FakeBackend._();
@@ -84,6 +87,57 @@ class _FakeBackend {
       }
       if (method == 'POST' && path == '/identity/password/reset/begin-rate') {
         req.response.statusCode = 429;
+        await req.response.close();
+        return;
+      }
+      if (method == 'GET' && path == '/resources') {
+        _writeJson(req, {
+          'counts': {'asset': 2, 'liability': 1},
+        });
+        return;
+      }
+      if (method == 'GET' && path.startsWith('/resources/asset')) {
+        _writeJson(req, {
+          'resources': [
+            {
+              'kind': 'asset',
+              'id': 'a1',
+              'ciphertext': 'AQIDBA==',
+              'integrity': {'ownership_bps': 10000},
+              'prevHash': null,
+              'deviceId': '00000000-0000-0000-0000-000000000070',
+              'version': 3,
+              'createdAt': '2026-11-01T09:00:00.000Z',
+              'updatedAt': '2026-11-07T09:00:00.000Z',
+              'deletedAt': null,
+            },
+          ],
+        });
+        return;
+      }
+      if (method == 'PUT' &&
+          RegExp(r'^/resources/asset/a1$').hasMatch(path)) {
+        resourcePuts += 1;
+        final body = await utf8.decoder.bind(req).join();
+        final parsed = jsonDecode(body) as Map<String, dynamic>;
+        _writeJson(req, {
+          'kind': 'asset',
+          'id': 'a1',
+          'ciphertext': parsed['ciphertext'],
+          'integrity': parsed['integrity'],
+          'prevHash': parsed['prevHash'],
+          'deviceId': parsed['deviceId'],
+          'version': 4,
+          'createdAt': '2026-11-01T09:00:00.000Z',
+          'updatedAt': '2026-11-08T09:00:00.000Z',
+          'deletedAt': null,
+        });
+        return;
+      }
+      if (method == 'DELETE' &&
+          RegExp(r'^/resources/asset/a1$').hasMatch(path)) {
+        resourceDeletes += 1;
+        req.response.statusCode = 204;
         await req.response.close();
         return;
       }
@@ -211,6 +265,37 @@ void main() {
     try {
       final providers = await buildSync(b).listBankProviders();
       expect(providers, ['mock', 'stanbic']);
+    } finally {
+      await b.close();
+    }
+  });
+
+  test('resource CRUD: count / list / put / delete', () async {
+    final b = await _FakeBackend.start();
+    try {
+      final sync = buildSync(b);
+      final counts = await sync.countResources();
+      expect(counts['asset'], 2);
+      final rows = await sync.listResources('asset');
+      expect(rows, hasLength(1));
+      expect(rows.first.id, 'a1');
+      expect(rows.first.integrity?['ownership_bps'], 10000);
+      expect(rows.first.version, 3);
+      final updated = await sync.putResource(
+        kind: 'asset',
+        id: 'a1',
+        ciphertext: Uint8List.fromList([5, 6, 7, 8]),
+        deviceId: '00000000-0000-0000-0000-000000000070',
+        integrity: {'ownership_bps': 10000},
+        expectedVersion: 3,
+      );
+      expect(updated.version, 4);
+      expect(b.resourcePuts, 1);
+      await sync.deleteResource(
+          kind: 'asset',
+          id: 'a1',
+          deviceId: '00000000-0000-0000-0000-000000000070');
+      expect(b.resourceDeletes, 1);
     } finally {
       await b.close();
     }

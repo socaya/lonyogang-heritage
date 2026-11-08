@@ -441,6 +441,90 @@ class RemoteSyncService implements SyncService {
     return rows;
   }
 
+  /// Lists the current state of one resource kind. The server returns the
+  /// encrypted ciphertext verbatim; the caller decrypts under the vault
+  /// content key and hands the plaintext to the matching reducer so a
+  /// web client can rebuild local state without replaying every event.
+  Future<List<RemoteResource>> listResources(
+    String kind, {
+    DateTime? since,
+    int limit = 500,
+    bool includeDeleted = false,
+  }) async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final query = <String, String>{
+      'limit': '${limit.clamp(1, 2000)}',
+      if (includeDeleted) 'includeDeleted': 'true',
+      if (since != null) 'since': since.toUtc().toIso8601String(),
+    };
+    final uri =
+        _baseUri.resolve('/resources/$kind').replace(queryParameters: query);
+    final text = await _request('GET', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    return (decoded['resources'] as List<dynamic>? ?? const [])
+        .map((e) => RemoteResource.fromJson(e as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Upserts a single resource ciphertext. Supply [expectedVersion] when
+  /// you have a last-known version and want the server to reject a stale
+  /// write (returns HTTP 409 `version_conflict`).
+  Future<RemoteResource> putResource({
+    required String kind,
+    required String id,
+    required Uint8List ciphertext,
+    required String deviceId,
+    Uint8List? prevHash,
+    Map<String, dynamic>? integrity,
+    int? expectedVersion,
+  }) async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/resources/$kind/$id');
+    final body = jsonEncode({
+      'ciphertext': base64Encode(ciphertext),
+      if (integrity != null) 'integrity': integrity,
+      if (prevHash != null) 'prevHash': base64Encode(prevHash),
+      'deviceId': deviceId,
+      if (expectedVersion != null) 'expectedVersion': expectedVersion,
+    });
+    final text = await _request('PUT', uri, creds, body: body);
+    return RemoteResource.fromJson(jsonDecode(text) as Map<String, dynamic>);
+  }
+
+  /// Tombstones a resource server-side. Sync pulls on other devices will
+  /// see `deletedAt` and drop their local copy.
+  Future<void> deleteResource({
+    required String kind,
+    required String id,
+    required String deviceId,
+  }) async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/resources/$kind/$id');
+    final request = await _http.openUrl('DELETE', uri);
+    request.headers.set('authorization', 'Bearer ${creds.accessToken}');
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({'deviceId': deviceId}));
+    final response = await request.close().timeout(requestDeadline);
+    await response.drain<void>().timeout(requestDeadline);
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw HttpException('Delete failed: ${response.statusCode}', uri: uri);
+    }
+  }
+
+  /// Lightweight dashboard call returning `{kind: count}`.
+  Future<Map<String, int>> countResources() async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/resources');
+    final text = await _request('GET', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    final counts = decoded['counts'] as Map<String, dynamic>? ?? const {};
+    return counts.map((k, v) => MapEntry(k, (v as num).toInt()));
+  }
+
   /// Lists the bank aggregation providers the server has registered.
   /// Public endpoint — no auth needed — so it is safe to call before
   /// the user has signed in.
@@ -599,6 +683,49 @@ class RemoteSyncSession {
             : DateTime.parse((j['revoked_at'] ?? j['revokedAt']) as String),
         expiresAt: DateTime.parse(
             (j['expires_at'] ?? j['expiresAt']) as String),
+      );
+}
+
+/// A row returned by the per-entity resource REST layer.
+class RemoteResource {
+  final String kind;
+  final String id;
+  final Uint8List ciphertext;
+  final Map<String, dynamic>? integrity;
+  final Uint8List? prevHash;
+  final String deviceId;
+  final int version;
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final DateTime? deletedAt;
+  const RemoteResource({
+    required this.kind,
+    required this.id,
+    required this.ciphertext,
+    required this.integrity,
+    required this.prevHash,
+    required this.deviceId,
+    required this.version,
+    required this.createdAt,
+    required this.updatedAt,
+    required this.deletedAt,
+  });
+  bool get isDeleted => deletedAt != null;
+  factory RemoteResource.fromJson(Map<String, dynamic> j) => RemoteResource(
+        kind: j['kind'] as String,
+        id: j['id'] as String,
+        ciphertext: base64Decode(j['ciphertext'] as String),
+        integrity: j['integrity'] as Map<String, dynamic>?,
+        prevHash: j['prevHash'] == null
+            ? null
+            : base64Decode(j['prevHash'] as String),
+        deviceId: j['deviceId'] as String,
+        version: (j['version'] as num).toInt(),
+        createdAt: DateTime.parse(j['createdAt'] as String),
+        updatedAt: DateTime.parse(j['updatedAt'] as String),
+        deletedAt: j['deletedAt'] == null
+            ? null
+            : DateTime.parse(j['deletedAt'] as String),
       );
 }
 

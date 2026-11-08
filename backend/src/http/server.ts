@@ -31,9 +31,11 @@ import {
   type TransparencyNotary,
 } from '../services/transparency.js';
 import { AccountService } from '../services/account.js';
+import { ResourcesService } from '../services/resources.js';
 import { registerIdentityRoutes } from './routes/identity.js';
 import { registerSyncRoutes } from './routes/sync.js';
 import { registerMiscRoutes } from './routes/misc.js';
+import { registerResourceRoutes } from './routes/resources.js';
 import { buildOpenApi } from './openapi.js';
 import { HeadBucketCommand } from '@aws-sdk/client-s3';
 
@@ -51,6 +53,7 @@ export interface ServerDependencies {
   virusScanner: VirusScanner;
   transparency: TransparencyService;
   account: AccountService;
+  resources: ResourcesService;
 }
 
 export interface AssembleOverrides {
@@ -75,6 +78,7 @@ export function assembleServices(
   const attachments = new AttachmentService(db, config, audit, virusScanner);
   const transparency = new TransparencyService(db, audit, notary);
   const account = new AccountService(db, audit, attachments);
+  const resources = new ResourcesService(db, audit);
   const fx = new FxService(db, config.NODE_ENV === 'test' ? new MockFxProvider() : pickProvider(config), config);
   const recovery = new RecoveryService(db, kms, audit);
   const aggregation = new AggregationService(db, kms, audit);
@@ -114,6 +118,7 @@ export function assembleServices(
     virusScanner,
     transparency,
     account,
+    resources,
   };
 }
 
@@ -280,6 +285,10 @@ export async function buildServer(
     identity: deps.identity,
   });
   await registerMiscRoutes(app, deps);
+  await registerResourceRoutes(app, {
+    identity: deps.identity,
+    resources: deps.resources,
+  });
 
   app.setErrorHandler(async (err, req, reply) => {
     req.log.error({ err }, 'unhandled request error');

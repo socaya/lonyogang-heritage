@@ -449,6 +449,84 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           responses: { '204': { description: 'Token dropped.' } },
         },
       },
+      '/resources': {
+        get: {
+          tags: ['resources'],
+          security: [{ bearer: [] }],
+          summary: 'Count of current resources per kind',
+          responses: { '200': { description: 'Counts.' } },
+        },
+      },
+      '/resources/{kind}': {
+        get: {
+          tags: ['resources'],
+          security: [{ bearer: [] }],
+          summary: 'List current resources of a kind (ciphertext bodies)',
+          responses: {
+            '200': { description: 'Resource list.' },
+            '400': { description: 'Unknown kind or bad query.' },
+          },
+        },
+      },
+      '/resources/{kind}/{id}': {
+        get: {
+          tags: ['resources'],
+          security: [{ bearer: [] }],
+          summary: 'Fetch one resource by kind + id',
+          responses: {
+            '200': { description: 'Resource row.' },
+            '404': { description: 'Not found or tombstoned.' },
+          },
+        },
+        put: {
+          tags: ['resources'],
+          security: [{ bearer: [] }],
+          summary: 'Upsert ciphertext for a resource (optional expectedVersion)',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['ciphertext', 'deviceId'],
+                  properties: {
+                    ciphertext: { type: 'string', description: 'base64 AES-GCM bytes' },
+                    integrity: { type: 'object', nullable: true },
+                    prevHash: { type: 'string', nullable: true, description: 'base64 SHA-256' },
+                    deviceId: { type: 'string', format: 'uuid' },
+                    expectedVersion: { type: 'integer', minimum: 1 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Row after upsert.' },
+            '400': { description: 'Bad body.' },
+            '409': { description: 'version_conflict — the stored version differs from expectedVersion.' },
+          },
+        },
+        delete: {
+          tags: ['resources'],
+          security: [{ bearer: [] }],
+          summary: 'Tombstone a resource',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['deviceId'],
+                  properties: {
+                    deviceId: { type: 'string', format: 'uuid' },
+                  },
+                },
+              },
+            },
+          },
+          responses: { '204': { description: 'Tombstoned (or already absent).' } },
+        },
+      },
       '/ops/push/send': {
         post: {
           tags: ['ops'],
