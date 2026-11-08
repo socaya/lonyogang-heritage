@@ -14,6 +14,10 @@ const signUpLimit = { rateLimit: { max: 5, timeWindow: '1 hour' } };
 const verifyLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 const resendLimit = { rateLimit: { max: 3, timeWindow: '1 minute' } };
 const sessionLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+// Refresh is cheap on the happy path but a leaked refresh token is a
+// password-equivalent; cap it so a stolen token can't be exchanged into
+// an unlimited supply of access tokens.
+const refreshLimit = { rateLimit: { max: 30, timeWindow: '1 minute' } };
 const resetBeginLimit = { rateLimit: { max: 5, timeWindow: '1 hour' } };
 const resetCompleteLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
 const passkeyAuthLimit = { rateLimit: { max: 15, timeWindow: '1 minute' } };
@@ -93,7 +97,7 @@ export async function registerIdentityRoutes(
     }
   });
 
-  app.post('/identity/sessions/refresh', async (req, reply) => {
+  app.post('/identity/sessions/refresh', { config: refreshLimit }, async (req, reply) => {
     const body = z.object({ refreshToken: z.string().min(32) }).parse(req.body);
     try {
       const result = await deps.identity.refreshSession(body.refreshToken);

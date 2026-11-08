@@ -115,36 +115,24 @@ export class PasskeyService {
     return { credentialId: credentialIdBuf.toString('base64url') };
   }
 
-  async authenticationOptions(accountEmail?: string) {
-    let allowCredentials:
-      | { id: string; transports?: AuthenticatorTransportFuture[] }[]
-      | undefined;
-    let accountId: string | null = null;
-    if (accountEmail) {
-      const account = await queryOne<{ id: string }>(
-        this.db,
-        'select id from accounts where email = $1',
-        [accountEmail.trim().toLowerCase()],
-      );
-      if (account) {
-        accountId = account.id;
-        const creds = await queryMany<{ credential_id: Buffer; transports: string[] }>(
-          this.db,
-          'select credential_id, transports from passkeys where account_id = $1',
-          [account.id],
-        );
-        allowCredentials = creds.map((c) => ({
-          id: c.credential_id.toString('base64url'),
-          transports: (c.transports as unknown) as AuthenticatorTransportFuture[],
-        }));
-      }
-    }
+  /**
+   * Issue a WebAuthn authentication challenge.
+   *
+   * We deliberately IGNORE any hint about which account is asking so an
+   * attacker can't poke this endpoint to learn whether a given email
+   * belongs to a real user. The authenticator's own resident-credential
+   * list picks the correct key, and `verifyAuthentication` resolves the
+   * accountId from the credential id presented back to us. Challenge is
+   * stored with a null account_id until it is consumed.
+   */
+  async authenticationOptions(_accountEmail?: string) {
     const options = await generateAuthenticationOptions({
       rpID: this.config.RP_ID,
-      allowCredentials,
+      // No allowCredentials → the browser presents whatever discoverable
+      // credential the user chooses; matches the "username-less" flow.
       userVerification: 'preferred',
     });
-    await this.persistChallenge(accountId, Buffer.from(options.challenge, 'base64url'), 'authentication');
+    await this.persistChallenge(null, Buffer.from(options.challenge, 'base64url'), 'authentication');
     return options;
   }
 

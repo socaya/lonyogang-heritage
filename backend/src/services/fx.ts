@@ -26,11 +26,37 @@ const SUPPORTED = ['USD', 'EUR', 'GBP', 'KES', 'TZS', 'RWF'];
  *   3. Fallback to the most recent cached row when the provider is down.
  */
 export class FxService {
+  // Three consecutive provider failures trips the breaker for 60s so we
+  // stop pounding a dead upstream and serving slow /fx/rates while every
+  // request waits for a timeout. Stale cache is always served during the
+  // open window.
+  private providerFailures = 0;
+  private breakerOpenUntil = 0;
+  private static readonly FAILURE_THRESHOLD = 3;
+  private static readonly BREAKER_COOLDOWN_MS = 60_000;
+
   constructor(
     private readonly db: Db,
     private readonly provider: FxProvider,
     private readonly config: AppConfig,
   ) {}
+
+  private breakerIsOpen(): boolean {
+    return Date.now() < this.breakerOpenUntil;
+  }
+
+  private noteProviderFailure(): void {
+    this.providerFailures += 1;
+    if (this.providerFailures >= FxService.FAILURE_THRESHOLD) {
+      this.breakerOpenUntil = Date.now() + FxService.BREAKER_COOLDOWN_MS;
+      this.providerFailures = 0;
+    }
+  }
+
+  private noteProviderSuccess(): void {
+    this.providerFailures = 0;
+    this.breakerOpenUntil = 0;
+  }
 
   async getRates(options: { currencies?: string[]; asOf?: Date } = {}): Promise<FxRate[]> {
     const asOf = options.asOf ?? new Date();
@@ -59,8 +85,15 @@ export class FxService {
     const missing = requested.filter((c) => !fresh.some((f) => f.currency === c));
     if (missing.length === 0) return fresh;
 
+    if (this.breakerIsOpen()) {
+      // Breaker open — go straight to stale fallback. Avoids piling onto a
+      // provider we already know is failing.
+      return [...fresh, ...(await this.staleFallback(missing, asOfKey))];
+    }
+
     try {
       const fetched = await this.provider.fetchRates(missing, asOf);
+      this.noteProviderSuccess();
       for (const rate of fetched) {
         await this.db.query(
           `insert into fx_rates_cache (currency, as_of, ugx_per_unit, source, cached_at)
@@ -74,27 +107,33 @@ export class FxService {
       }
       return [...fresh, ...fetched];
     } catch {
-      // Provider unavailable — fall back to whatever stale cache we have.
-      const stale = await queryMany<{ currency: string; as_of: Date; ugx_per_unit: string; source: string }>(
-        this.db,
-        `select currency, as_of, ugx_per_unit, source
-           from fx_rates_cache
-           where currency = any($1) and as_of <= $2
-           order by as_of desc`,
-        [missing, asOfKey],
-      );
-      const picked = new Map<string, FxRate>();
-      for (const row of stale) {
-        if (picked.has(row.currency)) continue;
-        picked.set(row.currency, {
-          currency: row.currency,
-          asOf: row.as_of.toISOString().slice(0, 10),
-          ugxPerUnit: Number(row.ugx_per_unit),
-          source: `${row.source} (stale fallback)`,
-        });
-      }
-      return [...fresh, ...Array.from(picked.values())];
+      this.noteProviderFailure();
+      return [...fresh, ...(await this.staleFallback(missing, asOfKey))];
     }
+  }
+
+  /** Pulls the most recent cached rate for each requested currency so
+   *  `/fx/rates` keeps returning data even when the upstream is down. */
+  private async staleFallback(currencies: string[], asOfKey: string): Promise<FxRate[]> {
+    const stale = await queryMany<{ currency: string; as_of: Date; ugx_per_unit: string; source: string }>(
+      this.db,
+      `select currency, as_of, ugx_per_unit, source
+         from fx_rates_cache
+         where currency = any($1) and as_of <= $2
+         order by as_of desc`,
+      [currencies, asOfKey],
+    );
+    const picked = new Map<string, FxRate>();
+    for (const row of stale) {
+      if (picked.has(row.currency)) continue;
+      picked.set(row.currency, {
+        currency: row.currency,
+        asOf: row.as_of.toISOString().slice(0, 10),
+        ugxPerUnit: Number(row.ugx_per_unit),
+        source: `${row.source} (stale fallback)`,
+      });
+    }
+    return Array.from(picked.values());
   }
 
   async latest(currency: string): Promise<FxRate | null> {

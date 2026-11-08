@@ -64,7 +64,8 @@ export class AttachmentService {
     if (input.sizeBytes <= 0) throw new Error('size_bytes must be positive');
     if (input.sizeBytes > 25 * 1024 * 1024) throw new Error('attachment exceeds 25 MB cap');
     const quota = await this.currentQuota(input.accountId);
-    if (quota + input.sizeBytes > this.quotaBytesForAccount(input.accountId)) {
+    const quotaCap = await this.quotaBytesForAccount(input.accountId);
+    if (quota + input.sizeBytes > quotaCap) {
       throw new Error('attachment quota exceeded');
     }
     const attachmentId = randomUUID();
@@ -192,9 +193,30 @@ export class AttachmentService {
     return Number(row?.total ?? 0);
   }
 
-  private quotaBytesForAccount(accountId: string): number {
-    // Hook: read the subscription tier and return the quota. Default: free.
-    void accountId;
-    return 100 * 1024 * 1024;
+  /**
+   * Quota per tier:
+   *   free     →  100 MB
+   *   heritage →    2 GB
+   *   legacy   →   10 GB
+   *
+   * Reads the live subscription row so a tier downgrade shrinks quota on
+   * the next upload attempt. A missing row is treated as free — a brand new
+   * signup gets the free quota until a payment webhook writes a tier.
+   */
+  private async quotaBytesForAccount(accountId: string): Promise<number> {
+    const row = await queryOne<{ tier: string; status: string }>(
+      this.db,
+      `select tier, status from subscriptions where account_id = $1`,
+      [accountId],
+    );
+    if (!row || row.status !== 'active') return 100 * 1024 * 1024;
+    switch (row.tier) {
+      case 'legacy':
+        return 10 * 1024 * 1024 * 1024;
+      case 'heritage':
+        return 2 * 1024 * 1024 * 1024;
+      default:
+        return 100 * 1024 * 1024;
+    }
   }
 }

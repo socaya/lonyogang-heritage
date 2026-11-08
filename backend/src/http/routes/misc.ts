@@ -49,7 +49,16 @@ export async function registerMiscRoutes(
     return deps.account.exportProfile(req.auth!.accountId);
   });
 
-  app.delete('/me', { preHandler: auth }, async (req, reply) => {
+  // Account erasure is irreversible. Rate-limit per IP so a stolen access
+  // token can't be used to carpet-bomb the delete endpoint, and demand the
+  // current password as a step-up signal that a bearer token alone can't
+  // satisfy. A caller who no longer knows the password should use the
+  // recovery redemption path first.
+  const eraseLimit = { rateLimit: { max: 3, timeWindow: '1 hour' } };
+  app.delete('/me', { preHandler: auth, config: eraseLimit }, async (req, reply) => {
+    const body = z.object({ password: z.string().min(1).max(1024) }).parse(req.body);
+    const ok = await deps.identity.verifyAccountPassword(req.auth!.accountId, body.password);
+    if (!ok) return reply.code(401).send({ error: 'reauth_failed' });
     await deps.account.eraseAccount(req.auth!.accountId);
     return reply.code(204).send();
   });
@@ -133,17 +142,35 @@ export async function registerMiscRoutes(
     return deps.recovery.enroll(req.auth!.accountId);
   });
 
-  app.post('/recovery/redeem', { preHandler: auth }, async (req, reply) => {
-    const body = z.object({ printableShare: z.string().min(16) }).parse(req.body);
-    try {
-      return await deps.recovery.redeem({
-        accountId: req.auth!.accountId,
-        printableShare: body.printableShare,
-      });
-    } catch (err) {
-      return reply.code(400).send({ error: 'bad_share', message: (err as Error).message });
-    }
-  });
+  // Redemption hands back the vault's recovery secret. The caller must
+  // prove they still hold the password *and* a valid share: a stolen
+  // access token should not be enough to pop open the vault.
+  const redeemLimit = { rateLimit: { max: 5, timeWindow: '1 hour' } };
+  app.post(
+    '/recovery/redeem',
+    { preHandler: auth, config: redeemLimit },
+    async (req, reply) => {
+      const body = z
+        .object({
+          printableShare: z.string().min(16),
+          password: z.string().min(1).max(1024),
+        })
+        .parse(req.body);
+      const ok = await deps.identity.verifyAccountPassword(
+        req.auth!.accountId,
+        body.password,
+      );
+      if (!ok) return reply.code(401).send({ error: 'reauth_failed' });
+      try {
+        return await deps.recovery.redeem({
+          accountId: req.auth!.accountId,
+          printableShare: body.printableShare,
+        });
+      } catch (err) {
+        return reply.code(400).send({ error: 'bad_share', message: (err as Error).message });
+      }
+    },
+  );
 
   // ---- Aggregation ----
   app.get('/bank/providers', async () => {

@@ -1,6 +1,6 @@
 import { createHmac, timingSafeEqual } from 'node:crypto';
 import type { Db } from '../db.js';
-import { queryOne } from '../db.js';
+import { queryOne, withTx } from '../db.js';
 import type { AppConfig } from '../config.js';
 import type { AuditService } from './audit.js';
 
@@ -53,30 +53,56 @@ export class PaymentsService {
     };
   }
 
-  async record(event: NormalizedPaymentEvent): Promise<void> {
-    await this.db.query(
-      `insert into payment_events (account_id, provider, external_ref, kind, payload)
-       values ($1, $2, $3, $4, $5)`,
-      [event.accountId, event.provider, event.externalRef, `${event.tier}:${event.status}`, event.raw],
-    );
-    await this.db.query(
-      `insert into subscriptions (account_id, tier, provider, external_ref, status, current_period_end, updated_at)
-       values ($1, $2, $3, $4, $5, $6, now())
-       on conflict (account_id) do update
-         set tier = excluded.tier,
-             provider = excluded.provider,
-             external_ref = excluded.external_ref,
-             status = excluded.status,
-             current_period_end = excluded.current_period_end,
-             updated_at = now()`,
-      [event.accountId, event.tier, event.provider, event.externalRef, event.status, event.currentPeriodEnd],
-    );
-    await this.audit.record({
-      accountId: event.accountId,
-      actor: { kind: 'service', id: event.provider },
-      action: 'subscription.updated',
-      resource: `subscription:${event.accountId}`,
-      context: { tier: event.tier, status: event.status },
+  /**
+   * Applies a provider webhook exactly once.
+   *
+   * Providers routinely retry a webhook (network blip, 5xx from us, dashboard
+   * resend) and we must not double-apply. We take a provider-scoped lock on
+   * webhook_idempotency(provider, external_ref); a conflict means the event
+   * has already been applied and we return silently. The payment_events row
+   * doubles as an audit trail, and the subscriptions row is the current
+   * state we hand back to GET /billing/subscription.
+   *
+   * Returns true on first application and false when the event was a
+   * duplicate retry.
+   */
+  async record(event: NormalizedPaymentEvent): Promise<boolean> {
+    return withTx(this.db, async (client) => {
+      const claim = await client.query(
+        `insert into webhook_idempotency (provider, external_ref)
+         values ($1, $2)
+         on conflict do nothing`,
+        [event.provider, event.externalRef],
+      );
+      if (claim.rowCount === 0) {
+        // Duplicate retry — the first delivery already moved state.
+        return false;
+      }
+      await client.query(
+        `insert into payment_events (account_id, provider, external_ref, kind, payload)
+         values ($1, $2, $3, $4, $5)`,
+        [event.accountId, event.provider, event.externalRef, `${event.tier}:${event.status}`, event.raw],
+      );
+      await client.query(
+        `insert into subscriptions (account_id, tier, provider, external_ref, status, current_period_end, updated_at)
+         values ($1, $2, $3, $4, $5, $6, now())
+         on conflict (account_id) do update
+           set tier = excluded.tier,
+               provider = excluded.provider,
+               external_ref = excluded.external_ref,
+               status = excluded.status,
+               current_period_end = excluded.current_period_end,
+               updated_at = now()`,
+        [event.accountId, event.tier, event.provider, event.externalRef, event.status, event.currentPeriodEnd],
+      );
+      await this.audit.record({
+        accountId: event.accountId,
+        actor: { kind: 'service', id: event.provider },
+        action: 'subscription.updated',
+        resource: `subscription:${event.accountId}`,
+        context: { tier: event.tier, status: event.status },
+      });
+      return true;
     });
   }
 

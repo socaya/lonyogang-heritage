@@ -3,6 +3,25 @@ import { ulid } from 'ulid';
 import type { Db } from '../db.js';
 import { queryMany, queryOne, withTx } from '../db.js';
 
+/**
+ * Deterministic JSON.stringify — sorts object keys so a semantically-equal
+ * payload serialises to the same bytes regardless of insertion order. The
+ * audit Merkle chain depends on this: a verifier recomputing the hash from
+ * row data must land on the same bytes the writer saw.
+ */
+function canonicalJson(value: unknown): string {
+  if (value === null || value === undefined) return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  if (typeof value === 'object') {
+    const keys = Object.keys(value as Record<string, unknown>).sort();
+    const body = keys
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson((value as Record<string, unknown>)[k])}`)
+      .join(',');
+    return `{${body}}`;
+  }
+  return JSON.stringify(value);
+}
+
 export interface AuditActor {
   kind: 'user' | 'service' | 'admin' | 'system';
   id?: string;
@@ -48,7 +67,7 @@ export class AuditService {
       );
       const prevHash = prev.rows[0]?.hash ?? null;
       const id = ulid();
-      const canonical = JSON.stringify({
+      const canonical = canonicalJson({
         id,
         account_id: input.accountId ?? null,
         actor_kind: input.actor.kind,
@@ -71,7 +90,7 @@ export class AuditService {
           input.actor.id ?? null,
           input.action,
           input.resource ?? null,
-          input.context ? JSON.stringify(input.context) : null,
+          input.context ? canonicalJson(input.context) : null,
           prevHash,
           hash,
         ],
@@ -142,7 +161,7 @@ export class AuditService {
     );
     let last: Buffer | null = null;
     for (const r of rows) {
-      const canonical = JSON.stringify({
+      const canonical = canonicalJson({
         id: r.id,
         account_id: r.account_id,
         actor_kind: r.actor_kind,

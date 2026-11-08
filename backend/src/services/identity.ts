@@ -278,7 +278,12 @@ export class IdentityService {
       throw new ClientError('bad_credentials', 'Email or password is incorrect');
     }
     if (account.status !== 'active') {
-      throw new ClientError('not_active', `Account is ${account.status}`);
+      // Burn CPU to match the active-path timing so a timing attack can't
+      // distinguish closed/pending/active. We also return the generic
+      // bad_credentials error so an attacker can't harvest existence just
+      // by observing status-specific errors.
+      await argon2.hash('decoy-password', { type: argon2.argon2id, memoryCost: 1024, timeCost: 1 });
+      throw new ClientError('bad_credentials', 'Email or password is incorrect');
     }
     if (account.locked_until && account.locked_until.getTime() > Date.now()) {
       throw new ClientError(
@@ -532,6 +537,25 @@ export class IdentityService {
 
   private pepper(password: string): string {
     return `${this.config.PASSWORD_PEPPER}:${password}`;
+  }
+
+  /**
+   * Verifies a password against the live hash on the account row without
+   * opening a session or touching failed_login_count. Used by endpoints
+   * that need a step-up check before a destructive action (DELETE /me,
+   * recovery redemption) — a stolen access token alone shouldn't be enough.
+   */
+  async verifyAccountPassword(accountId: string, password: string): Promise<boolean> {
+    const row = await queryOne<{ password_hash: string | null }>(
+      this.db,
+      'select password_hash from accounts where id = $1',
+      [accountId],
+    );
+    if (!row || !row.password_hash) {
+      await argon2.hash('decoy-password', { type: argon2.argon2id, memoryCost: 1024, timeCost: 1 });
+      return false;
+    }
+    return argon2.verify(row.password_hash, this.pepper(password));
   }
 
   async listSessions(accountId: string) {

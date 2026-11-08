@@ -208,6 +208,13 @@ export class AccountService {
       }
     }
     await withTx(this.db, async (client) => {
+      // Lock the account row so a concurrent password reset, session
+      // refresh or sync write can't race the erasure to completion.
+      const locked = await client.query<{ id: string }>(
+        'select id from accounts where id = $1 for update',
+        [accountId],
+      );
+      if (locked.rowCount === 0) throw new Error('Account not found');
       await client.query(
         `update sessions set revoked_at = coalesce(revoked_at, now())
            where account_id = $1`,
@@ -224,7 +231,8 @@ export class AccountService {
       await client.query(
         `update accounts set status = 'closed', closed_at = now(), password_hash = null,
                               totp_secret = null, phone = null, display_name = null,
-                              marketing_consent_at = null
+                              marketing_consent_at = null,
+                              failed_login_count = 0, locked_until = null
              where id = $1`,
         [accountId],
       );

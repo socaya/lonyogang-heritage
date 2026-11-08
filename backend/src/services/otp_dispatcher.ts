@@ -135,7 +135,24 @@ export class CompositeOtpDispatcher implements OtpDispatcher {
   constructor(private readonly options: { email?: OtpDispatcher; sms?: OtpDispatcher }) {}
   async send(req: OtpDeliveryRequest): Promise<void> {
     const child = req.channel === 'email' ? this.options.email : this.options.sms;
-    if (!child) return; // Delivery disabled for this channel.
-    await child.send(req);
+    if (!child) {
+      // Delivery disabled for this channel — log so ops notices that a
+      // sign-up or reset is silently failing to leave the server. We do not
+      // include the code; it would defeat the point of channelling it.
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[otp] channel ${req.channel} is unconfigured; dropped ${req.purpose} for account ${req.accountId}`,
+      );
+      return;
+    }
+    try {
+      await child.send(req);
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error(
+        `[otp] dispatch failed on ${req.channel} for account ${req.accountId} (${req.purpose}): ${(err as Error).message}`,
+      );
+      throw err;
+    }
   }
 }

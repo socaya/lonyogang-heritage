@@ -15,6 +15,19 @@ export interface PushMessage {
   alertId: string;
 }
 
+/**
+ * Thrown by a transport when the remote provider tells us a token is
+ * permanently invalid (FCM `NOT_FOUND`/HTTP 404 or APNs HTTP 410). The
+ * PushService uses this signal to prune the row so we stop paying the
+ * per-request cost for a token that will never deliver.
+ */
+export class InvalidPushTokenError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidPushTokenError';
+  }
+}
+
 export interface PushTransport {
   readonly name: 'fcm' | 'apns';
   send(token: string, message: PushMessage): Promise<void>;
@@ -62,21 +75,32 @@ export class PushService {
     );
   }
 
-  async send(message: PushMessage): Promise<{ delivered: number; attempted: number }> {
+  async send(message: PushMessage): Promise<{ delivered: number; attempted: number; pruned: number }> {
     const tokens = await queryMany<{ platform: 'fcm' | 'apns'; token: string }>(
       this.db,
       `select platform, token from push_tokens where account_id = $1`,
       [message.accountId],
     );
     let delivered = 0;
+    let pruned = 0;
     for (const t of tokens) {
       const transport = this.transports.get(t.platform);
       if (!transport) continue;
       try {
         await transport.send(t.token, message);
         delivered += 1;
-      } catch {
-        // Swallow per-device failures; they are retried on the next tick.
+      } catch (err) {
+        if (err instanceof InvalidPushTokenError) {
+          // The provider told us this token is dead: it was uninstalled,
+          // revoked, or paired with the wrong bundle. Drop the row so we
+          // don't waste another request per push on it.
+          await this.db.query(
+            'delete from push_tokens where token = $1 and platform = $2',
+            [t.token, t.platform],
+          );
+          pruned += 1;
+        }
+        // Other errors are per-device transients; retried on the next tick.
       }
     }
     await this.audit.record({
@@ -84,9 +108,9 @@ export class PushService {
       actor: { kind: 'service', id: 'push' },
       action: 'push.sent',
       resource: `account:${message.accountId}`,
-      context: { attempted: tokens.length, delivered, alertId: message.alertId },
+      context: { attempted: tokens.length, delivered, pruned, alertId: message.alertId },
     });
-    return { delivered, attempted: tokens.length };
+    return { delivered, attempted: tokens.length, pruned };
   }
 }
 
@@ -117,7 +141,14 @@ export class FcmTransport implements PushTransport {
       body: JSON.stringify(payload),
     });
     if (statusCode < 200 || statusCode >= 300) {
-      throw new Error(`FCM HTTP ${statusCode}: ${await body.text()}`);
+      const text = await body.text();
+      // FCM returns 404 NOT_FOUND when the registration id no longer maps
+      // to an install; 400 INVALID_ARGUMENT with "registration-token-not-registered"
+      // is the legacy equivalent. Either way, the token is unrecoverable.
+      if (statusCode === 404 || /not-registered|UNREGISTERED/i.test(text)) {
+        throw new InvalidPushTokenError(`FCM dropped token (HTTP ${statusCode})`);
+      }
+      throw new Error(`FCM HTTP ${statusCode}: ${text}`);
     }
     await body.dump();
   }
@@ -191,7 +222,14 @@ export class ApnsTransport implements PushTransport {
       body,
     });
     if (statusCode < 200 || statusCode >= 300) {
-      throw new Error(`APNs HTTP ${statusCode}: ${await resp.text()}`);
+      const text = await resp.text();
+      // APNs sends 410 Gone when the device has uninstalled or revoked
+      // notifications. Combine with a BadDeviceToken 400 — both signal the
+      // token is no longer valid and should be pruned.
+      if (statusCode === 410 || /BadDeviceToken|Unregistered/i.test(text)) {
+        throw new InvalidPushTokenError(`APNs dropped token (HTTP ${statusCode})`);
+      }
+      throw new Error(`APNs HTTP ${statusCode}: ${text}`);
     }
     await resp.dump();
   }

@@ -133,6 +133,26 @@ export class AggregationService {
       scopes: row.scopes,
       displayLabel: row.display_label ?? undefined,
     };
+    // Upstream tokens expire routinely. Confirm the token still resolves
+    // against the provider before we touch the transactions endpoint, so a
+    // partial failure can't leave the connection in a half-synced state.
+    try {
+      await provider.describe(ctx);
+    } catch (err) {
+      await this.db.query(
+        `update bank_connections set status = 'reauth_required'
+           where id = $1 and status = 'linked'`,
+        [row.id],
+      );
+      await this.audit.record({
+        accountId,
+        actor: { kind: 'service', id: `bank:${row.provider}` },
+        action: 'bank.reauth_required',
+        resource: `connection:${row.id}`,
+        context: { reason: (err as Error).message.slice(0, 200) },
+      });
+      throw new Error('Provider rejected the stored credential — relink the account');
+    }
     const transactions = await provider.listTransactions(ctx, since);
     let imported = 0;
     for (const tx of transactions) {
