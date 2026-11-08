@@ -10,6 +10,7 @@ import 'package:lonyogang_heritage/data/remote_sync.dart';
 import 'package:lonyogang_heritage/data/resource_hydrator.dart';
 import 'package:lonyogang_heritage/data/sync_outbox.dart';
 import 'package:lonyogang_heritage/data/sync_reducer.dart';
+import 'package:lonyogang_heritage/domain/models.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// A loopback backend that serves a canned `/resources/:kind` snapshot
@@ -144,6 +145,59 @@ void main() {
       expect(progress.applied, 2);
       expect(store.state.assets.any((a) => a.id == 'remote-plot'), isTrue);
       expect(store.state.goals.any((g) => g.id == 'g-remote'), isTrue);
+    } finally {
+      await backend.close();
+    }
+  });
+
+  test('tombstoned rows trigger the matching local deletion on hydrate',
+      () async {
+    final backend = await _SnapshotBackend.start();
+    try {
+      final outbox = SyncOutbox();
+      final store = PortfolioStore(outbox: outbox);
+      await store.load();
+      await store.setOwner('Owner');
+      await store.enablePassphrase('passphrase-of-length-12');
+
+      // Seed a local goal that the server has since deleted.
+      await store.upsertGoal(const WealthGoal(
+        id: 'g-dead',
+        name: 'Stale',
+        targetUgx: 1,
+        savedUgx: 0,
+      ));
+      expect(store.state.goals.any((g) => g.id == 'g-dead'), isTrue);
+
+      backend.snapshots['goal'] = [
+        {
+          'kind': 'goal',
+          'id': 'g-dead',
+          'ciphertext': 'AAAA',
+          'integrity': null,
+          'prevHash': null,
+          'deviceId': '00000000-0000-0000-0000-000000000080',
+          'version': 2,
+          'createdAt': '2026-11-01T09:00:00.000Z',
+          'updatedAt': '2026-11-02T09:00:00.000Z',
+          'deletedAt': '2026-11-02T09:00:00.000Z',
+        },
+      ];
+
+      final creds = CredentialsStore();
+      final remote = RemoteSyncService(
+        baseUri: backend.baseUri,
+        credentialsLoader: creds.load,
+        credentialsSaver: creds.save,
+        outboxLoader: () async => const [],
+        pullHandler: (_) async {},
+      );
+      final hydrator = ResourceHydrator(
+        remote: remote,
+        reducer: SyncReducer(store),
+      );
+      await hydrator.hydrate();
+      expect(store.state.goals.any((g) => g.id == 'g-dead'), isFalse);
     } finally {
       await backend.close();
     }
