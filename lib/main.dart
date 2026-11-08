@@ -165,14 +165,22 @@ class _LonyoGangAppState extends State<LonyoGangApp> {
       onSignInSuccess: remote == null
           ? null
           : () async {
-              // Opportunistic hydrate on sign-in: if the store is
-              // unlocked, pull every resource kind the server has for
-              // this account and merge via the reducer. A brand-new
-              // account gets 0 rows; a second-device install pulls
-              // whatever the first device has pushed. Then run the
-              // regular /sync/events pass to drain anything new since
-              // the resource snapshot.
-              if (widget.store.isUnlocked && widget.store.vault.activeKey != null) {
+              // Opportunistic hydrate on sign-in: only when the local
+              // store looks essentially empty (fresh-install signal).
+              // A returning user who signs out and back in keeps their
+              // local state and relies on the /sync/events pull to
+              // reconcile — otherwise this would overwrite any edits
+              // that hadn't finished syncing yet.
+              final s = widget.store.state;
+              final looksEmpty = s.assets.isEmpty &&
+                  s.liabilities.isEmpty &&
+                  s.events.isEmpty &&
+                  s.goals.isEmpty &&
+                  s.documents.isEmpty &&
+                  s.scheduled.isEmpty;
+              if (widget.store.isUnlocked &&
+                  widget.store.vault.activeKey != null &&
+                  looksEmpty) {
                 try {
                   await ResourceHydrator(
                     remote: remote,
