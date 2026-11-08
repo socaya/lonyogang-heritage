@@ -397,6 +397,69 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           responses: { '204': { description: 'Attachment committed.' } },
         },
       },
+      '/sync/attachments/{id}': {
+        get: {
+          tags: ['sync'],
+          security: [{ bearer: [] }],
+          summary: 'Request a presigned attachment download URL',
+          responses: { '200': { description: 'Download URL issued.' } },
+        },
+        delete: {
+          tags: ['sync'],
+          security: [{ bearer: [] }],
+          summary: 'Delete a stored attachment (object + db row)',
+          responses: { '204': { description: 'Deleted.' } },
+        },
+      },
+      '/sync/envelope': {
+        get: {
+          tags: ['sync'],
+          security: [{ bearer: [] }],
+          summary: 'Fetch the account vault envelope (recovery material)',
+          responses: { '200': { description: 'Envelope bytes.' } },
+        },
+        put: {
+          tags: ['sync'],
+          security: [{ bearer: [] }],
+          summary: 'Replace the account vault envelope',
+          responses: { '204': { description: 'Envelope stored.' } },
+        },
+      },
+      '/bank/connections/{id}': {
+        delete: {
+          tags: ['bank'],
+          security: [{ bearer: [] }],
+          summary: 'Revoke a bank aggregation link',
+          responses: { '204': { description: 'Revoked.' } },
+        },
+      },
+      '/bank/pending-imports': {
+        get: {
+          tags: ['bank'],
+          security: [{ bearer: [] }],
+          summary: 'List transactions pulled from bank feeds not yet posted as events',
+          responses: { '200': { description: 'Pending imports.' } },
+        },
+      },
+      '/push/tokens/{deviceId}/{platform}': {
+        delete: {
+          tags: ['push'],
+          security: [{ bearer: [] }],
+          summary: 'Drop a push token for this device + platform',
+          responses: { '204': { description: 'Token dropped.' } },
+        },
+      },
+      '/ops/push/send': {
+        post: {
+          tags: ['ops'],
+          summary: 'Internal ops push (requires x-ops-token header)',
+          responses: {
+            '200': { description: 'Delivery attempted.' },
+            '401': { description: 'Missing or wrong ops token.' },
+            '503': { description: 'Ops push disabled on this deployment.' },
+          },
+        },
+      },
       '/audit/entries': {
         get: {
           tags: ['audit'],
