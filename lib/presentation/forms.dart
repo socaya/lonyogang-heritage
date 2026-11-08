@@ -378,37 +378,215 @@ class _GoalFormState extends State<GoalForm> {
 
 class LegacyScreen extends StatelessWidget {
   final PortfolioStore store;
-  const LegacyScreen({super.key,required this.store});
-  @override Widget build(BuildContext context)=>ScreenPage(title:'Heritage & legacy',
-    subtitle:'Organise trusted contacts and estate-planning notes.',children:[
-    const SoftCard(color:LG.sageSoft,child:Row(children:[Icon(Icons.shield_outlined,color:LG.sage),SizedBox(width:12),
-      Expanded(child:Text('Contacts are private notes, not legally binding nominations or instructions.',
-        style:TextStyle(fontSize:12,color:LG.muted,height:1.5)))])),
-    const SizedBox(height:18),const SectionTitle('Trusted contacts'),
-    if(store.state.contacts.isEmpty)const EmptySection(title:'No trusted contacts',detail:'Record a contact without sharing access to your portfolio.')
-    else ...store.state.contacts.map((c)=>Padding(padding:const EdgeInsets.only(bottom:9),child:SoftCard(child:Row(children:[
-      const CircleAvatar(backgroundColor:LG.sageSoft,child:Icon(Icons.person_outline,color:LG.sage)),
-      const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text(c.name,style:const TextStyle(fontWeight:FontWeight.w800)),Text(c.relationship,style:const TextStyle(color:LG.muted,fontSize:12)),
-        if(c.instructions.isNotEmpty)Text(c.instructions,style:const TextStyle(color:LG.muted,fontSize:11))])),
-      IconButton(onPressed:()=>store.removeContact(c.id),icon:const Icon(Icons.delete_outline,color:LG.muted))])))),
-    const SizedBox(height:16),ElevatedButton.icon(onPressed:()=>_contactDialog(context,store),
-      icon:const Icon(Icons.person_add_alt_1_outlined),label:const Text('Add trusted contact')),
-  ]);
+  const LegacyScreen({super.key, required this.store});
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        final contacts = store.state.contacts;
+        return ScreenPage(
+          title: 'Heritage & legacy',
+          subtitle: 'Organise trusted contacts and estate-planning notes.',
+          children: [
+            const SoftCard(
+                color: LG.sageSoft,
+                child: Row(children: [
+                  Icon(Icons.shield_outlined, color: LG.sage),
+                  SizedBox(width: 12),
+                  Expanded(
+                      child: Text(
+                          'Contacts are private notes, not legally binding nominations or instructions.',
+                          style: TextStyle(
+                              fontSize: 12, color: LG.muted, height: 1.5)))
+                ])),
+            const SizedBox(height: 18),
+            const SectionTitle('Trusted contacts'),
+            if (contacts.isEmpty)
+              const EmptySection(
+                  title: 'No trusted contacts',
+                  detail:
+                      'Record a contact without sharing access to your portfolio.')
+            else
+              ...contacts.map((c) => Padding(
+                    padding: const EdgeInsets.only(bottom: 9),
+                    child: SoftCard(
+                      onTap: () => push(
+                          context, ContactForm(store: store, existing: c)),
+                      child: Row(children: [
+                        const CircleAvatar(
+                            backgroundColor: LG.sageSoft,
+                            child:
+                                Icon(Icons.person_outline, color: LG.sage)),
+                        const SizedBox(width: 12),
+                        Expanded(
+                            child: Column(
+                                crossAxisAlignment:
+                                    CrossAxisAlignment.start,
+                                children: [
+                              Text(c.name,
+                                  style: const TextStyle(
+                                      fontWeight: FontWeight.w800)),
+                              Text(c.relationship,
+                                  style: const TextStyle(
+                                      color: LG.muted, fontSize: 12)),
+                              if (c.email.isNotEmpty)
+                                Text(c.email,
+                                    style: const TextStyle(
+                                        color: LG.muted, fontSize: 11)),
+                              if (c.phone.isNotEmpty)
+                                Text(c.phone,
+                                    style: const TextStyle(
+                                        color: LG.muted, fontSize: 11)),
+                              if (c.instructions.isNotEmpty)
+                                Text(c.instructions,
+                                    maxLines: 2,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                        color: LG.muted, fontSize: 11)),
+                            ])),
+                        const Icon(Icons.chevron_right, color: LG.muted),
+                      ]),
+                    ),
+                  )),
+            const SizedBox(height: 16),
+            ElevatedButton.icon(
+                onPressed: () => push(context, ContactForm(store: store)),
+                icon: const Icon(Icons.person_add_alt_1_outlined),
+                label: const Text('Add trusted contact')),
+          ],
+        );
+      });
 }
-Future<void> _contactDialog(BuildContext context,PortfolioStore store)async{
-  final name=TextEditingController(),relation=TextEditingController(),note=TextEditingController();
-  final key=GlobalKey<FormState>();
-  await showDialog<void>(context:context,builder:(c)=>AlertDialog(title:const Text('Trusted contact'),content:Form(key:key,
-    child:Column(mainAxisSize:MainAxisSize.min,children:[
-      TextFormField(controller:name,decoration:const InputDecoration(labelText:'Name'),validator:(v)=>v!.trim().isEmpty?'Required':null),
-      const SizedBox(height:10),TextFormField(controller:relation,decoration:const InputDecoration(labelText:'Relationship'),validator:(v)=>v!.trim().isEmpty?'Required':null),
-      const SizedBox(height:10),TextFormField(controller:note,decoration:const InputDecoration(labelText:'Notes')),
-    ])),actions:[TextButton(onPressed:()=>Navigator.pop(c),child:const Text('Cancel')),
-      TextButton(onPressed:()async{if(!key.currentState!.validate())return;
-        await store.addContact(LegacyContact(id:makeId(),name:name.text.trim(),relationship:relation.text.trim(),instructions:note.text.trim()));
-        if(c.mounted)Navigator.pop(c);},child:const Text('Save'))]));
-  name.dispose();relation.dispose();note.dispose();
+
+/// Full-screen add/edit trusted contact form. Replaces the earlier dialog
+/// so edits are reachable and the fields are consistent with the rest of
+/// the app.
+class ContactForm extends StatefulWidget {
+  final PortfolioStore store;
+  final LegacyContact? existing;
+  const ContactForm({super.key, required this.store, this.existing});
+  @override
+  State<ContactForm> createState() => _ContactFormState();
+}
+
+class _ContactFormState extends State<ContactForm> {
+  final form = GlobalKey<FormState>();
+  late final name =
+      TextEditingController(text: widget.existing?.name ?? '');
+  late final relation =
+      TextEditingController(text: widget.existing?.relationship ?? '');
+  late final email =
+      TextEditingController(text: widget.existing?.email ?? '');
+  late final phone =
+      TextEditingController(text: widget.existing?.phone ?? '');
+  late final instructions =
+      TextEditingController(text: widget.existing?.instructions ?? '');
+  bool saving = false;
+
+  @override
+  void dispose() {
+    name.dispose();
+    relation.dispose();
+    email.dispose();
+    phone.dispose();
+    instructions.dispose();
+    super.dispose();
+  }
+
+  Future<void> _save() async {
+    if (!form.currentState!.validate()) return;
+    setState(() => saving = true);
+    try {
+      final contact = LegacyContact(
+        id: widget.existing?.id ?? makeId(),
+        name: name.text.trim(),
+        relationship: relation.text.trim(),
+        instructions: instructions.text.trim(),
+        email: email.text.trim(),
+        phone: phone.text.trim(),
+      );
+      await widget.store.upsertContact(contact);
+      if (!mounted) return;
+      Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      snack(context, 'Could not save contact: $e');
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
+  }
+
+  Future<void> _delete() async {
+    final existing = widget.existing;
+    if (existing == null) return;
+    await widget.store.removeContact(existing.id);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) => ScreenPage(
+        title: widget.existing == null ? 'New trusted contact' : 'Edit contact',
+        subtitle: 'Reachability notes only — no portfolio access is granted.',
+        children: [
+          Form(
+            key: form,
+            child: Column(children: [
+              FormFieldBlock(
+                  title: 'Name',
+                  child: TextFormField(
+                      controller: name,
+                      textCapitalization: TextCapitalization.words,
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null)),
+              FormFieldBlock(
+                  title: 'Relationship',
+                  child: TextFormField(
+                      controller: relation,
+                      textCapitalization: TextCapitalization.words,
+                      decoration: const InputDecoration(
+                          hintText: 'Spouse, lawyer, SACCO chair…'),
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null)),
+              FormFieldBlock(
+                  title: 'Email (optional)',
+                  child: TextFormField(
+                      controller: email,
+                      keyboardType: TextInputType.emailAddress,
+                      decoration:
+                          const InputDecoration(hintText: 'them@example.com'))),
+              FormFieldBlock(
+                  title: 'Phone (optional)',
+                  child: TextFormField(
+                      controller: phone,
+                      keyboardType: TextInputType.phone,
+                      decoration: const InputDecoration(
+                          hintText: '+256 700 123 456'))),
+              FormFieldBlock(
+                  title: 'Notes (optional)',
+                  help:
+                      'What should they know or do? Avoid identity numbers or passwords.',
+                  child: TextFormField(
+                      controller: instructions,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                          hintText:
+                              'Where documents live, instructions for next steps…'))),
+            ]),
+          ),
+          const SizedBox(height: 10),
+          ElevatedButton(
+              onPressed: saving ? null : _save,
+              child: Text(saving ? 'Saving…' : 'Save contact')),
+          if (widget.existing != null) ...[
+            const SizedBox(height: 10),
+            TextButton(
+                onPressed: saving ? null : _delete,
+                child: const Text('Remove contact',
+                    style: TextStyle(color: LG.negative))),
+          ],
+        ],
+      );
 }
 
 class RemindersScreen extends StatelessWidget {

@@ -251,6 +251,7 @@ class PortfolioStore extends ChangeNotifier {
   Future<void> addGoal(WealthGoal goal) async {
     _state = _replace(goals: [..._state.goals, goal]);
     await _save();
+    await _recordOutbox(payloadType: 'goal', payload: goal.toJson());
   }
 
   Future<void> upsertGoal(WealthGoal goal) async {
@@ -266,33 +267,59 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(goals: goals);
     await _save();
+    await _recordOutbox(payloadType: 'goal', payload: goal.toJson());
   }
 
   Future<void> deleteGoal(String id) async {
     _state = _replace(goals: _state.goals.where((x) => x.id != id).toList());
     await _save();
+    await _recordOutbox(
+        payloadType: 'goal_delete', payload: {'id': id});
   }
 
-  Future<void> addContact(LegacyContact contact) async {
-    _state = _replace(contacts: [..._state.contacts, contact]);
+  /// Append-only contact create. Preserved for back-compat with earlier
+  /// call sites; new flows should prefer [upsertContact] so an existing
+  /// row with the same id can be edited in place.
+  Future<void> addContact(LegacyContact contact) async =>
+      upsertContact(contact);
+
+  Future<void> upsertContact(LegacyContact contact) async {
+    if (contact.name.trim().isEmpty || contact.relationship.trim().isEmpty) {
+      throw ArgumentError('Contact needs a name and relationship');
+    }
+    final contacts = [..._state.contacts];
+    final i = contacts.indexWhere((x) => x.id == contact.id);
+    if (i < 0) {
+      contacts.add(contact);
+    } else {
+      contacts[i] = contact;
+    }
+    _state = _replace(contacts: contacts);
     await _save();
+    await _recordOutbox(
+        payloadType: 'trusted_contact', payload: contact.toJson());
   }
 
   Future<void> removeContact(String id) async {
     _state = _replace(
         contacts: _state.contacts.where((x) => x.id != id).toList());
     await _save();
+    await _recordOutbox(
+        payloadType: 'trusted_contact_delete', payload: {'id': id});
   }
 
   Future<void> addReminder(ReminderRecord reminder) async {
     _state = _replace(reminders: [..._state.reminders, reminder]);
     await _save();
+    await _recordOutbox(payloadType: 'reminder', payload: reminder.toJson());
   }
 
   Future<void> removeReminder(String id) async {
     _state = _replace(
         reminders: _state.reminders.where((x) => x.id != id).toList());
     await _save();
+    await _recordOutbox(
+        payloadType: 'reminder_delete', payload: {'id': id});
   }
 
   Future<void> toggleReminder(String id) async {
@@ -300,6 +327,13 @@ class PortfolioStore extends ChangeNotifier {
         reminders:
             _state.reminders.map((r) => r.id == id ? r.toggle() : r).toList());
     await _save();
+    final toggled = _state.reminders.firstWhere(
+      (r) => r.id == id,
+      orElse: () => ReminderRecord(id: id, title: '', dueAt: DateTime.now()),
+    );
+    if (toggled.title.isNotEmpty) {
+      await _recordOutbox(payloadType: 'reminder', payload: toggled.toJson());
+    }
   }
 
   Future<void> upsertDocument(DocumentRecord document) async {

@@ -105,11 +105,36 @@ class WealthGoal {
 }
 
 class LegacyContact {
-  final String id;final String name;final String relationship;final String instructions;
-  const LegacyContact({required this.id,required this.name,required this.relationship,this.instructions=''});
-  Json toJson()=>{'id':id,'name':name,'relationship':relationship,'instructions':instructions};
-  factory LegacyContact.fromJson(Json j)=>LegacyContact(id:asString(j['id']),name:asString(j['name']),
-    relationship:asString(j['relationship']),instructions:asString(j['instructions']));
+  final String id;
+  final String name;
+  final String relationship;
+  final String instructions;
+  final String email;
+  final String phone;
+  const LegacyContact({
+    required this.id,
+    required this.name,
+    required this.relationship,
+    this.instructions = '',
+    this.email = '',
+    this.phone = '',
+  });
+  Json toJson() => {
+        'id': id,
+        'name': name,
+        'relationship': relationship,
+        'instructions': instructions,
+        if (email.isNotEmpty) 'email': email,
+        if (phone.isNotEmpty) 'phone': phone,
+      };
+  factory LegacyContact.fromJson(Json j) => LegacyContact(
+        id: asString(j['id']),
+        name: asString(j['name']),
+        relationship: asString(j['relationship']),
+        instructions: asString(j['instructions']),
+        email: asString(j['email']),
+        phone: asString(j['phone']),
+      );
 }
 
 class ReminderRecord {

@@ -78,6 +78,37 @@ class SyncReducer {
         final document = DocumentRecord.fromJson(json);
         await _applyDocument(document);
         return true;
+      case 'goal':
+        await store.upsertGoal(WealthGoal.fromJson(json));
+        return true;
+      case 'goal_delete':
+        final id = json['id']?.toString() ?? '';
+        if (id.isNotEmpty) await store.deleteGoal(id);
+        return true;
+      case 'trusted_contact':
+        await store.upsertContact(LegacyContact.fromJson(json));
+        return true;
+      case 'trusted_contact_delete':
+        final id = json['id']?.toString() ?? '';
+        if (id.isNotEmpty) await store.removeContact(id);
+        return true;
+      case 'reminder':
+        final reminder = ReminderRecord.fromJson(json);
+        final existingIdx =
+            store.state.reminders.indexWhere((r) => r.id == reminder.id);
+        if (existingIdx >= 0) {
+          final existing = store.state.reminders[existingIdx];
+          if (existing.completed != reminder.completed) {
+            await store.toggleReminder(reminder.id);
+          }
+          return true;
+        }
+        await store.addReminder(reminder);
+        return true;
+      case 'reminder_delete':
+        final id = json['id']?.toString() ?? '';
+        if (id.isNotEmpty) await store.removeReminder(id);
+        return true;
       default:
         // Unknown payload type — ignore for forward-compat; the server may
         // route newer entities we don't yet understand.

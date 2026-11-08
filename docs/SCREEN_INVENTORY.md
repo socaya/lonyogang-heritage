@@ -37,7 +37,7 @@ LonyoGang Heritage uses flat Material 3 Theme 1. All screen classes below render
 - G01 `GoalsScreen` — rows tap to edit.
 - G02 `GoalForm` (full-screen) — add + edit flow with optional target date, saved-exceeds-target guard and destructive remove.
 - G04 `BeneficiariesScreen`, `BeneficiaryFormScreen`.
-- G06 `LegacyScreen` for trusted contacts.
+- G06 `LegacyScreen` for trusted contacts, with a full-screen `ContactForm` add/edit flow. `LegacyContact` carries optional email + phone for reachability.
 - G07 `DocumentsScreen` — rows tap to detail.
 - G08 `DocumentFormScreen` — pure metadata editor (title, category, linked asset, dates, notes).
 - G09 `DocumentDetailScreen` — landing with metadata card, attachment lifecycle (attach via `file_picker`, decrypt + preview via `open_filex`, SHA-256 integrity), Edit metadata CTA, Archive/Restore.
