@@ -134,6 +134,22 @@ class SyncReducer {
       case 'alert_dismissal_clear':
         await store.clearDismissedAlerts();
         return true;
+      case 'fx_rate':
+        await store.upsertFxRate(FxRate.fromJson(json));
+        return true;
+      case 'fx_rate_delete':
+        {
+          final id = json['id']?.toString() ?? '';
+          // The id shape is "<CURRENCY>:<ISO>"; parse rather than carry
+          // both separately so the wire payload stays small.
+          final sep = id.indexOf(':');
+          if (sep < 0) return false;
+          final currency = id.substring(0, sep);
+          final asOf = DateTime.tryParse(id.substring(sep + 1));
+          if (asOf == null) return false;
+          await store.removeFxRate(currency, asOf);
+          return true;
+        }
       default:
         // Unknown payload type — ignore for forward-compat; the server may
         // route newer entities we don't yet understand.

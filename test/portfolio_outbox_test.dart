@@ -98,6 +98,32 @@ void main() {
     expect(batches.last.integrity?['combined_bps'], 3000);
   });
 
+  test('FX rate upsert + remove emit fx_rate and fx_rate_delete events',
+      () async {
+    final outbox = SyncOutbox();
+    final store = PortfolioStore(outbox: outbox);
+    await store.load();
+    await store.setOwner('Owner');
+    await store.enablePassphrase('passphrase-of-length-12');
+    await store.upsertFxRate(FxRate(
+      currency: 'USD',
+      ugxPerUnit: 3850,
+      asOf: DateTime.utc(2026, 11, 7),
+      source: 'manual',
+    ));
+    final afterUpsert = (await outbox.snapshot())
+        .where((e) => e.payloadType == 'fx_rate')
+        .toList();
+    expect(afterUpsert, hasLength(1));
+    expect(afterUpsert.first.integrity?['ugx_per_unit'], 3850);
+
+    await store.removeFxRate('USD', DateTime.utc(2026, 11, 7));
+    final afterRemove = (await outbox.snapshot())
+        .where((e) => e.payloadType == 'fx_rate_delete')
+        .toList();
+    expect(afterRemove, hasLength(1));
+  });
+
   test('schedule upsert + pause + delete each emit their own event', () async {
     final outbox = SyncOutbox();
     final store = PortfolioStore(outbox: outbox);

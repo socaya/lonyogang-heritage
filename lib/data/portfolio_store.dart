@@ -562,6 +562,13 @@ class PortfolioStore extends ChangeNotifier {
     await _save();
   }
 
+  /// Composite resource id for an FxRate. The REST layer wants a single
+  /// string key per row; we synthesise it deterministically from the
+  /// currency code plus the ISO as-of date so a conflict only happens
+  /// when both devices truly wrote the same cell.
+  static String _fxId(String currency, DateTime asOf) =>
+      '${currency.toUpperCase()}:${asOf.toUtc().toIso8601String()}';
+
   Future<void> upsertFxRate(FxRate rate) async {
     if (rate.currency.trim().length != 3 || rate.ugxPerUnit <= 0) {
       throw ArgumentError('FX rate must have a 3-letter currency and positive quote');
@@ -576,6 +583,14 @@ class PortfolioStore extends ChangeNotifier {
     }
     _state = _replace(fxRates: rates);
     await _save();
+    await _recordOutbox(
+      payloadType: 'fx_rate',
+      payload: {
+        ...rate.toJson(),
+        'id': _fxId(rate.currency, rate.asOf),
+      },
+      integrity: {'ugx_per_unit': rate.ugxPerUnit},
+    );
   }
 
   Future<void> removeFxRate(String currency, DateTime asOf) async {
@@ -584,6 +599,10 @@ class PortfolioStore extends ChangeNotifier {
             .where((r) => r.currency != currency || !r.asOf.isAtSameMomentAs(asOf))
             .toList());
     await _save();
+    await _recordOutbox(
+      payloadType: 'fx_rate_delete',
+      payload: {'id': _fxId(currency, asOf)},
+    );
   }
 
   Future<void> upsertSchedule(ScheduledContribution schedule) async {

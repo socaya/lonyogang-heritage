@@ -170,6 +170,20 @@ class ResourceHydrator {
           await store.deleteBeneficiary(b.id);
         }
         return true;
+      case 'fx_rate':
+        {
+          // Composite id "<CURRENCY>:<ISO>" — split and remove.
+          final sep = id.indexOf(':');
+          if (sep < 0) return false;
+          final currency = id.substring(0, sep);
+          final asOf = DateTime.tryParse(id.substring(sep + 1));
+          if (asOf == null) return false;
+          final had = store.state.fxRates.any((r) =>
+              r.currency == currency && r.asOf.isAtSameMomentAs(asOf));
+          if (!had) return false;
+          await store.removeFxRate(currency, asOf);
+          return true;
+        }
       default:
         return false;
     }

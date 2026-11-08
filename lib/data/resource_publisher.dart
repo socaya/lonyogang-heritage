@@ -39,6 +39,7 @@ class ResourcePublisher {
       case 'trusted_contact_delete':
       case 'reminder_delete':
       case 'schedule_delete':
+      case 'fx_rate_delete':
         return payload['id']?.toString();
       default:
         final id = payload['id']?.toString();
@@ -56,6 +57,7 @@ class ResourcePublisher {
     'trusted_contact_delete',
     'reminder_delete',
     'schedule_delete',
+    'fx_rate_delete',
   };
 
   /// Payload types that clear an entire kind rather than one row.
@@ -76,6 +78,8 @@ class ResourcePublisher {
         return 'reminder';
       case 'schedule_delete':
         return 'schedule';
+      case 'fx_rate_delete':
+        return 'fx_rate';
       case 'alert_dismissal_clear':
         return 'alert_dismissal';
       default:
