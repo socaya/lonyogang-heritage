@@ -175,6 +175,15 @@ export async function buildServer(
     trustProxy: true,
   });
 
+  // Collect live route paths so the OpenAPI-drift test can walk them.
+  const liveRoutes = new Set<string>();
+  app.addHook('onRoute', (routeOptions) => {
+    if (routeOptions.url && routeOptions.url !== '*') {
+      liveRoutes.add(routeOptions.url);
+    }
+  });
+  (app as unknown as { liveRoutes: Set<string> }).liveRoutes = liveRoutes;
+
   // Replace Fastify's default JSON parser with one that also keeps the raw
   // bytes on the request under `rawBody`. Needed for Stripe webhook
   // signature verification — the stringified representation of the parsed
