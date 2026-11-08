@@ -140,6 +140,66 @@ export class IdentityService {
     };
   }
 
+  /** Dispatches a fresh verification code for a pending channel. Used by
+   *  the client's "resend" button when the user never received the first
+   *  code. Rate-limited coarsely through the global 180/min limit; a
+   *  per-account cooldown is enforced here by refusing if the newest
+   *  outstanding code was issued less than 60 seconds ago. */
+  async resendVerification(input: {
+    accountId: string;
+    channel: 'email' | 'phone';
+  }): Promise<void> {
+    const account = await queryOne<AccountRow>(
+      this.db,
+      'select id, email, phone, status from accounts where id = $1',
+      [input.accountId],
+    );
+    if (!account) throw new ClientError('not_found', 'Account not found');
+    if (account.status === 'active') {
+      throw new ClientError('already_verified', 'Account is already active');
+    }
+    const destination =
+      input.channel === 'email' ? account.email : account.phone;
+    if (!destination) {
+      throw new ClientError(
+          'channel_unavailable',
+          `No ${input.channel} on file`);
+    }
+    const latest = await queryOne<{ created_at: Date }>(
+      this.db,
+      `select created_at from account_verifications
+         where account_id = $1 and channel = $2 and consumed_at is null
+         order by created_at desc limit 1`,
+      [input.accountId, input.channel],
+    );
+    if (
+      latest &&
+      Date.now() - latest.created_at.getTime() < 60_000
+    ) {
+      throw new ClientError('cooldown', 'Please wait before requesting another code');
+    }
+    const code = this.generateOtp();
+    await this.db.query(
+      `insert into account_verifications (account_id, channel, code_hash, expires_at)
+       values ($1, $2, $3, now() + interval '15 minutes')`,
+      [input.accountId, input.channel, this.hashCode(code)],
+    );
+    await this.dispatcher.send({
+      accountId: input.accountId,
+      channel: input.channel,
+      code,
+      destination,
+      purpose: 'signup',
+    });
+    await this.audit.record({
+      accountId: input.accountId,
+      actor: { kind: 'user', id: input.accountId },
+      action: 'verification.resent',
+      resource: `account:${input.accountId}`,
+      context: { channel: input.channel },
+    });
+  }
+
   /** Verifies one channel. When all pending verifications are consumed the
    *  account flips to `active`. */
   async verify(input: {

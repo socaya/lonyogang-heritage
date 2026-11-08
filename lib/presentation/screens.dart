@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
+import '../data/sync_outbox.dart';
 import '../domain/finance.dart';
 import '../domain/models.dart';
 import 'widgets.dart';
@@ -49,9 +50,48 @@ class HomeScreen extends StatelessWidget {
       if(assets.isEmpty)EmptySection(title:'Start building your portfolio',detail:'Add an investment, property or savings account.',onAdd:onAdd)
       else ...assets.take(3).map((a)=>Padding(padding:const EdgeInsets.only(bottom:8),child:AssetTile(asset:a,
         onTap:()=>push(context,AssetDetails(store:store,asset:a))))),
+      const SizedBox(height:18),SyncOutboxBadge(store:store),
       const SizedBox(height:18),HomeRecentActivity(store:store),
       const SizedBox(height:18),const PrivacyBanner(),
     ]);
+  }
+}
+
+/// Subtle indicator on Home that lets the user see how many mutations are
+/// still queued for the next sync run. Rebuilds whenever the outbox fires
+/// its ChangeNotifier. Hidden entirely when there is no online outbox or
+/// the queue is empty, so it doesn't clutter the dashboard.
+class SyncOutboxBadge extends StatelessWidget {
+  final PortfolioStore store;
+  const SyncOutboxBadge({super.key, required this.store});
+  @override
+  Widget build(BuildContext context) {
+    final outbox = store.outbox;
+    if (outbox == null) return const SizedBox.shrink();
+    return AnimatedBuilder(
+      animation: outbox,
+      builder: (context, _) {
+        final count = outbox.length;
+        if (count == 0) return const SizedBox.shrink();
+        return SoftCard(
+          color: LG.sageSoft,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          child: Row(children: [
+            const Icon(Icons.cloud_upload_outlined, color: LG.sage, size: 20),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                count == 1
+                    ? '1 change queued for the next sync.'
+                    : '$count changes queued for the next sync.',
+                style: const TextStyle(
+                    color: LG.navy, fontWeight: FontWeight.w700, fontSize: 13),
+              ),
+            ),
+          ]),
+        );
+      },
+    );
   }
 }
 

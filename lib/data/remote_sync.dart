@@ -318,6 +318,23 @@ class RemoteSyncService implements SyncService {
     }
   }
 
+  /// Requests a fresh OTP code for a channel while the account is still
+  /// pending verification. The server enforces a 60-second cooldown.
+  Future<void> resendOtp({
+    required String accountId,
+    required String channel,
+  }) async {
+    final uri = _baseUri.resolve('/identity/accounts/verify/resend');
+    final request = await _http.postUrl(uri);
+    request.headers.contentType = ContentType.json;
+    request.write(jsonEncode({'accountId': accountId, 'channel': channel}));
+    final response = await request.close();
+    final text = await response.transform(utf8.decoder).join();
+    if (response.statusCode != 202 && response.statusCode != 200) {
+      throw HttpException('Resend failed: $text', uri: uri);
+    }
+  }
+
   /// Convenience: signs in with email + password (+ optional TOTP) and
   /// persists the resulting credentials.
   Future<RemoteSyncCredentials> signIn({

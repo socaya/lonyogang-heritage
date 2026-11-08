@@ -9,6 +9,7 @@ import '../core/design.dart';
 import '../data/credentials_store.dart';
 import '../data/remote_sync.dart';
 import 'components.dart';
+import 'totp_enrol_screen.dart';
 import 'widgets.dart';
 
 /// Lets a signed-in user exercise their Uganda DPPA 2019 data-subject
@@ -188,6 +189,20 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
             loading: _working,
             showArrow: false,
             onPressed: _profile == null ? null : _export,
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _profile == null || _working
+                ? null
+                : () async {
+                    await Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => TotpEnrolScreen(
+                              baseUri: widget.baseUri,
+                              credentials: widget.credentials,
+                            )));
+                  },
+            icon: const Icon(Icons.shield_outlined),
+            label: const Text('Enrol TOTP second factor'),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(

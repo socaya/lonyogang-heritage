@@ -45,6 +45,7 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
     _displayName.dispose();
     _emailCode.dispose();
     _phoneCode.dispose();
+    _resendTimer?.cancel();
     super.dispose();
   }
 
@@ -219,7 +220,12 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
             ],
           ),
         ),
-        if (_composedPhone.trim().length > 4)
+        _ResendButton(
+          channel: 'email',
+          onPressed: _busy ? null : () => _resend('email'),
+          cooldown: _emailResendCooldown,
+        ),
+        if (_composedPhone.trim().length > 4) ...[
           FormFieldBlock(
             title: 'SMS verification code',
             help: 'Enter the code we texted to your phone.',
@@ -232,6 +238,12 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
               ],
             ),
           ),
+          _ResendButton(
+            channel: 'phone',
+            onPressed: _busy ? null : () => _resend('phone'),
+            cooldown: _phoneResendCooldown,
+          ),
+        ],
         PrimaryCTA(
           label: _busy ? 'Verifying…' : 'Verify and sign in',
           loading: _busy,
@@ -242,4 +254,69 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
           child: const Text('Back', style: TextStyle(color: LG.muted)),
         ),
       ];
+
+  Future<void> _resend(String channel) async {
+    final accountId = _accountId;
+    if (accountId == null) return;
+    try {
+      await widget.sync.resendOtp(accountId: accountId, channel: channel);
+      _startCooldown(channel);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('New $channel code dispatched. Check your inbox.')));
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _error = '$e');
+    }
+  }
+
+  int _emailResendCooldown = 0;
+  int _phoneResendCooldown = 0;
+  Timer? _resendTimer;
+
+  void _startCooldown(String channel) {
+    setState(() {
+      if (channel == 'email') _emailResendCooldown = 60;
+      if (channel == 'phone') _phoneResendCooldown = 60;
+    });
+    _resendTimer?.cancel();
+    _resendTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() {
+        if (_emailResendCooldown > 0) _emailResendCooldown--;
+        if (_phoneResendCooldown > 0) _phoneResendCooldown--;
+      });
+      if (_emailResendCooldown == 0 && _phoneResendCooldown == 0) t.cancel();
+    });
+  }
+}
+
+class _ResendButton extends StatelessWidget {
+  final String channel;
+  final VoidCallback? onPressed;
+  final int cooldown;
+  const _ResendButton({
+    required this.channel,
+    required this.onPressed,
+    required this.cooldown,
+  });
+  @override
+  Widget build(BuildContext context) {
+    final blocked = cooldown > 0;
+    return Align(
+      alignment: Alignment.centerRight,
+      child: TextButton(
+        onPressed: blocked ? null : onPressed,
+        child: Text(
+          blocked
+              ? 'Resend $channel in $cooldown s'
+              : 'Resend $channel code',
+          style: const TextStyle(color: LG.muted),
+        ),
+      ),
+    );
+  }
 }

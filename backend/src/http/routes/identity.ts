@@ -48,6 +48,21 @@ export async function registerIdentityRoutes(
     }
   });
 
+  app.post('/identity/accounts/verify/resend', async (req, reply) => {
+    const body = z
+      .object({
+        accountId: z.string().uuid(),
+        channel: z.enum(['email', 'phone']),
+      })
+      .parse(req.body);
+    try {
+      await deps.identity.resendVerification(body);
+      return reply.code(202).send({ status: 'accepted' });
+    } catch (err) {
+      return reply.code(400).send(toError(err));
+    }
+  });
+
   // ---- Password sessions ----
   app.post('/identity/sessions', async (req, reply) => {
     const body = z

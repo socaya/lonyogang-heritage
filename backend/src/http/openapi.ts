@@ -191,6 +191,13 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           responses: { '200': { description: 'Verification result.' } },
         },
       },
+      '/identity/accounts/verify/resend': {
+        post: {
+          tags: ['identity'],
+          summary: 'Dispatch a fresh OTP code for a pending channel',
+          responses: { '202': { description: 'Dispatcher invoked.' } },
+        },
+      },
       '/identity/sessions': {
         post: {
           tags: ['identity'],
