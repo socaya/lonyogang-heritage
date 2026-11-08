@@ -967,6 +967,155 @@ class _RecoverAccountScreenState extends State<RecoverAccountScreen> {
             loading: _busy,
             onPressed: _submit,
           ),
+          const SizedBox(height: 10),
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                  builder: (_) => const PasswordResetCompleteScreen())),
+              child: const Text('I already have a reset code',
+                  style: TextStyle(color: LG.muted)),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const _PrototypeDisclaimer(),
+        ],
+      );
+}
+
+/// Second half of the password-reset flow: the user pastes the code the
+/// server sent to their email (plus the email itself) and picks a new
+/// password. Only functional when an OnlineScope is wired; otherwise the
+/// screen stays as a design preview so the surface area is visible.
+class PasswordResetCompleteScreen extends StatefulWidget {
+  const PasswordResetCompleteScreen({super.key});
+  @override
+  State<PasswordResetCompleteScreen> createState() =>
+      _PasswordResetCompleteScreenState();
+}
+
+class _PasswordResetCompleteScreenState
+    extends State<PasswordResetCompleteScreen> {
+  final form = GlobalKey<FormState>();
+  final email = TextEditingController();
+  final token = TextEditingController();
+  final password = TextEditingController();
+  bool _busy = false;
+  String? _error;
+
+  @override
+  void dispose() {
+    email.dispose();
+    token.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (!form.currentState!.validate()) return;
+    final scope = OnlineScope.maybeOf(context);
+    final remote = scope?.sync;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      if (remote == null) {
+        await Future<void>.delayed(const Duration(milliseconds: 400));
+        if (!mounted) return;
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text(
+                'Preview: password would be reset once the backend is connected.')));
+        return;
+      }
+      await remote.completePasswordReset(
+        email: email.text.trim(),
+        token: token.text.trim(),
+        newPassword: password.text,
+      );
+      if (!mounted) return;
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Password updated. Sign in with the new password.')));
+    } on HttpException catch (err) {
+      setState(() {
+        _busy = false;
+        _error = err.message.contains('token_invalid')
+            ? 'That reset code is not valid or has expired.'
+            : 'Reset failed: ${err.message}';
+      });
+    } catch (err) {
+      setState(() {
+        _busy = false;
+        _error = 'Reset failed: $err';
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AppPage(
+        appBar: const AppHeader(),
+        children: [
+          const Center(child: BrandMark(height: 32)),
+          const SizedBox(height: 28),
+          Text('Choose a new password',
+              style: Theme.of(context).textTheme.headlineMedium),
+          const SizedBox(height: 10),
+          const Text(
+            'Paste the reset code from the email the server sent you. All existing sessions are revoked when the password changes.',
+            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+          ),
+          const SizedBox(height: 24),
+          Form(
+            key: form,
+            autovalidateMode: AutovalidateMode.onUserInteraction,
+            child: Column(children: [
+              FormFieldBlock(
+                title: 'Email',
+                child: TextFormField(
+                  controller: email,
+                  keyboardType: TextInputType.emailAddress,
+                  decoration: const InputDecoration(hintText: 'you@example.com'),
+                  validator: (v) =>
+                      isLikelyEmail(v ?? '') ? null : 'Enter the account email',
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Reset code',
+                child: TextFormField(
+                  controller: token,
+                  decoration: const InputDecoration(
+                      hintText: 'Paste the code from the reset email'),
+                  validator: (v) => (v == null || v.trim().length < 6)
+                      ? 'Enter the reset code from the email'
+                      : null,
+                ),
+              ),
+              FormFieldBlock(
+                title: 'New password',
+                child: TextFormField(
+                  controller: password,
+                  obscureText: true,
+                  decoration:
+                      const InputDecoration(hintText: 'At least 10 characters'),
+                  validator: (v) => (v == null || v.length < 10)
+                      ? 'At least 10 characters'
+                      : null,
+                ),
+              ),
+              if (_error != null) ...[
+                const SizedBox(height: 4),
+                Text(_error!,
+                    style: const TextStyle(color: LG.negative, fontSize: 12)),
+              ],
+            ]),
+          ),
+          const SizedBox(height: 22),
+          PrimaryCTA(
+            label: _busy ? 'Resetting…' : 'Reset password',
+            loading: _busy,
+            onPressed: _submit,
+          ),
           const SizedBox(height: 18),
           const _PrototypeDisclaimer(),
         ],

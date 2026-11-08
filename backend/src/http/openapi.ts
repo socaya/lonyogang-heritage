@@ -228,6 +228,12 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
             '401': { description: 'Bad credentials or TOTP.' },
           },
         },
+        get: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: "List this account's active sessions",
+          responses: { '200': { description: 'Session list.' } },
+        },
       },
       '/identity/sessions/refresh': {
         post: {
@@ -242,6 +248,96 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           security: [{ bearer: [] }],
           summary: 'Revoke a specific session',
           responses: { '204': { description: 'Revoked.' } },
+        },
+      },
+      '/identity/totp': {
+        post: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'Enroll a TOTP second factor; returns seed + otpauth URI',
+          responses: { '200': { description: 'Seed + otpauth URI.' } },
+        },
+      },
+      '/identity/password/reset/begin': {
+        post: {
+          tags: ['identity'],
+          summary: 'Request a password reset code (always 202 to avoid enumeration)',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['email'],
+                  properties: {
+                    email: { type: 'string', format: 'email' },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '202': { description: 'Accepted (regardless of whether the email resolves).' },
+            '429': { description: 'Rate limit (5/hour) hit.' },
+          },
+        },
+      },
+      '/identity/password/reset/complete': {
+        post: {
+          tags: ['identity'],
+          summary: 'Complete a password reset with the emailed token',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['email', 'token', 'newPassword'],
+                  properties: {
+                    email: { type: 'string', format: 'email' },
+                    token: { type: 'string', minLength: 8 },
+                    newPassword: { type: 'string', minLength: 10 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '204': { description: 'Password updated; sessions revoked.' },
+            '400': { description: 'Token expired or did not match.' },
+            '429': { description: 'Rate limit (10/min) hit.' },
+          },
+        },
+      },
+      '/identity/passkeys/registration/verify': {
+        post: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'Verify a WebAuthn registration response',
+          responses: { '200': { description: 'Credential registered.' } },
+        },
+      },
+      '/identity/passkeys/authentication/verify': {
+        post: {
+          tags: ['identity'],
+          summary: 'Verify a WebAuthn authentication response and open a session',
+          responses: { '200': { description: 'Access + refresh issued.' } },
+        },
+      },
+      '/identity/passkeys/{credentialId}': {
+        delete: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'Remove a registered passkey',
+          responses: { '204': { description: 'Removed.' } },
+        },
+      },
+      '/identity/passkeys': {
+        get: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'List this account\'s registered passkeys',
+          responses: { '200': { description: 'Passkey list.' } },
         },
       },
       '/identity/passkeys/registration': {
