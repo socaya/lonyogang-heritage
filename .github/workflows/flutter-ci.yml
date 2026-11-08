@@ -18,6 +18,45 @@ jobs:
         run: |
           flutter create --platforms=android,ios --org com.lonyogang .
           rm -f test/widget_test.dart
+      - name: Enable core library desugaring for flutter_local_notifications
+        run: |
+          set -eu
+          gradle=android/app/build.gradle
+          # Patch minSdkVersion to 23 so local_auth is satisfied, and enable
+          # Java 11 + core library desugaring that flutter_local_notifications
+          # requires. Idempotent so repeated CI runs don't double-apply.
+          grep -q "coreLibraryDesugaring" "$gradle" || python3 - <<'PY'
+import re, pathlib
+p = pathlib.Path("android/app/build.gradle")
+src = p.read_text()
+# Bump minSdkVersion (match either `minSdkVersion flutter.minSdkVersion` or an integer)
+src = re.sub(r"minSdkVersion\s+(?:flutter\.minSdkVersion|\d+)", "minSdkVersion 23", src)
+# Inject compileOptions + coreLibraryDesugaringEnabled into android { ... } once.
+if "coreLibraryDesugaringEnabled" not in src:
+    src = src.replace(
+        "android {",
+        "android {\n    compileOptions {\n"
+        "        coreLibraryDesugaringEnabled true\n"
+        "        sourceCompatibility JavaVersion.VERSION_11\n"
+        "        targetCompatibility JavaVersion.VERSION_11\n"
+        "    }\n"
+        "    kotlinOptions {\n"
+        "        jvmTarget = '11'\n"
+        "    }\n",
+        1,
+    )
+# Append the desugaring dep inside dependencies { ... }
+if "com.android.tools:desugar_jdk_libs" not in src:
+    src = re.sub(
+        r"dependencies\s*\{",
+        "dependencies {\n    coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.0.4'",
+        src,
+        count=1,
+    )
+p.write_text(src)
+print("Patched", p)
+PY
+          cat android/app/build.gradle | sed -n '/android {/,/^}$/p' | head -40
       - name: Dependencies
         run: flutter pub get
       - name: Analyze Dart source

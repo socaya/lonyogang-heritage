@@ -1,4 +1,3 @@
-import 'package:flutter/services.dart';
 import 'package:local_auth/local_auth.dart';
 
 /// Wrapper around `local_auth` that degrades to "unavailable" instead of
@@ -12,7 +11,9 @@ class BiometricGateway {
       final supported = await _auth.isDeviceSupported();
       final canCheck = await _auth.canCheckBiometrics;
       return supported && canCheck;
-    } on PlatformException {
+    } catch (_) {
+      // Covers PlatformException, MissingPluginException (widget tests) and
+      // any device that cannot answer the capability probe.
       return false;
     }
   }
@@ -24,7 +25,7 @@ class BiometricGateway {
         options: const AuthenticationOptions(
             stickyAuth: true, biometricOnly: true),
       );
-    } on PlatformException {
+    } catch (_) {
       return false;
     }
   }

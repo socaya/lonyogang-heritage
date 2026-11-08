@@ -1,7 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import type { PoolClient } from 'pg';
 import pg from 'pg';
-import { PostgreSqlContainer, type StartedTestContainer } from 'testcontainers';
+import { PostgreSqlContainer } from '@testcontainers/postgresql';
+import type { StartedTestContainer } from 'testcontainers';
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

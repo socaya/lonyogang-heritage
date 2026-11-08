@@ -1,7 +1,7 @@
 import { readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { generateKeyPairSync } from 'node:crypto';
-import { PostgreSqlContainer } from 'testcontainers';
+import { PostgreSqlContainer } from '@testcontainers/postgresql';
 import type { StartedTestContainer } from 'testcontainers';
 import pg from 'pg';
 import type { FastifyInstance } from 'fastify';
