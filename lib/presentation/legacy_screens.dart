@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
+import '../data/remote_sync.dart';
 import '../domain/models.dart';
 import 'components.dart';
 import 'detail_screens.dart';
@@ -749,25 +750,158 @@ class SecurityCenterScreen extends StatelessWidget {
 
 class SubscriptionScreen extends StatelessWidget {
   const SubscriptionScreen({super.key});
-  @override Widget build(BuildContext context)=>const WealthPage(
-    title:'Subscription & billing',subtitle:'How LonyoGang will offer ongoing access.',children:[
-      SoftCard(color:LG.sageSoft,child:Row(children:[
-        Icon(Icons.info_outline,color:LG.sage),SizedBox(width:12),
-        Expanded(child:Text('Payments are not connected in this preview. No subscription or charge has been created.',
-          style:TextStyle(color:LG.muted,fontSize:12,height:1.5)))])),
-      SizedBox(height:22),SectionTitle('Planned personal portfolio access'),
-      SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text('Personal wealth tracking',style:TextStyle(fontSize:18,fontWeight:FontWeight.w800)),
-        SizedBox(height:12),InfoLabel(label:'Owner',value:'One personal portfolio'),
-        InfoLabel(label:'Assets & net worth',value:'Included in design'),
-        InfoLabel(label:'Properties & savings',value:'Included in design'),
-        InfoLabel(label:'Legacy planning',value:'Included in design'),
-        InfoLabel(label:'Billing price',value:'Not finalized'),
-        InfoLabel(label:'Payment service',value:'Not available'),
-      ])),SizedBox(height:22),
-      Text('Prices, billing cycles, eligibility and cancellation terms must be approved before paid subscriptions can be offered.',
-        style:TextStyle(color:LG.muted,fontSize:12,height:1.5)),
-    ]);
+  @override
+  Widget build(BuildContext context) {
+    final scope = OnlineScope.maybeOf(context);
+    final remote = scope?.sync;
+    // Backend not configured → show the honest "payments not connected"
+    // panel so the user never thinks a subscription might exist silently.
+    if (remote == null) return const _SubscriptionDesignPreview();
+    return FutureBuilder<RemoteSubscription>(
+      future: remote.getSubscription(),
+      builder: (context, snap) {
+        if (snap.connectionState != ConnectionState.done) {
+          return const WealthPage(
+              title: 'Subscription & billing',
+              subtitle: 'Fetching current tier from the backend.',
+              children: [LoadingState(message: 'Loading subscription')]);
+        }
+        if (snap.hasError) {
+          return WealthPage(
+              title: 'Subscription & billing',
+              subtitle: 'Could not reach the billing service.',
+              children: [
+                ErrorState(
+                    message: '${snap.error}',
+                    onRetry: () async {
+                      (context as Element).markNeedsBuild();
+                    }),
+              ]);
+        }
+        final sub = snap.data!;
+        return WealthPage(
+          title: 'Subscription & billing',
+          subtitle: 'Current tier on this account.',
+          children: [
+            SoftCard(
+              color: sub.status == 'active' ? LG.sageSoft : LG.white,
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(_tierLabel(sub.tier),
+                    style: const TextStyle(
+                        fontSize: 20, fontWeight: FontWeight.w800)),
+                const SizedBox(height: 8),
+                Text('Status: ${sub.status}',
+                    style: const TextStyle(color: LG.muted, fontSize: 12)),
+                if (sub.currentPeriodEnd != null) ...[
+                  const SizedBox(height: 4),
+                  Text('Renews ${LG.date(sub.currentPeriodEnd!)}',
+                      style: const TextStyle(color: LG.muted, fontSize: 12)),
+                ],
+                if (sub.provider != null) ...[
+                  const SizedBox(height: 4),
+                  Text('Provider: ${sub.provider}',
+                      style: const TextStyle(color: LG.muted, fontSize: 12)),
+                ],
+              ]),
+            ),
+            const SizedBox(height: 22),
+            const SectionTitle('What this tier covers'),
+            SoftCard(
+                child: Column(children: [
+              InfoLabel(
+                  label: 'Attachment quota',
+                  value: _quotaLabel(sub.tier)),
+              const InfoLabel(
+                  label: 'Multi-device sync', value: 'Included'),
+              const InfoLabel(
+                  label: 'Audit trail + anchors', value: 'Included'),
+              InfoLabel(
+                  label: 'Bank-feed aggregation',
+                  value: sub.tier == 'free' ? 'Not included' : 'Included'),
+            ])),
+            const SizedBox(height: 22),
+            const Text(
+                'Changes take effect at the start of the next billing period. Payment provider interactions remain subject to local law.',
+                style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+          ],
+        );
+      },
+    );
+  }
+
+  static String _tierLabel(String tier) {
+    switch (tier) {
+      case 'legacy':
+        return 'Legacy';
+      case 'heritage':
+        return 'Heritage';
+      default:
+        return 'Free';
+    }
+  }
+
+  static String _quotaLabel(String tier) {
+    switch (tier) {
+      case 'legacy':
+        return '10 GB';
+      case 'heritage':
+        return '2 GB';
+      default:
+        return '100 MB';
+    }
+  }
+}
+
+/// The original hard-coded panel. Still shown when the device was built
+/// without a backend URL so the user is never misled about what the
+/// preview can actually do.
+class _SubscriptionDesignPreview extends StatelessWidget {
+  const _SubscriptionDesignPreview();
+  @override
+  Widget build(BuildContext context) => const WealthPage(
+          title: 'Subscription & billing',
+          subtitle: 'How LonyoGang will offer ongoing access.',
+          children: [
+            SoftCard(
+                color: LG.sageSoft,
+                child: Row(children: [
+                  Icon(Icons.info_outline, color: LG.sage),
+                  SizedBox(width: 12),
+                  Expanded(
+                      child: Text(
+                          'Payments are not connected in this preview. No subscription or charge has been created.',
+                          style: TextStyle(
+                              color: LG.muted, fontSize: 12, height: 1.5))),
+                ])),
+            SizedBox(height: 22),
+            SectionTitle('Planned personal portfolio access'),
+            SoftCard(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text('Personal wealth tracking',
+                      style: TextStyle(
+                          fontSize: 18, fontWeight: FontWeight.w800)),
+                  SizedBox(height: 12),
+                  InfoLabel(label: 'Owner', value: 'One personal portfolio'),
+                  InfoLabel(
+                      label: 'Assets & net worth',
+                      value: 'Included in design'),
+                  InfoLabel(
+                      label: 'Properties & savings',
+                      value: 'Included in design'),
+                  InfoLabel(
+                      label: 'Legacy planning',
+                      value: 'Included in design'),
+                  InfoLabel(label: 'Billing price', value: 'Not finalized'),
+                  InfoLabel(
+                      label: 'Payment service', value: 'Not available'),
+                ])),
+            SizedBox(height: 22),
+            Text(
+                'Prices, billing cycles, eligibility and cancellation terms must be approved before paid subscriptions can be offered.',
+                style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+          ]);
 }
 
 class HelpCenterScreen extends StatefulWidget {

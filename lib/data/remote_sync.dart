@@ -441,6 +441,16 @@ class RemoteSyncService implements SyncService {
     return rows;
   }
 
+  /// Fetches the live subscription row for this account.
+  Future<RemoteSubscription> getSubscription() async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/billing/subscription');
+    final text = await _request('GET', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    return RemoteSubscription.fromJson(decoded);
+  }
+
   /// Revokes a single session by id. The caller must not revoke the
   /// session id currently backing [creds.accessToken] — the UI enforces
   /// that by comparing against the active session.
@@ -493,6 +503,33 @@ class RemoteSyncSession {
             : DateTime.parse((j['revoked_at'] ?? j['revokedAt']) as String),
         expiresAt: DateTime.parse(
             (j['expires_at'] ?? j['expiresAt']) as String),
+      );
+}
+
+/// The subscription row returned by `GET /billing/subscription`. Free
+/// accounts land in the `{tier: 'free', status: 'active'}` state even when
+/// no row is present in the server's subscriptions table.
+class RemoteSubscription {
+  final String tier;
+  final String status;
+  final DateTime? currentPeriodEnd;
+  final String? provider;
+  const RemoteSubscription({
+    required this.tier,
+    required this.status,
+    required this.currentPeriodEnd,
+    required this.provider,
+  });
+  factory RemoteSubscription.fromJson(Map<String, dynamic> j) =>
+      RemoteSubscription(
+        tier: (j['tier'] ?? 'free').toString(),
+        status: (j['status'] ?? 'active').toString(),
+        currentPeriodEnd: (j['currentPeriodEnd'] ?? j['current_period_end']) ==
+                null
+            ? null
+            : DateTime.parse((j['currentPeriodEnd'] ??
+                j['current_period_end']) as String),
+        provider: (j['provider']) as String?,
       );
 }
 
