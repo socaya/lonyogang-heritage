@@ -19,3 +19,6 @@ ios/Flutter/flutter_export_environment.sh
 *.keystore
 *.jks
 .env
+
+# Claude Code session state
+.claude/
