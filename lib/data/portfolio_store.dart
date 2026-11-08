@@ -478,6 +478,36 @@ class PortfolioStore extends ChangeNotifier {
     return updated;
   }
 
+  /// Sweeps the document set for attachments that have no serverId —
+  /// typically because an earlier upload failed (offline, flaky
+  /// network, 5xx) — and retries the three-phase presign dance.
+  /// Returns the number of attachments successfully uploaded. Safe
+  /// to call repeatedly; already-synced attachments are skipped.
+  Future<int> retryPendingAttachments() async {
+    final syncer = attachmentSyncer;
+    if (syncer == null) return 0;
+    var retried = 0;
+    for (final doc in [..._state.documents]) {
+      final ref = doc.attachment;
+      if (ref == null || ref.serverId != null) continue;
+      try {
+        final ciphertext = await attachments.readCiphertext(ref);
+        final sha = _hexToBytes(ref.sha256Hex);
+        final serverId = await syncer.uploadCiphertext(
+          bytes: ciphertext,
+          sha256: sha,
+          mimeType: ref.mimeType,
+        );
+        final updated = doc.copyWith(attachment: ref.withServerId(serverId));
+        await upsertDocument(updated);
+        retried += 1;
+      } catch (_) {
+        // Leave the doc untouched; the next sweep tries again.
+      }
+    }
+    return retried;
+  }
+
   Future<void> removeAttachment(DocumentRecord document) async {
     final ref = document.attachment;
     if (ref == null) return;

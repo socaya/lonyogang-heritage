@@ -121,6 +121,10 @@ class _LonyoGangAppState extends State<LonyoGangApp> {
     final sync = widget.sync;
     if (sync == null) return;
     try {
+      // Opportunistic attachment upload retry — picks up anything that
+      // was attached while offline so the document rows the outbox has
+      // already pushed get their serverId back-filled on the next tick.
+      await widget.store.retryPendingAttachments();
       await sync.sync();
     } catch (_) {
       // Transient network issues are swallowed; the status surface in
