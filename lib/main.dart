@@ -10,6 +10,7 @@ import 'data/credentials_store.dart';
 import 'data/notifications.dart';
 import 'data/portfolio_store.dart';
 import 'data/remote_sync.dart';
+import 'data/resource_publisher.dart';
 import 'data/sync.dart';
 import 'data/sync_outbox.dart';
 import 'data/sync_reducer.dart';
@@ -31,22 +32,34 @@ Future<void> main() async {
   final AttachmentSyncer? attachmentSyncer = hasBackend
       ? AttachmentSyncer(baseUri: backendBase, credentials: credentials)
       : null;
-  final store = PortfolioStore(
+  // Build the RemoteSyncService first so the PortfolioStore can mirror
+  // its writes to /resources/:kind/:id as well as the outbox.
+  RemoteSyncService? remoteSync;
+  PortfolioStore lateStore;
+  final reducerHolder = <SyncReducer>[];
+  if (hasBackend) {
+    remoteSync = RemoteSyncService(
+      baseUri: backendBase,
+      credentialsLoader: credentials.load,
+      credentialsSaver: credentials.save,
+      outboxLoader: outbox.snapshot,
+      pullHandler: (record) async {
+        if (reducerHolder.isNotEmpty) {
+          await reducerHolder.first.apply(record);
+        }
+      },
+    );
+  }
+  lateStore = PortfolioStore(
     outbox: outbox,
     attachmentSyncer: attachmentSyncer,
+    resourcePublisher:
+        remoteSync == null ? null : ResourcePublisher(remote: remoteSync),
   );
-  final reducer = SyncReducer(store, attachmentSyncer: attachmentSyncer);
-  final SyncService sync = !hasBackend
-      ? NoopSyncService()
-      : RemoteSyncService(
-          baseUri: backendBase,
-          credentialsLoader: credentials.load,
-          credentialsSaver: credentials.save,
-          outboxLoader: outbox.snapshot,
-          pullHandler: (record) async {
-            await reducer.apply(record);
-          },
-        );
+  final reducer = SyncReducer(lateStore, attachmentSyncer: attachmentSyncer);
+  reducerHolder.add(reducer);
+  final store = lateStore;
+  final SyncService sync = remoteSync ?? NoopSyncService();
   runApp(LonyoGangApp(
     store: store,
     scheduler: scheduler,

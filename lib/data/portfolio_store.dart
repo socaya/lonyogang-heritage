@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../domain/models.dart';
@@ -5,6 +6,7 @@ import '../domain/finance.dart';
 import 'vault.dart';
 import 'attachment_store.dart';
 import 'attachment_syncer.dart';
+import 'resource_publisher.dart';
 import 'sync_outbox.dart';
 
 /// Local, offline-first repository. In 0.3 this wrote cleartext to
@@ -17,6 +19,7 @@ class PortfolioStore extends ChangeNotifier {
     AttachmentStore? attachments,
     this.outbox,
     this.attachmentSyncer,
+    this.resourcePublisher,
     String? deviceId,
   })  : vault = vault ?? Vault(),
         attachments = attachments ?? AttachmentStore(),
@@ -28,6 +31,11 @@ class PortfolioStore extends ChangeNotifier {
   final AttachmentStore attachments;
   final SyncOutbox? outbox;
   final AttachmentSyncer? attachmentSyncer;
+  /// Optional publisher that mirrors every outbox write to the server's
+  /// REST resource layer. When null (no online scope wired, or the user
+  /// has not signed in yet), every mutation still goes to the outbox and
+  /// the next /sync/events push will carry it across.
+  final ResourcePublisher? resourcePublisher;
   final String deviceId;
 
   static int _deviceIdCounter = 0;
@@ -58,6 +66,20 @@ class PortfolioStore extends ChangeNotifier {
     } catch (_) {
       // Record-on-mutation failures do not break the local write; the next
       // sync run will retry when the vault is available.
+    }
+    // Mirror the write to the REST resource layer (if wired). The
+    // publisher is fire-and-forget: the outbox remains the source of
+    // truth for cross-device replay, this is a best-effort push so a
+    // web client can see the row before the next pull cycle.
+    final publisher = resourcePublisher;
+    if (publisher != null) {
+      unawaited(publisher.publish(
+        kind: payloadType,
+        payload: payload,
+        integrity: integrity,
+        vaultKey: key,
+        deviceId: deviceId,
+      ));
     }
   }
 
