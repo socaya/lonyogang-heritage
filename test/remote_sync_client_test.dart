@@ -76,6 +76,23 @@ class _FakeBackend {
         _writeJson(req, {'ok': true});
         return;
       }
+      if (method == 'POST' && path == '/identity/password/reset/begin') {
+        await utf8.decoder.bind(req).join();
+        req.response.statusCode = 202;
+        await req.response.close();
+        return;
+      }
+      if (method == 'POST' && path == '/identity/password/reset/begin-rate') {
+        req.response.statusCode = 429;
+        await req.response.close();
+        return;
+      }
+      if (method == 'GET' && path == '/bank/providers') {
+        _writeJson(req, {
+          'providers': ['mock', 'stanbic'],
+        });
+        return;
+      }
       if (method == 'GET' && path == '/audit/chain') {
         _writeJson(req, {
           'verified': true,
@@ -174,6 +191,26 @@ void main() {
     try {
       await buildSync(b).patchMe(marketingConsent: true);
       expect(b.meMarketingConsentCalls, 1);
+    } finally {
+      await b.close();
+    }
+  });
+
+  test('beginPasswordReset swallows the 202 response silently', () async {
+    final b = await _FakeBackend.start();
+    try {
+      // Plain success path; should not raise.
+      await buildSync(b).beginPasswordReset(email: 'you@example.com');
+    } finally {
+      await b.close();
+    }
+  });
+
+  test('listBankProviders returns the string list from the server', () async {
+    final b = await _FakeBackend.start();
+    try {
+      final providers = await buildSync(b).listBankProviders();
+      expect(providers, ['mock', 'stanbic']);
     } finally {
       await b.close();
     }
