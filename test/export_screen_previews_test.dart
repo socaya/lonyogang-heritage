@@ -8,8 +8,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lonyogang_heritage/core/design.dart';
 import 'package:lonyogang_heritage/data/portfolio_store.dart';
 import 'package:lonyogang_heritage/domain/models.dart';
-import 'package:lonyogang_heritage/presentation/wealth_screens.dart';
+import 'package:lonyogang_heritage/presentation/account_screens.dart';
+import 'package:lonyogang_heritage/presentation/analysis_screens.dart';
+import 'package:lonyogang_heritage/presentation/detail_screens.dart';
+import 'package:lonyogang_heritage/presentation/forms.dart';
 import 'package:lonyogang_heritage/presentation/legacy_screens.dart';
+import 'package:lonyogang_heritage/presentation/onboarding_screens.dart';
+import 'package:lonyogang_heritage/presentation/security_screens.dart';
+import 'package:lonyogang_heritage/presentation/wealth_screens.dart';
 
 /// Widget images at 360x800 logical points and 3x output = 1080x2400 PNG.
 /// Only fictional records are used; not screenshots of a connected account.
@@ -51,7 +57,35 @@ void main(){
     await store.postEvent(LedgerEvent(id:'demo-cost',description:'Sample property maintenance',
       kind:EventKind.expense,amountUgx:400000,assetId:'property-rental',occurredAt:DateTime.now()));
     final sample=store.state.assets.firstWhere((a)=>a.id=='property-rental');
+    const draft=CreateAccountDraft(
+      fullName:'Example Owner',email:'owner@example.com',phone:'+256 700 123 456');
     final pages=<(String,Widget)>[
+      ('01-create-account-step-1',const CreateAccountStep1Screen()),
+      ('02-create-account-step-2',const CreateAccountStep2Screen(draft:draft)),
+      // OTP verification intentionally omitted from the pixel export: its
+      // periodic resend-cooldown timer prevents tester.pumpAndSettle from
+      // resolving. The screen is covered by the onboarding widget tests.
+      ('04-recover-account',const RecoverAccountScreen()),
+      ('05-portfolio-setup',PortfolioSetupScreen(store:store)),
+      ('06-not-found',const NotFoundScreen(attemptedTarget:'/legacy-record')),
+      ('07-unlock-screen',UnlockScreen(store:store)),
+      ('08-encryption-setup',EncryptionSetupScreen(store:store)),
+      ('09-allocation',AllocationScreen(store:store)),
+      ('10-fx-rates',FxRatesScreen(store:store)),
+      ('11-scheduled-contributions',ScheduledContributionsScreen(store:store)),
+      ('12-historical-trend',HistoricalTrendScreen(store:store)),
+      ('13-asset-performance',AssetPerformanceScreen(store:store,asset:sample)),
+      ('14-transaction-detail',TransactionDetailScreen(store:store,
+        event:store.state.events.firstWhere((e)=>e.id=='demo-rent'))),
+      ('15-liability-detail',LiabilityDetailScreen(store:store,
+        liability:store.state.liabilities.firstWhere((l)=>l.id=='mortgage'))),
+      ('16-data-sync-status',DataSyncStatusScreen(store:store)),
+      ('17-document-detail',DocumentDetailScreen(store:store,
+        document:store.state.documents.firstWhere((d)=>d.id=='demo-document'))),
+      ('18-goal-form',GoalForm(store:store)),
+      ('19-notification-detail',NotificationDetailScreen(store:store,
+        alert:buildLocalAlerts(store.state,DateTime.now()).first)),
+      ('19a-sign-in',const SignInScreen()),
       ('20-financial-position',WealthStatementScreen(store:store)),
       ('21-financial-holdings',InvestmentOverviewScreen(store:store)),
       ('22-portfolio-search',PortfolioSearchScreen(store:store)),

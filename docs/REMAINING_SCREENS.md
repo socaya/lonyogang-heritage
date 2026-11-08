@@ -1,6 +1,6 @@
 # LonyoGang Heritage — Flutter screen completion register
 
-Updated: 6 November 2026 · Version: 0.3.0 preview.
+Updated: 6 November 2026 · Version: 0.4.0 local alpha.
 
 ## Approved visual language
 
@@ -32,16 +32,20 @@ The app follows the 6.7-inch Android flat UI reference: Midnight Navy #102D3F, A
 - Subscription and billing information: SubscriptionScreen
 - JSON import/export and demo data: SettingsScreen
 - In-app FAQ and product information: HelpCenterScreen, AboutScreen
+- Passphrase unlock, set/change and biometric linking: UnlockScreen, EncryptionSetupScreen
+- Target allocation and drift: AllocationScreen
+- Recurring contributions: ScheduledContributionsScreen, ScheduleForm
+- Offline FX reference rates: FxRatesScreen
 
 Most new screens are reached via More, with shortcuts from Home, Asset details and Reports.
 
 ## Financial and persistence semantics
 
-The local PortfolioState remains backwards compatible with schema-1 saved portfolios. Documents, beneficiary plans, valuation history and notification preferences are optional new fields. Amounts are integer UGX. Ownership-adjusted asset values contribute to net worth. Linked mortgages are deducted just once. Activity events remain append-only and reversals cancel originals. Valuations preserve source and dates. Beneficiary intended shares are constrained to a combined 100%.
+The local PortfolioState is now schema version 2, but imports of schema version 1 remain supported — documents, beneficiary plans, valuation history, notification preferences, FX rates, scheduled contributions and target weights are all optional new fields that default to empty. Amounts are integer UGX. Ownership-adjusted asset values contribute to net worth. Linked mortgages are deducted just once. Activity events remain append-only and reversals cancel originals. Valuations preserve source and dates. Beneficiary intended shares are constrained to a combined 100%. TWR is computed per asset from dated valuations using a Modified-Dietz chain-link and annualized over the observed span; XIRR uses Newton–Raphson over contributions, withdrawals, dividends/interest/rent, fees/tax/expenses and the current value as the terminal flow.
 
 ## Clear limitations
 
-Document records contain metadata ONLY; actual files are not stored or uploaded. Beneficiary notes are non-binding and do not give legal estate rights or account access. Subscription checkout and payment processing are not connected. Notifications are derived in-app only. There are no remote passkeys, encrypted private database, real cloud accounts, multi-device sync, financial institution feeds, live FX or independently verified property values. Do not capture real identity numbers, title identifiers, account credentials or confidential financial details in the preview.
+Document attachments are encrypted on device under the vault key (AES-GCM) but still live in the app sandbox — enable the passphrase under Encryption for strongest protection. Beneficiary notes are non-binding and do not give legal estate rights or account access. Subscription checkout and payment processing are not connected. OS notification delivery depends on the platform granting the app permission. There are no remote passkeys, cloud database, remote account recovery, multi-device sync, financial institution feeds, live FX feed or independently verified property values. Do not capture real identity numbers, title identifiers, account credentials or confidential financial details until an independent security review has signed off on the local vault model.
 
 ## Device acceptance checklist
 

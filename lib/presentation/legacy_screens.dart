@@ -4,7 +4,10 @@ import 'package:flutter/services.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/models.dart';
+import 'components.dart';
+import 'detail_screens.dart';
 import 'forms.dart';
+import 'security_screens.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
 
@@ -23,11 +26,14 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
         (d.title.toLowerCase().contains(query.text.toLowerCase())||
          d.category.toLowerCase().contains(query.text.toLowerCase()))).toList()
        ..sort((a,b)=>a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+    final encryptionOn=widget.store.vault.hasPassphrase;
     return WealthPage(title:'Documents & records',subtitle:'A private catalog of important financial and property records.',children:[
-      const SoftCard(color:LG.sageSoft,child:Row(children:[
-        Icon(Icons.info_outline,color:LG.sage),SizedBox(width:12),
-        Expanded(child:Text('Metadata index only. No files are uploaded, scanned, encrypted or stored in this preview.',
-          style:TextStyle(color:LG.muted,fontSize:12,height:1.5)))])),
+      SoftCard(color:LG.sageSoft,child:Row(children:[
+        const Icon(Icons.info_outline,color:LG.sage),const SizedBox(width:12),
+        Expanded(child:Text(encryptionOn
+          ?'Attachments are AES-GCM encrypted on this device under your vault key.'
+          :'Attachments are stored on this device with a per-file key. Enable a passphrase to lock them to your vault.',
+          style:const TextStyle(color:LG.muted,fontSize:12,height:1.5)))])),
       const SizedBox(height:18),
       TextField(controller:query,onChanged:(_)=>setState((){}),
         decoration:const InputDecoration(prefixIcon:Icon(Icons.search,color:LG.sage),hintText:'Find a document record')),
@@ -38,18 +44,23 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
             selectedColor:LG.sageSoft,side:BorderSide.none)),
       ])),
       const SizedBox(height:20),
-      if(docs.isEmpty)const EmptySection(title:'No document records',detail:'Create a record for a deed, policy, contract or statement.')
+      if(docs.isEmpty)const AppEmptyState(title:'No document records',
+        detail:'Create a record for a deed, policy, contract or statement.',
+        icon:Icons.folder_outlined)
       else ...docs.map((d){
         final overdue=d.expiresAt!=null&&d.expiresAt!.isBefore(DateTime.now());
+        final hasFile=d.attachment!=null;
         return Padding(padding:const EdgeInsets.only(bottom:10),child:SoftCard(
-          onTap:()=>openWealthPage(context,DocumentFormScreen(store:widget.store,existing:d)),
+          onTap:()=>openWealthPage(context,DocumentDetailScreen(store:widget.store,document:d)),
           child:Row(children:[
             Container(width:44,height:44,decoration:BoxDecoration(color:LG.sageSoft,borderRadius:BorderRadius.circular(12)),
-              child:const Icon(Icons.description_outlined,color:LG.sage)),
+              child:Icon(hasFile?Icons.lock_outline:Icons.description_outlined,color:LG.sage)),
             const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
               Text(d.title,style:const TextStyle(fontWeight:FontWeight.w700)),
               const SizedBox(height:5),Text(d.expiresAt==null?d.category:'${d.category} · Expires ${LG.date(d.expiresAt!)}',
                 style:TextStyle(color:overdue?LG.negative:LG.muted,fontSize:12)),
+              if(hasFile)const Text('Encrypted file attached',
+                style:TextStyle(color:LG.sage,fontSize:11,fontWeight:FontWeight.w700)),
             ])),const Icon(Icons.chevron_right,color:LG.muted),
           ])));
       }),
@@ -61,76 +72,178 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
 }
 
 class DocumentFormScreen extends StatefulWidget {
-  final PortfolioStore store; final DocumentRecord? existing;
-  const DocumentFormScreen({super.key,required this.store,this.existing});
-  @override State<DocumentFormScreen> createState()=>_DocumentFormScreenState();
+  final PortfolioStore store;
+  final DocumentRecord? existing;
+  const DocumentFormScreen({super.key, required this.store, this.existing});
+  @override
+  State<DocumentFormScreen> createState() => _DocumentFormScreenState();
 }
+
 class _DocumentFormScreenState extends State<DocumentFormScreen> {
-  final key=GlobalKey<FormState>();
-  late final title=TextEditingController(text:widget.existing?.title??'');
-  late final notes=TextEditingController(text:widget.existing?.notes??'');
-  late String category=widget.existing?.category??'Property';
-  late String? linkedAssetId=widget.existing?.linkedAssetId;
-  late DateTime? issued=widget.existing?.issuedAt;
-  late DateTime? expires=widget.existing?.expiresAt;
-  bool saving=false;
-  @override void dispose(){title.dispose();notes.dispose();super.dispose();}
-  @override Widget build(BuildContext context) {
-    final assets=widget.store.state.assets.where((x)=>!x.archived).toList();
-    if(linkedAssetId!=null && !assets.any((a)=>a.id==linkedAssetId))linkedAssetId=null;
-    return Scaffold(appBar:AppBar(title:const BrandMark(height:28)),body:SafeArea(
-      child:Form(key:key,child:ListView(padding:const EdgeInsets.all(24),children:[
-      PageHeading(widget.existing==null?'New document record':'Edit document record',
-        subtitle:'Capture references and renewal dates, not the underlying files.'),
-      FormFieldBlock(title:'Document name',child:TextFormField(controller:title,
-        validator:(v)=>v==null||v.trim().isEmpty?'Required':null,
-        decoration:const InputDecoration(hintText:'e.g. Property insurance certificate'))),
-      FormFieldBlock(title:'Category',child:DropdownButtonFormField<String>(initialValue:category,
-        items:['Property','Investment','Insurance','Identity','Other']
-          .map((v)=>DropdownMenuItem(value:v,child:Text(v))).toList(),
-        onChanged:(v)=>setState(()=>category=v??category))),
-      FormFieldBlock(title:'Related asset (optional)',child:DropdownButtonFormField<String?>(initialValue:linkedAssetId,
-        items:[const DropdownMenuItem(value:null,child:Text('No linked asset')),
-          ...assets.map((a)=>DropdownMenuItem(value:a.id,child:Text(a.name,maxLines:1,overflow:TextOverflow.ellipsis)))],
-        onChanged:(v)=>setState(()=>linkedAssetId=v))),
-      FormFieldBlock(title:'Issue date',child:SoftCard(onTap:()async{
-        final v=await showDatePicker(context:context,initialDate:issued??DateTime.now(),
-          firstDate:DateTime(1950),lastDate:DateTime(2100));
-        if(v!=null)setState(()=>issued=v);
-      },child:Row(children:[const Icon(Icons.event_outlined,color:LG.sage),const SizedBox(width:10),
-        Text(issued==null?'Choose issue date':LG.date(issued!))]))),
-      FormFieldBlock(title:'Expiry or renewal date',child:SoftCard(onTap:()async{
-        final v=await showDatePicker(context:context,initialDate:expires??DateTime.now(),
-          firstDate:DateTime(1950),lastDate:DateTime(2100));
-        if(v!=null)setState(()=>expires=v);
-      },child:Row(children:[const Icon(Icons.event_available_outlined,color:LG.sage),const SizedBox(width:10),
-        Text(expires==null?'No expiry set':LG.date(expires!)),
-        const Spacer(),if(expires!=null)IconButton(onPressed:()=>setState(()=>expires=null),
-          icon:const Icon(Icons.close,color:LG.muted,size:18))]))),
-      FormFieldBlock(title:'Notes (optional)',child:TextFormField(controller:notes,maxLines:3,
-        decoration:const InputDecoration(hintText:'Storage location or renewal instructions (no secrets)'))),
-      const SizedBox(height:10),ElevatedButton(onPressed:saving?null:()async{
-        if(!key.currentState!.validate())return;
-        if(issued!=null&&expires!=null&&expires!.isBefore(issued!)){
-          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Expiry cannot precede issue date')));return;
-        }
-        setState(()=>saving=true);
-        try{await widget.store.upsertDocument(DocumentRecord(id:widget.existing?.id??makeId(),
-          title:title.text.trim(),category:category,linkedAssetId:linkedAssetId,
-          issuedAt:issued,expiresAt:expires,notes:notes.text.trim()));
-          if(context.mounted)Navigator.pop(context);
-        }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
-        finally{if(mounted)setState(()=>saving=false);}
-      },child:Text(saving?'Saving...':'Save document record')),
-      if(widget.existing!=null)...[
-        const SizedBox(height:12),TextButton(onPressed:()async{
-          await widget.store.archiveDocument(widget.existing!);
-          if(context.mounted)Navigator.pop(context);
-        },child:const Text('Archive record',style:TextStyle(color:LG.negative))),
+  final key = GlobalKey<FormState>();
+  late final title =
+      TextEditingController(text: widget.existing?.title ?? '');
+  late final notes =
+      TextEditingController(text: widget.existing?.notes ?? '');
+  late String category = widget.existing?.category ?? 'Property';
+  late String? linkedAssetId = widget.existing?.linkedAssetId;
+  late DateTime? issued = widget.existing?.issuedAt;
+  late DateTime? expires = widget.existing?.expiresAt;
+  bool saving = false;
+  @override
+  void dispose() {
+    title.dispose();
+    notes.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final assets = widget.store.state.assets.where((x) => !x.archived).toList();
+    if (linkedAssetId != null && !assets.any((a) => a.id == linkedAssetId)) {
+      linkedAssetId = null;
+    }
+    return AppPage(
+      appBar: const AppHeader(),
+      children: [
+        PageHeading(
+            widget.existing == null
+                ? 'New document record'
+                : 'Edit document record',
+            subtitle:
+                'Capture references and renewal dates. Attachments are managed from the detail page after saving.'),
+        Form(
+            key: key,
+            child: Column(children: [
+              FormFieldBlock(
+                  title: 'Document name',
+                  child: TextFormField(
+                      controller: title,
+                      validator: (v) =>
+                          v == null || v.trim().isEmpty ? 'Required' : null,
+                      decoration: const InputDecoration(
+                          hintText: 'e.g. Property insurance certificate'))),
+              FormFieldBlock(
+                  title: 'Category',
+                  child: DropdownButtonFormField<String>(
+                      initialValue: category,
+                      items: ['Property', 'Investment', 'Insurance', 'Identity', 'Other']
+                          .map((v) => DropdownMenuItem(value: v, child: Text(v)))
+                          .toList(),
+                      onChanged: (v) => setState(() => category = v ?? category))),
+              FormFieldBlock(
+                  title: 'Related asset (optional)',
+                  child: DropdownButtonFormField<String?>(
+                      initialValue: linkedAssetId,
+                      items: [
+                        const DropdownMenuItem(value: null, child: Text('No linked asset')),
+                        ...assets.map((a) => DropdownMenuItem(
+                            value: a.id,
+                            child: Text(a.name,
+                                maxLines: 1, overflow: TextOverflow.ellipsis)))
+                      ],
+                      onChanged: (v) => setState(() => linkedAssetId = v))),
+              FormFieldBlock(
+                  title: 'Issue date',
+                  child: SoftCard(
+                      onTap: () async {
+                        final v = await showDatePicker(
+                            context: context,
+                            initialDate: issued ?? DateTime.now(),
+                            firstDate: DateTime(1950),
+                            lastDate: DateTime(2100));
+                        if (v != null) setState(() => issued = v);
+                      },
+                      child: Row(children: [
+                        const Icon(Icons.event_outlined, color: LG.sage),
+                        const SizedBox(width: 10),
+                        Text(issued == null
+                            ? 'Choose issue date'
+                            : LG.date(issued!)),
+                        const Spacer(),
+                        if (issued != null)
+                          IconButton(
+                              tooltip: 'Clear issue date',
+                              onPressed: () => setState(() => issued = null),
+                              icon: const Icon(Icons.close,
+                                  color: LG.muted, size: 18)),
+                      ]))),
+              FormFieldBlock(
+                  title: 'Expiry or renewal date',
+                  child: SoftCard(
+                      onTap: () async {
+                        final v = await showDatePicker(
+                            context: context,
+                            initialDate: expires ?? DateTime.now(),
+                            firstDate: DateTime(1950),
+                            lastDate: DateTime(2100));
+                        if (v != null) setState(() => expires = v);
+                      },
+                      child: Row(children: [
+                        const Icon(Icons.event_available_outlined,
+                            color: LG.sage),
+                        const SizedBox(width: 10),
+                        Text(expires == null
+                            ? 'No expiry set'
+                            : LG.date(expires!)),
+                        const Spacer(),
+                        if (expires != null)
+                          IconButton(
+                              tooltip: 'Clear expiry',
+                              onPressed: () => setState(() => expires = null),
+                              icon: const Icon(Icons.close,
+                                  color: LG.muted, size: 18)),
+                      ]))),
+              FormFieldBlock(
+                  title: 'Notes (optional)',
+                  child: TextFormField(
+                      controller: notes,
+                      maxLines: 3,
+                      decoration: const InputDecoration(
+                          hintText:
+                              'Storage location or renewal instructions (no secrets)'))),
+            ])),
+        PrimaryCTA(
+          label: saving ? 'Saving…' : 'Save document record',
+          loading: saving,
+          onPressed: () async {
+            if (!key.currentState!.validate()) return;
+            if (issued != null &&
+                expires != null &&
+                expires!.isBefore(issued!)) {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+                  content: Text('Expiry cannot precede issue date')));
+              return;
+            }
+            setState(() => saving = true);
+            try {
+              final record = DocumentRecord(
+                  id: widget.existing?.id ?? makeId(),
+                  title: title.text.trim(),
+                  category: category,
+                  linkedAssetId: linkedAssetId,
+                  issuedAt: issued,
+                  expiresAt: expires,
+                  notes: notes.text.trim(),
+                  attachment: widget.existing?.attachment);
+              await widget.store.upsertDocument(record);
+              if (!context.mounted) return;
+              Navigator.of(context).pop();
+            } catch (e) {
+              if (!context.mounted) return;
+              ScaffoldMessenger.of(context)
+                  .showSnackBar(SnackBar(content: Text('$e')));
+            } finally {
+              if (mounted) setState(() => saving = false);
+            }
+          },
+        ),
+        const SizedBox(height: 18),
+        const Text(
+            'Attachments, previews and removal live on the document detail page. Metadata captured here stays on this device only.',
+            style: TextStyle(fontSize: 12, color: LG.muted, height: 1.5)),
       ],
-      const SizedBox(height:18),const Text('No document image or content is uploaded. Avoid entering title numbers, identity numbers or credentials until the encrypted vault is delivered.',
-        style:TextStyle(fontSize:12,color:LG.muted,height:1.5)),
-    ]))));
+    );
   }
 }
 
@@ -228,60 +341,250 @@ class _BeneficiaryFormScreenState extends State<BeneficiaryFormScreen> {
     ]))));
 }
 
-class NotificationsCenterScreen extends StatelessWidget {
-  final PortfolioStore store;
-  const NotificationsCenterScreen({super.key,required this.store});
-  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:store,builder:(context,_){
-    final now=DateTime.now();
-    final preferences=store.state.notificationOptions;
-    final alerts=<_LocalAlert>[];
-    if(preferences.upcomingReminders){
-      for(final r in store.state.reminders.where((x)=>!x.completed)){
-        final delta=r.dueAt.difference(now).inDays;
-        if(delta<=30){alerts.add(_LocalAlert(r.title,delta<0?'Overdue · ${LG.date(r.dueAt)}':'Due ${LG.date(r.dueAt)}',
-          Icons.notifications_none_rounded,delta<0,()=>openWealthPage(context,RemindersScreen(store:store))));}
-      }
-    }
-    if(preferences.expiringDocuments){
-      for(final d in store.state.documents.where((x)=>!x.archived&&x.expiresAt!=null)){
-        final delta=d.expiresAt!.difference(now).inDays;
-        if(delta<=60){alerts.add(_LocalAlert(d.title,delta<0?'Record expired':'Renew by ${LG.date(d.expiresAt!)}',
-          Icons.description_outlined,delta<0,()=>openWealthPage(context,DocumentsScreen(store:store))));}
-      }
-    }
-    if(preferences.staleValuations){
-      for(final a in store.state.assets.where((x)=>!x.archived)){
-        if(now.difference(a.valuedAt).inDays>365){alerts.add(_LocalAlert(a.name,
-          'Recorded value is more than 12 months old',Icons.update_rounded,false,
-          ()=>openWealthPage(context,ValuationHistoryScreen(store:store,asset:a))));}
-      }
-    }
-    return WealthPage(title:'Notifications',subtitle:'Useful reminders from your local wealth records.',children:[
-      Row(children:[Expanded(child:Text('${alerts.length} items',
-        style:Theme.of(context).textTheme.titleMedium)),
-        TextButton.icon(onPressed:()=>openWealthPage(context,NotificationPreferencesScreen(store:store)),
-          icon:const Icon(Icons.tune,size:18),label:const Text('Preferences'))]),
-      const SizedBox(height:12),
-      if(alerts.isEmpty)const EmptySection(title:'You are up to date',
-        detail:'Upcoming reminders, document renewals and stale valuations will appear here.')
-      else ...alerts.map((a)=>Padding(padding:const EdgeInsets.only(bottom:10),
-        child:SoftCard(onTap:a.action,child:Row(children:[
-          Container(width:44,height:44,decoration:BoxDecoration(color:a.urgent?const Color(0xFFF8EAE7):LG.sageSoft,
-            borderRadius:BorderRadius.circular(12)),
-            child:Icon(a.icon,color:a.urgent?LG.negative:LG.sage)),
-          const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-            Text(a.title,style:const TextStyle(fontWeight:FontWeight.w700)),
-            const SizedBox(height:4),Text(a.detail,style:const TextStyle(color:LG.muted,fontSize:12)),
-          ])),const Icon(Icons.chevron_right,color:LG.muted),
-        ])))),
-      const SizedBox(height:22),const Text('In-app notices only. Push notifications, email delivery and background scheduling are not connected.',
-        style:TextStyle(color:LG.muted,fontSize:12,height:1.5)),
-    ]);
+enum LocalAlertSource { reminder, documentExpiry, staleValuation }
+
+class LocalAlert {
+  final LocalAlertSource source;
+  final String sourceId;
+  final String title;
+  final String detail;
+  final IconData icon;
+  final bool urgent;
+  final DateTime occurrence;
+  const LocalAlert({
+    required this.source,
+    required this.sourceId,
+    required this.title,
+    required this.detail,
+    required this.icon,
+    required this.urgent,
+    required this.occurrence,
   });
 }
-class _LocalAlert {
-  final String title;final String detail;final IconData icon;final bool urgent;final VoidCallback action;
-  const _LocalAlert(this.title,this.detail,this.icon,this.urgent,this.action);
+
+List<LocalAlert> buildLocalAlerts(PortfolioState state, DateTime now) {
+  final out = <LocalAlert>[];
+  if (state.notificationOptions.upcomingReminders) {
+    for (final r in state.reminders.where((x) => !x.completed)) {
+      final delta = r.dueAt.difference(now).inDays;
+      if (delta <= 30) {
+        out.add(LocalAlert(
+          source: LocalAlertSource.reminder,
+          sourceId: r.id,
+          title: r.title,
+          detail: delta < 0 ? 'Overdue · ${LG.date(r.dueAt)}' : 'Due ${LG.date(r.dueAt)}',
+          icon: Icons.notifications_none_rounded,
+          urgent: delta < 0,
+          occurrence: r.dueAt,
+        ));
+      }
+    }
+  }
+  if (state.notificationOptions.expiringDocuments) {
+    for (final d in state.documents.where((x) => !x.archived && x.expiresAt != null)) {
+      final delta = d.expiresAt!.difference(now).inDays;
+      if (delta <= 60) {
+        out.add(LocalAlert(
+          source: LocalAlertSource.documentExpiry,
+          sourceId: d.id,
+          title: d.title,
+          detail: delta < 0 ? 'Record expired' : 'Renew by ${LG.date(d.expiresAt!)}',
+          icon: Icons.description_outlined,
+          urgent: delta < 0,
+          occurrence: d.expiresAt!,
+        ));
+      }
+    }
+  }
+  if (state.notificationOptions.staleValuations) {
+    for (final a in state.assets.where((x) => !x.archived)) {
+      if (now.difference(a.valuedAt).inDays > 365) {
+        out.add(LocalAlert(
+          source: LocalAlertSource.staleValuation,
+          sourceId: a.id,
+          title: a.name,
+          detail: 'Recorded value is more than 12 months old',
+          icon: Icons.update_rounded,
+          urgent: false,
+          occurrence: a.valuedAt,
+        ));
+      }
+    }
+  }
+  return out..sort((a, b) => a.occurrence.compareTo(b.occurrence));
+}
+
+class NotificationsCenterScreen extends StatelessWidget {
+  final PortfolioStore store;
+  const NotificationsCenterScreen({super.key, required this.store});
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+      animation: store,
+      builder: (context, _) {
+        final alerts = buildLocalAlerts(store.state, DateTime.now());
+        return WealthPage(
+            title: 'Notifications',
+            subtitle: 'Useful reminders from your local wealth records.',
+            children: [
+              Row(children: [
+                Expanded(
+                    child: Text('${alerts.length} items',
+                        style: Theme.of(context).textTheme.titleMedium)),
+                TextButton.icon(
+                    onPressed: () => openWealthPage(
+                        context, NotificationPreferencesScreen(store: store)),
+                    icon: const Icon(Icons.tune, size: 18),
+                    label: const Text('Preferences')),
+              ]),
+              const SizedBox(height: 12),
+              if (alerts.isEmpty)
+                const AppEmptyState(
+                    title: 'You are up to date',
+                    detail:
+                        'Upcoming reminders, document renewals and stale valuations will appear here.',
+                    icon: Icons.notifications_none_rounded)
+              else
+                ...alerts.map((a) => Padding(
+                      padding: const EdgeInsets.only(bottom: 10),
+                      child: SoftCard(
+                        onTap: () => openWealthPage(
+                            context,
+                            NotificationDetailScreen(store: store, alert: a)),
+                        child: Row(children: [
+                          Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                  color: a.urgent
+                                      ? const Color(0xFFF8EAE7)
+                                      : LG.sageSoft,
+                                  borderRadius: BorderRadius.circular(12)),
+                              child: Icon(a.icon,
+                                  color: a.urgent ? LG.negative : LG.sage)),
+                          const SizedBox(width: 12),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment:
+                                      CrossAxisAlignment.start,
+                                  children: [
+                                Text(a.title,
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.w700)),
+                                const SizedBox(height: 4),
+                                Text(a.detail,
+                                    style: const TextStyle(
+                                        color: LG.muted, fontSize: 12)),
+                              ])),
+                          const Icon(Icons.chevron_right, color: LG.muted),
+                        ]),
+                      ),
+                    )),
+              const SizedBox(height: 22),
+              const Text(
+                  'Tap an alert to see its origin record. OS-level scheduling is wired via flutter_local_notifications when the platform permits it; this list always stays in sync with your state.',
+                  style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+            ]);
+      });
+}
+
+class NotificationDetailScreen extends StatelessWidget {
+  final PortfolioStore store;
+  final LocalAlert alert;
+  const NotificationDetailScreen(
+      {super.key, required this.store, required this.alert});
+  @override
+  Widget build(BuildContext context) => WealthPage(
+        title: 'Alert',
+        subtitle: alert.title,
+        children: [
+          SoftCard(
+              color: alert.urgent ? const Color(0xFFF8EAE7) : LG.sageSoft,
+              child: Row(children: [
+                Container(
+                    width: 46,
+                    height: 46,
+                    decoration: BoxDecoration(
+                        color: LG.white,
+                        borderRadius: BorderRadius.circular(14)),
+                    child: Icon(alert.icon,
+                        color: alert.urgent ? LG.negative : LG.sage)),
+                const SizedBox(width: 12),
+                Expanded(
+                    child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                      Text(_sourceLabel(alert.source),
+                          style: const TextStyle(
+                              color: LG.sage,
+                              fontSize: 11,
+                              letterSpacing: 1.2,
+                              fontWeight: FontWeight.w800)),
+                      const SizedBox(height: 4),
+                      Text(alert.title,
+                          style: const TextStyle(
+                              fontWeight: FontWeight.w800, fontSize: 18)),
+                    ])),
+                StatusChip(
+                    label: alert.urgent ? 'Needs attention' : 'Upcoming',
+                    tone: alert.urgent ? StatusTone.danger : StatusTone.info),
+              ])),
+          const SizedBox(height: 18),
+          SoftCard(
+              child: Column(children: [
+            InfoLabel(label: 'When', value: LG.date(alert.occurrence)),
+            InfoLabel(label: 'Detail', value: alert.detail),
+            InfoLabel(label: 'Source', value: _sourceLabel(alert.source)),
+          ])),
+          const SizedBox(height: 22),
+          PrimaryCTA(
+            label: 'Open source record',
+            showArrow: false,
+            onPressed: () async => _openSource(context),
+          ),
+          const SizedBox(height: 10),
+          TextButton(
+              onPressed: () => openWealthPage(
+                  context, NotificationPreferencesScreen(store: store)),
+              child: const Text('Adjust alert preferences',
+                  style: TextStyle(color: LG.muted))),
+          const SizedBox(height: 16),
+          const Text(
+              'Alerts are derived from your state. If you dislike a specific alert, change the trigger (mark the reminder complete, archive the document, record a fresh valuation) or disable the category from preferences.',
+              style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+        ],
+      );
+
+  Future<void> _openSource(BuildContext context) async {
+    switch (alert.source) {
+      case LocalAlertSource.reminder:
+        openWealthPage(context, RemindersScreen(store: store));
+      case LocalAlertSource.documentExpiry:
+        final doc = store.state.documents.firstWhere(
+            (d) => d.id == alert.sourceId,
+            orElse: () => DocumentRecord(
+                id: alert.sourceId,
+                title: alert.title,
+                category: 'Other',
+                archived: true));
+        openWealthPage(context, DocumentDetailScreen(store: store, document: doc));
+      case LocalAlertSource.staleValuation:
+        final asset = store.state.assets.firstWhere(
+            (a) => a.id == alert.sourceId,
+            orElse: () => WealthAsset(
+                id: alert.sourceId,
+                name: alert.title,
+                kind: AssetKind.other,
+                valueUgx: 0,
+                valuedAt: DateTime(1970)));
+        openWealthPage(context, ValuationHistoryScreen(store: store, asset: asset));
+    }
+  }
+
+  static String _sourceLabel(LocalAlertSource s) => switch (s) {
+        LocalAlertSource.reminder => 'Reminder',
+        LocalAlertSource.documentExpiry => 'Document renewal',
+        LocalAlertSource.staleValuation => 'Stale valuation',
+      };
 }
 
 class NotificationPreferencesScreen extends StatelessWidget {
@@ -348,28 +651,44 @@ class _ProfileScreenState extends State<ProfileScreen> {
 class SecurityCenterScreen extends StatelessWidget {
   final PortfolioStore store;
   const SecurityCenterScreen({super.key,required this.store});
-  @override Widget build(BuildContext context)=>WealthPage(
-    title:'Security & privacy',subtitle:'A transparent view of the protection currently available.',children:[
-    const SoftCard(color:LG.sageSoft,child:Row(children:[
-      Icon(Icons.shield_outlined,color:LG.sage,size:30),SizedBox(width:14),
-      Expanded(child:Text('Preview mode: do not enter real financial credentials, title references or identity numbers.',
-        style:TextStyle(fontSize:12,color:LG.muted,height:1.5)))])),
-    const SizedBox(height:22),const SectionTitle('Security readiness'),
-    const SoftCard(child:Column(children:[
-      InfoLabel(label:'Passkey sign-in',value:'Not connected'),
-      InfoLabel(label:'Biometric access',value:'Not enabled'),
-      InfoLabel(label:'Encrypted local vault',value:'Not implemented'),
-      InfoLabel(label:'Cloud backup',value:'Not connected'),
-      InfoLabel(label:'Session management',value:'Not connected'),
-      InfoLabel(label:'Data import / export',value:'Manual JSON'),
-    ])),
-    const SizedBox(height:18),
-    OutlinedButton.icon(onPressed:()=>openWealthPage(context,SettingsScreen(store:store)),
-      icon:const Icon(Icons.settings_backup_restore),label:const Text('Data management settings')),
-    const SizedBox(height:18),const Text(
-      'No passkeys, biometrics, backend account or secure storage is simulated. A dedicated authentication and encryption implementation is required before handling sensitive data.',
-      style:TextStyle(color:LG.muted,fontSize:12,height:1.55)),
-  ]);
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:store,builder:(context,_){
+    final encryptionOn=store.vault.hasPassphrase;
+    final biometricLinked=store.vault.hasBiometricStash;
+    return WealthPage(
+      title:'Security & privacy',subtitle:'The protection currently active on this device.',children:[
+      SoftCard(color:encryptionOn?LG.sageSoft:LG.white,child:Row(children:[
+        Icon(encryptionOn?Icons.shield:Icons.shield_outlined,
+          color:encryptionOn?LG.sage:LG.muted,size:30),const SizedBox(width:14),
+        Expanded(child:Text(encryptionOn
+          ?'Your vault is encrypted on this device with AES-GCM 256 under a passphrase-derived key.'
+          :'Your portfolio is stored in cleartext on this device. Enable a passphrase to protect it.',
+          style:const TextStyle(fontSize:12,color:LG.muted,height:1.5)))])),
+      const SizedBox(height:22),const SectionTitle('Security readiness'),
+      SoftCard(child:Column(children:[
+        InfoLabel(label:'Passphrase lock',
+          value:encryptionOn?'Enabled':'Not set',
+          valueColor:encryptionOn?LG.sage:LG.muted),
+        InfoLabel(label:'Biometric unlock',
+          value:biometricLinked?'Linked':'Not linked',
+          valueColor:biometricLinked?LG.sage:LG.muted),
+        const InfoLabel(label:'Encryption algorithm',value:'AES-GCM 256'),
+        const InfoLabel(label:'Key derivation',value:'PBKDF2-HMAC-SHA256 · 120,000 rounds'),
+        const InfoLabel(label:'Cloud backup',value:'Not connected'),
+        const InfoLabel(label:'Multi-device sync',value:'Not connected'),
+        const InfoLabel(label:'Data import / export',value:'Manual JSON (unencrypted)'),
+      ])),
+      const SizedBox(height:18),
+      ElevatedButton.icon(onPressed:()=>openWealthPage(context,EncryptionSetupScreen(store:store)),
+        icon:Icon(encryptionOn?Icons.manage_accounts:Icons.lock),
+        label:Text(encryptionOn?'Manage encryption':'Enable encryption')),
+      const SizedBox(height:10),
+      OutlinedButton.icon(onPressed:()=>openWealthPage(context,SettingsScreen(store:store)),
+        icon:const Icon(Icons.settings_backup_restore),label:const Text('Data management settings')),
+      const SizedBox(height:18),const Text(
+        'This device is the only place holding your passphrase or derived key — there is no server-side recovery. Keep an unencrypted JSON export in a safe physical location.',
+        style:TextStyle(color:LG.muted,fontSize:12,height:1.55)),
+    ]);
+  });
 }
 
 class SubscriptionScreen extends StatelessWidget {
@@ -407,9 +726,15 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
         ('How is net worth calculated?','Net worth equals your attributable recorded assets minus all active liabilities, including any linked mortgage just once.'),
         ('Are property values verified?','No. Values are manually entered and tagged with dates and source information.'),
         ('Does LonyoGang hold my money?','No. It is a tracking and personal record-keeping application, not a bank or broker.'),
-        ('Are documents uploaded?','No. The document screen currently stores descriptive metadata only.'),
+        ('What does the Stale badge mean on an asset?','The recorded valuation is more than 12 months old. Record a fresh valuation to clear the flag; the old history is kept for TWR and XIRR.'),
+        ('How do TWR and XIRR differ?','Time-weighted return (TWR) uses only your dated valuations, so contributions and withdrawals do not distort it. XIRR folds contributions, distributions and the current value together, giving a money-weighted return. Both appear on the Performance screen for each asset.'),
+        ('What is the target allocation screen for?','Set a target weight for each asset in basis points (100% = 10,000 bps). Drift shows how far actual holdings are from the plan without changing any value.'),
+        ('Can I attach files to a document record?','Yes. Open a document, tap Attach encrypted file. The file is AES-GCM encrypted under your vault key (or a per-file key if you have not set a passphrase) and SHA-256 verified on every read.'),
+        ('What does enabling encryption actually protect?','We derive an AES-GCM 256 key from your passphrase with PBKDF2-HMAC-SHA-256 (120k iterations). The portfolio payload on disk is then ciphertext. Biometric unlock stores a device-scoped wrap of the passphrase for faster entry; it is additive, not a replacement.'),
+        ('What happens if I forget my passphrase?','This preview has no server-side recovery. The encrypted data on this device cannot be unlocked. Keep an unencrypted JSON export (Settings → Export) in a safe place, or use the demo portfolio until you are ready for real values.'),
+        ('How do scheduled contributions work?','Each schedule has a next-fire date and a frequency. Tap Post now to append a normal ledger contribution and advance the next-fire date. Reversals still work on the posted entries.'),
         ('Can I transfer assets to beneficiaries?','No. Legacy planning entries are non-binding notes and cannot transfer ownership.'),
-        ('Where are preview records stored?','On this device in unencrypted app preferences. Use sample data only until a secure vault is implemented.'),
+        ('How do I start over on this device?','Settings → Reset portfolio wipes every record, deletes encrypted attachments and disables the passphrase. There is no undo, so export first if you want a backup.'),
       ])ExpansionTile(title:Text(qa.$1,style:const TextStyle(fontWeight:FontWeight.w700,fontSize:14)),
         iconColor:LG.sage,collapsedIconColor:LG.muted,tilePadding:EdgeInsets.zero,
         childrenPadding:const EdgeInsets.only(bottom:16),
