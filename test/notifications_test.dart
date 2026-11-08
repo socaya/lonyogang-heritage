@@ -61,6 +61,44 @@ void main() {
     expect(scheduled.length, 1);
   });
 
+  test('Stale-valuation fires at the 1-year mark for a fresh asset', () {
+    final state = PortfolioState(
+      notificationOptions: const NotificationOptions(staleValuations: true),
+      assets: [
+        WealthAsset(
+            id: 'a1',
+            name: 'Village plot',
+            kind: AssetKind.property,
+            valueUgx: 1,
+            ownershipBps: 10000,
+            valuedAt: now.subtract(const Duration(days: 30))),
+      ],
+    );
+    final alerts = computeScheduledAlerts(state, now);
+    final stale = alerts.firstWhere((a) => a.kind == AlertKind.staleValuation);
+    expect(stale.fireAt,
+        now.subtract(const Duration(days: 30)).add(const Duration(days: 365)));
+  });
+
+  test('Already-stale valuation fires right now, not silently dropped', () {
+    final state = PortfolioState(
+      notificationOptions: const NotificationOptions(staleValuations: true),
+      assets: [
+        WealthAsset(
+            id: 'ageing',
+            name: 'Forgotten shares',
+            kind: AssetKind.investment,
+            valueUgx: 1,
+            ownershipBps: 10000,
+            valuedAt: now.subtract(const Duration(days: 500))),
+      ],
+    );
+    final alerts = computeScheduledAlerts(state, now);
+    final stale = alerts.firstWhere((a) => a.kind == AlertKind.staleValuation);
+    expect(stale.fireAt, now);
+    expect(stale.title, 'Valuation overdue');
+  });
+
   test('NoopNotificationScheduler tracks what the UI synced', () async {
     final scheduler = NoopNotificationScheduler();
     await scheduler.syncWith([

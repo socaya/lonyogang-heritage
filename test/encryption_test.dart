@@ -9,6 +9,23 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
   setUp(() => SharedPreferences.setMockInitialValues({}));
 
+  test('deriveKey rejects an empty passphrase before touching PBKDF2', () async {
+    final salt = VaultCrypto.newSalt();
+    expect(
+      () => VaultCrypto.deriveKey('', salt),
+      throwsArgumentError,
+    );
+  });
+
+  test('decryptBytes rejects a blob shorter than nonce+mac', () async {
+    final salt = VaultCrypto.newSalt();
+    final key = await VaultCrypto.deriveKey('a-valid-passphrase', salt);
+    expect(
+      () => VaultCrypto.decryptBytes(List<int>.filled(4, 0), key),
+      throwsFormatException,
+    );
+  });
+
   test('AES-GCM round trip preserves the payload', () async {
     final salt = VaultCrypto.newSalt();
     final key = await VaultCrypto.deriveKey('correct horse battery', salt);

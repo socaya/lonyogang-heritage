@@ -55,6 +55,52 @@ void main() {
     expect(reloaded.length, 0);
   });
 
+  test('trims the oldest entries when the retention cap is exceeded', () async {
+    final vaultKey = await VaultCrypto.deriveKey(
+        'passphrase-of-length-12', List<int>.filled(16, 9));
+    final outbox = SyncOutbox();
+    await outbox.load();
+    // Record a few more than the cap and confirm we never grow past it.
+    const over = SyncOutbox.maxEntries + 5;
+    for (var i = 0; i < over; i += 1) {
+      await outbox.record(
+        payloadType: 'asset',
+        payload: {'id': 'a$i'},
+        integrity: null,
+        vaultKey: vaultKey,
+        deviceId: '00000000-0000-0000-0000-000000000080',
+      );
+    }
+    expect(outbox.length, SyncOutbox.maxEntries);
+  });
+
+  test('ulid is device-scoped so two installs cannot collide', () async {
+    final vaultKey = await VaultCrypto.deriveKey(
+        'passphrase-of-length-12', List<int>.filled(16, 7));
+    final a = SyncOutbox();
+    await a.record(
+      payloadType: 'asset',
+      payload: {'id': 'a'},
+      integrity: null,
+      vaultKey: vaultKey,
+      deviceId: 'aaaa-bbbb-cccc-dddd',
+    );
+    final aIds = (await a.snapshot()).map((e) => e.id).toSet();
+
+    SharedPreferences.setMockInitialValues({});
+    final b = SyncOutbox();
+    await b.record(
+      payloadType: 'asset',
+      payload: {'id': 'a'},
+      integrity: null,
+      vaultKey: vaultKey,
+      deviceId: 'zzzz-yyyy-xxxx-wwww',
+    );
+    final bIds = (await b.snapshot()).map((e) => e.id).toSet();
+
+    expect(aIds.intersection(bIds), isEmpty);
+  });
+
   test('deriveContentKey yields a stable 32-byte key per vault key', () async {
     final vaultKey = await VaultCrypto.deriveKey('passphrase-of-length-12', List<int>.filled(16, 3));
     final a = await SyncOutbox.deriveContentKey(vaultKey);

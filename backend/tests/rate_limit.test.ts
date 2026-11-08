@@ -46,3 +46,23 @@ describe('sign-in rate limit', () => {
     expect(sawRateLimit, 'expected the route-scoped 429 cap to engage').toBe(true);
   });
 });
+
+describe('session-refresh rate limit', () => {
+  it('caps /identity/sessions/refresh so a stolen refresh token cannot churn', async () => {
+    let sawRateLimit = false;
+    for (let i = 0; i < 50; i += 1) {
+      const res = await harness.app.inject({
+        method: 'POST',
+        url: '/identity/sessions/refresh',
+        payload: { refreshToken: 'x'.repeat(40) },
+        remoteAddress: '203.0.113.60',
+      });
+      if (res.statusCode === 429) {
+        sawRateLimit = true;
+        expect(res.headers['retry-after']).toBeDefined();
+        break;
+      }
+    }
+    expect(sawRateLimit, 'expected refresh endpoint to return 429 under spam').toBe(true);
+  });
+});
