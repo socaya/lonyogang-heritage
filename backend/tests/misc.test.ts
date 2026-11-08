@@ -83,7 +83,7 @@ describe('Recovery service', () => {
     const redeem = await harness.app.inject({
       method: 'POST',
       url: '/recovery/redeem',
-      payload: { printableShare },
+      payload: { printableShare, password: 'correct-horse-battery-staple' },
       headers: { authorization: `Bearer ${accessToken}` },
     });
     expect(redeem.statusCode).toBe(200);
@@ -102,7 +102,10 @@ describe('Recovery service', () => {
     const redeem = await harness.app.inject({
       method: 'POST',
       url: '/recovery/redeem',
-      payload: { printableShare: Buffer.alloc(33).toString('base64') },
+      payload: {
+        printableShare: Buffer.alloc(33).toString('base64'),
+        password: 'correct-horse-battery-staple',
+      },
       headers: { authorization: `Bearer ${accessToken}` },
     });
     expect(redeem.statusCode).toBe(400);

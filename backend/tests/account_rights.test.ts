@@ -87,12 +87,34 @@ describe('data-subject rights', () => {
     expect(Array.isArray(bundle['audit'])).toBe(true);
   });
 
-  it('DELETE /me tombstones the account and breaks subsequent sign-ins', async () => {
+  it('DELETE /me demands the password + tombstones the account', async () => {
     const s = await newSession('erase@example.com');
+
+    // Without the password body — 401 reauth_failed.
+    const noBody = await harness.app.inject({
+      method: 'DELETE',
+      url: '/me',
+      headers: { authorization: `Bearer ${s.accessToken}` },
+      payload: {},
+    });
+    expect(noBody.statusCode).toBe(400);
+
+    // Wrong password — 401.
+    const wrong = await harness.app.inject({
+      method: 'DELETE',
+      url: '/me',
+      headers: { authorization: `Bearer ${s.accessToken}` },
+      payload: { password: 'not-the-password' },
+    });
+    expect(wrong.statusCode).toBe(401);
+    expect((wrong.json() as { error: string }).error).toBe('reauth_failed');
+
+    // Correct password — 204, and subsequent sign-ins are blocked.
     const del = await harness.app.inject({
       method: 'DELETE',
       url: '/me',
       headers: { authorization: `Bearer ${s.accessToken}` },
+      payload: { password: 'correct-horse-battery-staple' },
     });
     expect(del.statusCode).toBe(204);
     const signInAgain = await harness.app.inject({

@@ -382,6 +382,18 @@ export class IdentityService {
       [hash],
     );
     if (!row || row.revoked_at || row.expires_at.getTime() < Date.now()) {
+      // Burn the same CPU the happy path spends (issueRefresh +
+      // signAccess) so an attacker can't distinguish "token not in db"
+      // from "token in db but expired" through response-time
+      // differentials. This closes the timing side-channel on the
+      // refresh hash lookup.
+      const decoy = this.tokens.issueRefresh();
+      await this.tokens.signAccess({
+        accountId: '00000000-0000-0000-0000-000000000000',
+        sessionId: '00000000-0000-0000-0000-000000000000',
+        deviceId: '00000000-0000-0000-0000-000000000000',
+      });
+      void decoy;
       throw new ClientError('bad_refresh', 'Refresh token is not valid');
     }
     const { token: nextRefresh, hash: nextHash } = this.tokens.issueRefresh();

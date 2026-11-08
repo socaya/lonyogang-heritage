@@ -89,8 +89,26 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
         delete: {
           tags: ['identity'],
           security: [{ bearer: [] }],
-          summary: 'Exercise right to erasure',
-          responses: { '204': { description: 'Account tombstoned.' } },
+          summary: 'Exercise right to erasure (requires password re-auth)',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['password'],
+                  properties: {
+                    password: { type: 'string', minLength: 1, maxLength: 1024 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '204': { description: 'Account tombstoned.' },
+            '401': { description: 'Password re-auth failed.' },
+            '429': { description: 'Rate limit (3/hour) hit.' },
+          },
         },
       },
       '/me/export': {
@@ -335,8 +353,28 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
         post: {
           tags: ['recovery'],
           security: [{ bearer: [] }],
-          summary: 'Exchange the printable share for the server share',
-          responses: { '200': { description: 'Server share returned.' } },
+          summary: 'Exchange the printable share for the server share (requires password re-auth)',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['printableShare', 'password'],
+                  properties: {
+                    printableShare: { type: 'string', minLength: 16 },
+                    password: { type: 'string', minLength: 1, maxLength: 1024 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '200': { description: 'Server share returned.' },
+            '400': { description: 'Share could not be validated.' },
+            '401': { description: 'Password re-auth failed.' },
+            '429': { description: 'Rate limit (5/hour) hit.' },
+          },
         },
       },
       '/fx/rates': {

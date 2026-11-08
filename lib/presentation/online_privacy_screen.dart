@@ -107,6 +107,8 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
   }
 
   Future<void> _erase() async {
+    final password = await _promptPassword();
+    if (password == null || password.isEmpty) return;
     final confirmed = await confirmActionSheet(
       context,
       title: 'Erase online account?',
@@ -125,10 +127,15 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
       final uri = widget.baseUri.resolve('/me');
       final req = await _http.deleteUrl(uri);
       req.headers.set('authorization', 'Bearer ${creds.accessToken}');
+      req.headers.contentType = ContentType.json;
+      req.write(jsonEncode({'password': password}));
       final res = await req.close();
-      await res.drain();
+      final body = await res.transform(utf8.decoder).join();
+      if (res.statusCode == 401) {
+        throw const HttpException('Re-authentication failed. Check the password.');
+      }
       if (res.statusCode != 204 && res.statusCode != 200) {
-        throw HttpException('HTTP ${res.statusCode}', uri: uri);
+        throw HttpException('HTTP ${res.statusCode}: $body', uri: uri);
       }
       await widget.credentials.clear();
       if (!mounted) return;
@@ -140,6 +147,33 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
     } finally {
       if (mounted) setState(() => _working = false);
     }
+  }
+
+  /// Ask for the current online password before firing a destructive call
+  /// like DELETE /me — the server enforces this too, but asking up-front
+  /// keeps the UX honest.
+  Future<String?> _promptPassword() async {
+    final controller = TextEditingController();
+    return showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Confirm with your online password'),
+        content: TextField(
+          controller: controller,
+          obscureText: true,
+          autofocus: true,
+          decoration: const InputDecoration(labelText: 'Password'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text),
+              child: const Text('Continue')),
+        ],
+      ),
+    );
   }
 
   @override
