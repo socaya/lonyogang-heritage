@@ -161,6 +161,49 @@ describe('resources REST layer', () => {
     expect(secondBody.hasMore).toBe(false);
   });
 
+  it('DELETE /resources/:kind tombstones every live row in one call',
+      async () => {
+    const accessToken = await authed(`bulk-${Date.now()}@example.com`);
+    const h = { authorization: `Bearer ${accessToken}` };
+    for (let i = 0; i < 3; i += 1) {
+      await harness.app.inject({
+        method: 'PUT',
+        url: `/resources/alert_dismissal/key-${i}`,
+        headers: h,
+        payload: {
+          ciphertext: Buffer.from(`c-${i}`).toString('base64'),
+          deviceId: '00000000-0000-0000-0000-000000000084',
+        },
+      });
+    }
+    const beforeClear = await harness.app.inject({
+      method: 'GET',
+      url: '/resources/alert_dismissal',
+      headers: h,
+    });
+    expect(
+      beforeClear.json<{ resources: unknown[] }>().resources,
+    ).toHaveLength(3);
+
+    const clear = await harness.app.inject({
+      method: 'DELETE',
+      url: '/resources/alert_dismissal',
+      headers: h,
+      payload: { deviceId: '00000000-0000-0000-0000-000000000084' },
+    });
+    expect(clear.statusCode).toBe(200);
+    expect(clear.json<{ cleared: number }>().cleared).toBe(3);
+
+    const afterClear = await harness.app.inject({
+      method: 'GET',
+      url: '/resources/alert_dismissal',
+      headers: h,
+    });
+    expect(
+      afterClear.json<{ resources: unknown[] }>().resources,
+    ).toHaveLength(0);
+  });
+
   it('rejects an oversized ciphertext up front', async () => {
     const accessToken = await authed(`big-${Date.now()}@example.com`);
     const h = { authorization: `Bearer ${accessToken}` };

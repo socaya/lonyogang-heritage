@@ -17,6 +17,7 @@ class _FakeBackend {
   int meMarketingConsentCalls = 0;
   int resourcePuts = 0;
   int resourceDeletes = 0;
+  int revokeOthersCalls = 0;
 
   static Future<_FakeBackend> start() async {
     final backend = _FakeBackend._();
@@ -77,6 +78,11 @@ class _FakeBackend {
           meMarketingConsentCalls += 1;
         }
         _writeJson(req, {'ok': true});
+        return;
+      }
+      if (method == 'POST' && path == '/identity/sessions/revoke-others') {
+        revokeOthersCalls += 1;
+        _writeJson(req, {'revoked': 3});
         return;
       }
       if (method == 'POST' && path == '/identity/password/reset/begin') {
@@ -258,6 +264,18 @@ void main() {
       pullHandler: (_) async {},
     );
   }
+
+  test('revokeOtherSessions POSTs the revoke-others endpoint and returns the count',
+      () async {
+    final b = await _FakeBackend.start();
+    try {
+      final count = await buildSync(b).revokeOtherSessions();
+      expect(count, 3);
+      expect(b.revokeOthersCalls, 1);
+    } finally {
+      await b.close();
+    }
+  });
 
   test('listSessions decodes the server shape', () async {
     final b = await _FakeBackend.start();
