@@ -441,6 +441,25 @@ class RemoteSyncService implements SyncService {
     return rows;
   }
 
+  /// Lists the bank aggregation providers the server has registered.
+  /// Public endpoint — no auth needed — so it is safe to call before
+  /// the user has signed in.
+  Future<List<String>> listBankProviders() async {
+    final uri = _baseUri.resolve('/bank/providers');
+    final request = await _http.getUrl(uri);
+    final response = await request.close().timeout(requestDeadline);
+    final text =
+        await response.transform(utf8.decoder).join().timeout(requestDeadline);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw HttpException('Providers HTTP ${response.statusCode}: $text',
+          uri: uri);
+    }
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    return (decoded['providers'] as List<dynamic>? ?? const [])
+        .map((e) => e.toString())
+        .toList();
+  }
+
   /// Updates subject-controlled fields on the profile — display name,
   /// phone, marketing consent. Each field is optional; nulls are passed
   /// through so the caller can clear a value explicitly.

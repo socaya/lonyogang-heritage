@@ -4,7 +4,9 @@ import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/models.dart';
 import 'account_screens.dart';
+import 'bank_providers_screen.dart';
 import 'components.dart';
+import 'online_scope.dart';
 import 'widgets.dart';
 import 'screens.dart';
 
@@ -656,6 +658,25 @@ class SettingsScreen extends StatelessWidget {
         subtitle:const Text('Remove every local record, attachment and passphrase'),
         onTap:()=>runLocalReset(context,store)),
     ])),
+    // Bank aggregation is purely an online surface; only show the entry
+    // when a backend is configured, otherwise it would advertise a
+    // service that cannot run.
+    Builder(builder:(context){
+      final remote=OnlineScope.maybeOf(context)?.sync;
+      if(remote==null)return const SizedBox.shrink();
+      return Column(children:[
+        const SizedBox(height:22),
+        const SectionTitle('Online integrations'),
+        SoftCard(child:ListTile(
+          contentPadding:EdgeInsets.zero,
+          leading:const Icon(Icons.account_balance_outlined,color:LG.sage),
+          title:const Text('Bank aggregation providers'),
+          subtitle:const Text('What the server can link against today'),
+          trailing:const Icon(Icons.chevron_right,color:LG.muted),
+          onTap:()=>push(context,BankProvidersScreen(sync:remote)),
+        )),
+      ]);
+    }),
     const SizedBox(height:22),const SectionTitle('About'),
     const SoftCard(child:Column(children:[InfoLabel(label:'App',value:'LonyoGang Heritage'),
       InfoLabel(label:'Prototype version',value:'0.4.0 local alpha'),

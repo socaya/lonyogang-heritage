@@ -151,6 +151,73 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
     }
   }
 
+  Future<void> _editDisplayName(RemoteSyncService remote) async {
+    final current = _profile?['displayName']?.toString() ?? '';
+    final value = await _promptText(
+      title: 'Display name',
+      initial: current,
+      hint: 'How your account is labelled',
+    );
+    if (value == null) return;
+    setState(() => _working = true);
+    try {
+      await remote.patchMe(displayName: value);
+      await _load();
+    } catch (err) {
+      if (!mounted) return;
+      setState(() => _error = '$err');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<void> _editPhone(RemoteSyncService remote) async {
+    final current = _profile?['phone']?.toString() ?? '';
+    final value = await _promptText(
+      title: 'Phone number',
+      initial: current,
+      hint: '+256 700 123 456',
+    );
+    if (value == null) return;
+    setState(() => _working = true);
+    try {
+      await remote.patchMe(phone: value);
+      await _load();
+    } catch (err) {
+      if (!mounted) return;
+      setState(() => _error = '$err');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<String?> _promptText({
+    required String title,
+    required String initial,
+    required String hint,
+  }) async {
+    final controller = TextEditingController(text: initial);
+    return showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(hintText: hint),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+              child: const Text('Save')),
+        ],
+      ),
+    );
+  }
+
   /// Ask for the current online password before firing a destructive call
   /// like DELETE /me — the server enforces this too, but asking up-front
   /// keeps the UX honest.
@@ -225,6 +292,26 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
             if (remote == null || _profile == null) return const SizedBox.shrink();
             final consented = _profile!['marketingConsentAt'] != null;
             return Column(children: [
+              OutlinedButton.icon(
+                onPressed: _working
+                    ? null
+                    : () async {
+                        await _editDisplayName(remote);
+                      },
+                icon: const Icon(Icons.badge_outlined),
+                label: const Text('Edit display name'),
+              ),
+              const SizedBox(height: 10),
+              OutlinedButton.icon(
+                onPressed: _working
+                    ? null
+                    : () async {
+                        await _editPhone(remote);
+                      },
+                icon: const Icon(Icons.phone_outlined),
+                label: const Text('Update phone number'),
+              ),
+              const SizedBox(height: 10),
               SoftCard(
                 child: Row(children: [
                   const Icon(Icons.campaign_outlined, color: LG.sage),
