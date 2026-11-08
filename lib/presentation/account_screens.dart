@@ -263,6 +263,22 @@ class _ResourceHydrateCtaState extends State<_ResourceHydrateCta> {
       padding: const EdgeInsets.only(top: 12),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         OutlinedButton.icon(
+          onPressed: _busy || remote.status.value == SyncStatus.syncing
+              ? null
+              : () async {
+                  setState(() => _status = 'Sync running…');
+                  try {
+                    await remote.sync();
+                    setState(() => _status = 'Sync complete.');
+                  } catch (err) {
+                    setState(() => _status = 'Sync failed: $err');
+                  }
+                },
+          icon: const Icon(Icons.sync),
+          label: const Text('Sync now'),
+        ),
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
           onPressed: _busy || !widget.store.isUnlocked
               ? null
               : () => _run(remote),
