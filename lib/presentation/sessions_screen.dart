@@ -45,6 +45,30 @@ class _SessionsScreenState extends State<SessionsScreen> {
     }
   }
 
+  Future<void> _revokeOthers() async {
+    final confirmed = await confirmActionSheet(
+      context,
+      title: 'Sign out everywhere else?',
+      consequence:
+          'Every other active session on this account will be revoked. Only this device stays signed in. Use this after a lost or stolen phone.',
+      confirmLabel: 'Sign out others',
+    );
+    if (!confirmed) return;
+    try {
+      final count = await widget.sync.revokeOtherSessions();
+      await _load();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(count == 0
+              ? 'No other sessions were active.'
+              : 'Revoked $count other session${count == 1 ? '' : 's'}.')));
+    } catch (err) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Revoke failed: $err')));
+    }
+  }
+
   Future<void> _revoke(RemoteSyncSession session) async {
     final confirmed = await confirmActionSheet(
       context,
@@ -79,6 +103,14 @@ class _SessionsScreenState extends State<SessionsScreen> {
             style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 20),
+          if (!_loading && _error == null && _sessions.length > 1) ...[
+            OutlinedButton.icon(
+              onPressed: _revokeOthers,
+              icon: const Icon(Icons.logout),
+              label: const Text('Sign out everywhere else'),
+            ),
+            const SizedBox(height: 16),
+          ],
           if (_loading)
             const LoadingState(message: 'Fetching sessions')
           else if (_error != null)

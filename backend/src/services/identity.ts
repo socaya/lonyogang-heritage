@@ -423,6 +423,31 @@ export class IdentityService {
     });
   }
 
+  /// Revokes every active session for [accountId] except [keepSessionId].
+  /// Used by the "sign out everywhere else" action on the SessionsScreen
+  /// after a lost device. Returns the count of rows revoked.
+  async revokeAllSessionsExcept(
+    accountId: string,
+    keepSessionId: string,
+  ): Promise<number> {
+    const result = await this.db.query(
+      `update sessions set revoked_at = now()
+         where account_id = $1 and id != $2 and revoked_at is null`,
+      [accountId, keepSessionId],
+    );
+    const revoked = result.rowCount ?? 0;
+    if (revoked > 0) {
+      await this.audit.record({
+        accountId,
+        actor: { kind: 'user', id: accountId },
+        action: 'session.revoked_others',
+        resource: `account:${accountId}`,
+        context: { revoked, kept: keepSessionId },
+      });
+    }
+    return revoked;
+  }
+
   // ---------- TOTP enrolment ----------
 
   async enrollTotp(accountId: string): Promise<{ secret: string; otpauthUrl: string }> {

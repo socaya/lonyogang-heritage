@@ -667,6 +667,19 @@ class RemoteSyncService implements SyncService {
     return RemoteSubscription.fromJson(decoded);
   }
 
+  /// Revokes every active session on this account except the one the
+  /// caller is currently using. Fast path for "sign out everywhere
+  /// else". Returns the number of rows revoked so the UI can report
+  /// back accurately.
+  Future<int> revokeOtherSessions() async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/identity/sessions/revoke-others');
+    final text = await _request('POST', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    return (decoded['revoked'] as num?)?.toInt() ?? 0;
+  }
+
   /// Revokes a single session by id. The caller must not revoke the
   /// session id currently backing [creds.accessToken] — the UI enforces
   /// that by comparing against the active session.

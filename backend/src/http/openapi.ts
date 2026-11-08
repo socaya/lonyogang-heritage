@@ -250,6 +250,19 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           responses: { '204': { description: 'Revoked.' } },
         },
       },
+      '/identity/sessions/revoke-others': {
+        post: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary:
+            'Revoke every active session except the one making the request',
+          responses: {
+            '200': {
+              description: 'Returns `{revoked: <count>}` of sessions revoked.',
+            },
+          },
+        },
+      },
       '/identity/totp': {
         post: {
           tags: ['identity'],

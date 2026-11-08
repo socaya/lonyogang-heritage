@@ -118,6 +118,18 @@ export async function registerIdentityRoutes(
     return { sessions: rows };
   });
 
+  // Revoke every live session except the one the caller is currently
+  // using. Fast path for "sign out everywhere else" after a lost device
+  // or a suspicious location on the SessionsScreen.
+  app.post('/identity/sessions/revoke-others', { preHandler: auth }, async (req) => {
+    const current = req.auth!.sessionId;
+    const revoked = await deps.identity.revokeAllSessionsExcept(
+      req.auth!.accountId,
+      current,
+    );
+    return { revoked };
+  });
+
   // ---- TOTP ----
   app.post('/identity/totp', { preHandler: auth }, async (req) => {
     return deps.identity.enrollTotp(req.auth!.accountId);
