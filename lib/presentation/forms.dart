@@ -182,47 +182,58 @@ class GoalsScreen extends StatelessWidget {
                   icon: Icons.track_changes_outlined,
                 )
               else
-                ...goals.map((g) => Padding(
+                ...goals.map((g) {
+                  final pct = g.targetUgx <= 0
+                      ? 0.0
+                      : (g.savedUgx / g.targetUgx).clamp(0.0, 1.0);
+                  final overdueTail = g.targetDate != null &&
+                          g.targetDate!.isBefore(DateTime.now())
+                      ? ', overdue since ${LG.date(g.targetDate!)}'
+                      : g.targetDate != null
+                          ? ', due ${LG.date(g.targetDate!)}'
+                          : '';
+                  return Padding(
                       padding: const EdgeInsets.only(bottom: 10),
-                      child: SoftCard(
-                        onTap: () => push(context, GoalForm(store: store, existing: g)),
-                        child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(children: [
-                                Expanded(
-                                    child: Text(g.name,
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.w800))),
-                                if (g.targetDate != null) ...[
-                                  StatusChip(
-                                      label: 'Due ${LG.date(g.targetDate!)}',
-                                      tone: g.targetDate!.isBefore(DateTime.now())
-                                          ? StatusTone.warn
-                                          : StatusTone.info),
-                                  const SizedBox(width: 6),
-                                ],
-                                const Icon(Icons.chevron_right, color: LG.muted),
+                      child: Semantics(
+                        label:
+                            '${g.name}, ${(pct * 100).round()}% funded — ${LG.money(g.savedUgx)} of ${LG.money(g.targetUgx)}$overdueTail',
+                        button: true,
+                        child: SoftCard(
+                          onTap: () => push(context, GoalForm(store: store, existing: g)),
+                          child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(children: [
+                                  Expanded(
+                                      child: Text(g.name,
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.w800))),
+                                  if (g.targetDate != null) ...[
+                                    StatusChip(
+                                        label: 'Due ${LG.date(g.targetDate!)}',
+                                        tone: g.targetDate!.isBefore(DateTime.now())
+                                            ? StatusTone.warn
+                                            : StatusTone.info),
+                                    const SizedBox(width: 6),
+                                  ],
+                                  const Icon(Icons.chevron_right, color: LG.muted),
+                                ]),
+                                const SizedBox(height: 10),
+                                LinearProgressIndicator(
+                                    value: pct.toDouble(),
+                                    minHeight: 8,
+                                    color: LG.sage,
+                                    backgroundColor: LG.sageSoft,
+                                    borderRadius: BorderRadius.circular(7)),
+                                const SizedBox(height: 9),
+                                Text(
+                                    '${LG.money(g.savedUgx)} of ${LG.money(g.targetUgx)}',
+                                    style: const TextStyle(
+                                        fontSize: 12, color: LG.muted)),
                               ]),
-                              const SizedBox(height: 10),
-                              LinearProgressIndicator(
-                                  value: g.targetUgx <= 0
-                                      ? 0
-                                      : (g.savedUgx / g.targetUgx)
-                                          .clamp(0.0, 1.0)
-                                          .toDouble(),
-                                  minHeight: 8,
-                                  color: LG.sage,
-                                  backgroundColor: LG.sageSoft,
-                                  borderRadius: BorderRadius.circular(7)),
-                              const SizedBox(height: 9),
-                              Text(
-                                  '${LG.money(g.savedUgx)} of ${LG.money(g.targetUgx)}',
-                                  style: const TextStyle(
-                                      fontSize: 12, color: LG.muted)),
-                            ]),
-                      ),
-                    )),
+                        ),
+                      ));
+                }),
               const SizedBox(height: 16),
               ElevatedButton.icon(
                   onPressed: () => push(context, GoalForm(store: store)),

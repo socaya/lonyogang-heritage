@@ -320,30 +320,38 @@ class ScheduledContributionsScreen extends StatelessWidget {
                     detail: 'Add a recurring contribution to see upcoming postings here.')
               else ...schedules.map((s) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: SoftCard(
-                      onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute<void>(
-                              builder: (_) => ScheduleForm(store: store, existing: s))),
-                      child: Row(children: [
-                        Switch.adaptive(
-                            value: s.active,
-                            activeTrackColor: LG.sageSoft,
-                            onChanged: (v) =>
-                                store.pauseSchedule(s.id, active: v)),
-                        const SizedBox(width: 10),
-                        Expanded(
-                            child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                              Text(s.name,
-                                  style: const TextStyle(fontWeight: FontWeight.w800)),
-                              Text(
-                                  '${LG.money(s.amountUgx, compact: true)} · ${s.frequency.name} · next ${LG.date(s.nextFire)}',
-                                  style: const TextStyle(color: LG.muted, fontSize: 12)),
-                            ])),
-                        const Icon(Icons.chevron_right, color: LG.muted),
-                      ])))),
+                  child: Semantics(
+                    label:
+                        '${s.name}, ${LG.money(s.amountUgx, compact: true)} ${s.frequency.name}, next due ${LG.date(s.nextFire)}, ${s.active ? "active" : "paused"}',
+                    button: true,
+                    child: SoftCard(
+                        onTap: () => Navigator.push(
+                            context,
+                            MaterialPageRoute<void>(
+                                builder: (_) => ScheduleForm(store: store, existing: s))),
+                        child: Row(children: [
+                          Semantics(
+                            label: s.active ? 'Pause schedule' : 'Resume schedule',
+                            child: Switch.adaptive(
+                                value: s.active,
+                                activeTrackColor: LG.sageSoft,
+                                onChanged: (v) =>
+                                    store.pauseSchedule(s.id, active: v)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                              child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                Text(s.name,
+                                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                                Text(
+                                    '${LG.money(s.amountUgx, compact: true)} · ${s.frequency.name} · next ${LG.date(s.nextFire)}',
+                                    style: const TextStyle(color: LG.muted, fontSize: 12)),
+                              ])),
+                          const Icon(Icons.chevron_right, color: LG.muted),
+                        ])),
+                  ))),
               const SizedBox(height: 14),
               ElevatedButton.icon(
                   onPressed: () => Navigator.push(context,
