@@ -551,6 +551,11 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
       Navigator.of(context).popUntil((route) => route.isFirst);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Account verified and signed in.')));
+      // Brand-new account won't have anything to hydrate, but fire the
+      // hook anyway so a user who signs up from device B after using
+      // device A sees existing state (the OTP + sign-in already landed
+      // credentials on device B at this point).
+      unawaited(scope.onSignInSuccess?.call() ?? remote.sync());
     } on HttpException catch (err) {
       setState(() {
         _busy = false;
@@ -738,7 +743,11 @@ class _SignInScreenState extends State<SignInScreen> {
       Navigator.of(context).popUntil((r) => r.isFirst);
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Signed in. Syncing portfolio.')));
-      unawaited(remote.sync());
+      // Fire the sign-in hook so the shell can hydrate from /resources
+      // (cheap if local state is already populated; the hydrator uses
+      // the SyncReducer which is idempotent on known ids). Falls back
+      // to the plain sync() call when no hook is wired.
+      unawaited(scope.onSignInSuccess?.call() ?? remote.sync());
     } on HttpException catch (err) {
       final msg = err.message;
       if (!_needsTotp && msg.contains('totp_required')) {

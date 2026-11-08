@@ -10,6 +10,7 @@ import 'data/credentials_store.dart';
 import 'data/notifications.dart';
 import 'data/portfolio_store.dart';
 import 'data/remote_sync.dart';
+import 'data/resource_hydrator.dart';
 import 'data/resource_publisher.dart';
 import 'data/sync.dart';
 import 'data/sync_outbox.dart';
@@ -157,6 +158,29 @@ class _LonyoGangAppState extends State<LonyoGangApp> {
     return OnlineScope(
       sync: remote,
       credentials: widget.credentials ?? CredentialsStore(),
+      onSignInSuccess: remote == null
+          ? null
+          : () async {
+              // Opportunistic hydrate on sign-in: if the store is
+              // unlocked, pull every resource kind the server has for
+              // this account and merge via the reducer. A brand-new
+              // account gets 0 rows; a second-device install pulls
+              // whatever the first device has pushed. Then run the
+              // regular /sync/events pass to drain anything new since
+              // the resource snapshot.
+              if (widget.store.isUnlocked && widget.store.vault.activeKey != null) {
+                try {
+                  await ResourceHydrator(
+                    remote: remote,
+                    reducer: SyncReducer(widget.store,
+                        attachmentSyncer: widget.store.attachmentSyncer),
+                  ).hydrate();
+                } catch (_) {
+                  // Hydration is best-effort; fall through to the event stream.
+                }
+              }
+              await remote.sync();
+            },
       child: MaterialApp(
         title: 'LonyoGang Heritage',
         debugShowCheckedModeBanner: false,
