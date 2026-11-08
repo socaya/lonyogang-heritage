@@ -526,7 +526,7 @@ class PortfolioStore extends ChangeNotifier {
 
   Future<void> recordValuation(
       String assetId, int fullValueUgx, DateTime asOf, String source,
-      {String notes = ''}) async {
+      {String notes = '', String? id}) async {
     if (fullValueUgx < 0 || source.trim().isEmpty) {
       throw ArgumentError('Invalid valuation');
     }
@@ -543,18 +543,27 @@ class PortfolioStore extends ChangeNotifier {
     final updated = [..._state.assets];
     updated[index] = asset.copyWith(
         valueUgx: fullValueUgx, valuedAt: asOf, status: RecordStatus.userEntered);
-    final history = [
-      ..._state.valuations,
-      ValuationRecord(
-          id: makeId(),
-          assetId: assetId,
-          fullValueUgx: fullValueUgx,
-          asOf: asOf,
-          source: source.trim(),
-          notes: notes.trim())
-    ];
+    // The id is passed through from the sync reducer so a cross-device
+    // replay keeps the same primary key; otherwise mint a fresh one so
+    // the local write stays stable.
+    final record = ValuationRecord(
+        id: id ?? makeId(),
+        assetId: assetId,
+        fullValueUgx: fullValueUgx,
+        asOf: asOf,
+        source: source.trim(),
+        notes: notes.trim());
+    final history = [..._state.valuations, record];
     _state = _replace(assets: updated, valuations: history);
     await _save();
+    // Push both the asset mutation (new current valuedAt/valueUgx) and
+    // the valuation history row. Without this, a peer device's hydrate
+    // misses every revaluation.
+    await _recordOutbox(
+        payloadType: 'asset', payload: updated[index].toJson(), integrity: {
+      'ownership_bps': updated[index].ownershipBps,
+    });
+    await _recordOutbox(payloadType: 'valuation', payload: record.toJson());
   }
 
   Future<void> updateNotificationOptions(NotificationOptions options) async {

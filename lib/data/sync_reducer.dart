@@ -83,7 +83,8 @@ class SyncReducer {
         await store.recordValuation(
             valuation.assetId, valuation.fullValueUgx, valuation.asOf,
             valuation.source,
-            notes: valuation.notes);
+            notes: valuation.notes,
+            id: valuation.id);
         return true;
       case 'document_record':
         final document = DocumentRecord.fromJson(json);

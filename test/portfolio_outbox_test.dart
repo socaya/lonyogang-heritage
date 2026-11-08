@@ -98,6 +98,27 @@ void main() {
     expect(batches.last.integrity?['combined_bps'], 3000);
   });
 
+  test('recordValuation emits both the asset mutation and the valuation row',
+      () async {
+    final outbox = SyncOutbox();
+    final store = PortfolioStore(outbox: outbox);
+    await store.load();
+    await store.setOwner('Owner');
+    await store.enablePassphrase('passphrase-of-length-12');
+    await store.upsertAsset(WealthAsset(
+      id: 'a1',
+      name: 'Plot',
+      kind: AssetKind.property,
+      valueUgx: 10000000,
+      valuedAt: DateTime(2026, 10, 1),
+    ));
+    final startCount = (await outbox.snapshot()).length;
+    await store.recordValuation('a1', 15000000, DateTime(2026, 11, 1), 'manual');
+    final added = (await outbox.snapshot()).sublist(startCount);
+    final kinds = added.map((e) => e.payloadType).toSet();
+    expect(kinds, {'asset', 'valuation'});
+  });
+
   test('FX rate upsert + remove emit fx_rate and fx_rate_delete events',
       () async {
     final outbox = SyncOutbox();
