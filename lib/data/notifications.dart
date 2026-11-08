@@ -171,15 +171,15 @@ class LocalNotificationScheduler implements NotificationScheduler {
   @override Future<void> syncWith(List<ScheduledAlert> alerts) async {
     if (!_initialized) await initialize();
     await _plugin.cancelAll();
-    final details = NotificationDetails(
-        android: const AndroidNotificationDetails(
+    const details = NotificationDetails(
+        android: AndroidNotificationDetails(
           'lonyogang_reminders',
           'LonyoGang reminders',
           channelDescription: 'Portfolio reminders, document renewals and schedules',
           importance: Importance.defaultImportance,
           priority: Priority.defaultPriority,
         ),
-        iOS: const DarwinNotificationDetails());
+        iOS: DarwinNotificationDetails());
     for (final alert in alerts) {
       try {
         await _plugin.zonedSchedule(

@@ -227,10 +227,10 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                   notes: notes.text.trim(),
                   attachment: widget.existing?.attachment);
               await widget.store.upsertDocument(record);
-              if (!mounted) return;
+              if (!context.mounted) return;
               Navigator.of(context).pop();
             } catch (e) {
-              if (!mounted) return;
+              if (!context.mounted) return;
               ScaffoldMessenger.of(context)
                   .showSnackBar(SnackBar(content: Text('$e')));
             } finally {

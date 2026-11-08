@@ -11,10 +11,9 @@ import 'sync_outbox.dart';
 /// — when a passphrase is set — persist an AES-GCM envelope and mediate all
 /// reads and writes through [Vault]. Nothing is pushed to a server.
 class PortfolioStore extends ChangeNotifier {
-  PortfolioStore({Vault? vault, AttachmentStore? attachments, SyncOutbox? outbox, String? deviceId})
+  PortfolioStore({Vault? vault, AttachmentStore? attachments, this.outbox, String? deviceId})
       : vault = vault ?? Vault(),
         attachments = attachments ?? AttachmentStore(),
-        outbox = outbox,
         deviceId = deviceId ?? _newDeviceId() {
     this.vault.addListener(notifyListeners);
   }
@@ -29,7 +28,7 @@ class PortfolioStore extends ChangeNotifier {
     final ms = DateTime.now().millisecondsSinceEpoch.toString().padLeft(13, '0');
     final suffix = (_deviceIdCounter++).toString().padLeft(4, '0');
     // Shape a UUID-like identifier that matches the server's uuid validator.
-    final part = '${ms.substring(0, 8)}-${ms.substring(8, 12)}-4${ms.substring(12).padRight(3, '0').substring(0, 3)}-a${suffix}';
+    final part = '${ms.substring(0, 8)}-${ms.substring(8, 12)}-4${ms.substring(12).padRight(3, '0').substring(0, 3)}-a$suffix';
     return '$part-${DateTime.now().microsecondsSinceEpoch.toRadixString(16).padLeft(12, '0').substring(0, 12)}';
   }
 

@@ -530,7 +530,7 @@ class ErrorState extends StatelessWidget {
   Widget build(BuildContext context) => SoftCard(
         color: const Color(0xFFF8EAE7),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Row(children: const [
+          const Row(children: [
             Icon(Icons.error_outline, color: LG.negative),
             SizedBox(width: 10),
             Text('Something went wrong',
