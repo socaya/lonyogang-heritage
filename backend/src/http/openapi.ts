@@ -481,7 +481,7 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
         put: {
           tags: ['resources'],
           security: [{ bearer: [] }],
-          summary: 'Upsert ciphertext for a resource (optional expectedVersion)',
+          summary: 'Upsert ciphertext for a resource (optional expectedVersion; max 350 KB base64; 120/min per account)',
           requestBody: {
             required: true,
             content: {
@@ -490,7 +490,11 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
                   type: 'object',
                   required: ['ciphertext', 'deviceId'],
                   properties: {
-                    ciphertext: { type: 'string', description: 'base64 AES-GCM bytes' },
+                    ciphertext: {
+                      type: 'string',
+                      maxLength: 358400,
+                      description: 'base64 AES-GCM bytes',
+                    },
                     integrity: { type: 'object', nullable: true },
                     prevHash: { type: 'string', nullable: true, description: 'base64 SHA-256' },
                     deviceId: { type: 'string', format: 'uuid' },
@@ -502,8 +506,9 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           },
           responses: {
             '200': { description: 'Row after upsert.' },
-            '400': { description: 'Bad body.' },
+            '400': { description: 'Bad body (including oversized ciphertext).' },
             '409': { description: 'version_conflict — the stored version differs from expectedVersion.' },
+            '429': { description: 'Write rate-limit (120/min per account) hit.' },
           },
         },
         delete: {

@@ -11,6 +11,18 @@ import { requireAuth } from '../auth.js';
 const kindSchema = z.enum(RESOURCE_KINDS as [ResourceKind, ...ResourceKind[]]);
 const idSchema = z.string().min(1).max(200);
 
+// Resources carry AES-GCM payloads. A real entity (asset, goal, document
+// record) rounds to a few KB of JSON before encryption; a legitimate
+// payload will not exceed 256 KB post-encode. Reject anything larger up
+// front so a malicious client cannot burn disk + CPU on garbage writes.
+const MAX_CIPHERTEXT_B64 = 350 * 1024;
+
+// Writes + mutations get a per-account bucket so a chatty client can't
+// outrun the global 180/min cap. Reads are cheaper and cap at 600/min
+// because the hydrator legitimately fires 12 GETs in quick succession.
+const writeLimit = { rateLimit: { max: 120, timeWindow: '1 minute' } };
+const readLimit = { rateLimit: { max: 600, timeWindow: '1 minute' } };
+
 function toWire(row: {
   kind: string;
   id: string;
@@ -60,12 +72,12 @@ export async function registerResourceRoutes(
 ): Promise<void> {
   const auth = requireAuth(deps.identity.tokens);
 
-  app.get('/resources', { preHandler: auth }, async (req) => {
+  app.get('/resources', { preHandler: auth, config: readLimit }, async (req) => {
     const counts = await deps.resources.countByKind(req.auth!.accountId);
     return { counts };
   });
 
-  app.get('/resources/:kind', { preHandler: auth }, async (req, reply) => {
+  app.get('/resources/:kind', { preHandler: auth, config: readLimit }, async (req, reply) => {
     const parsedParams = z.object({ kind: kindSchema }).safeParse(req.params);
     if (!parsedParams.success) {
       return reply.code(400).send({ error: 'bad_kind' });
@@ -92,7 +104,7 @@ export async function registerResourceRoutes(
     return { resources: rows.map(toWire) };
   });
 
-  app.get('/resources/:kind/:id', { preHandler: auth }, async (req, reply) => {
+  app.get('/resources/:kind/:id', { preHandler: auth, config: readLimit }, async (req, reply) => {
     const parsed = z
       .object({ kind: kindSchema, id: idSchema })
       .safeParse(req.params);
@@ -110,7 +122,7 @@ export async function registerResourceRoutes(
     return toWire(row);
   });
 
-  app.put('/resources/:kind/:id', { preHandler: auth }, async (req, reply) => {
+  app.put('/resources/:kind/:id', { preHandler: auth, config: writeLimit }, async (req, reply) => {
     const parsedParams = z
       .object({ kind: kindSchema, id: idSchema })
       .safeParse(req.params);
@@ -119,7 +131,7 @@ export async function registerResourceRoutes(
     }
     const body = z
       .object({
-        ciphertext: z.string().min(1),
+        ciphertext: z.string().min(1).max(MAX_CIPHERTEXT_B64),
         integrity: z.record(z.string(), z.unknown()).nullable().optional(),
         prevHash: z.string().nullable().optional(),
         deviceId: z.string().uuid(),
@@ -156,7 +168,7 @@ export async function registerResourceRoutes(
 
   app.delete(
     '/resources/:kind/:id',
-    { preHandler: auth },
+    { preHandler: auth, config: writeLimit },
     async (req, reply) => {
       const parsedParams = z
         .object({ kind: kindSchema, id: idSchema })

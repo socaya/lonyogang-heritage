@@ -16,6 +16,32 @@
 - `presentation/analysis_screens.dart`: target allocation, FX rates, scheduled contributions.
 - `presentation/security_screens.dart`: unlock, passphrase set/change, biometric linking.
 
+## Dual-sync (0.4 online path)
+
+Two complementary channels fan writes out from the Flutter store to the
+backend. Both carry the same AES-GCM content key — ciphertext bytes are
+byte-identical across the channels — so consumers see a consistent view
+regardless of which channel they read from.
+
+- **`/sync/events`** — append-only log, ordered by `receivedAt`. Used
+  for cross-device replay with a server-side cursor. `SyncOutbox`
+  queues every mutation locally, then `RemoteSyncService.sync()`
+  posts and pulls. `SyncReducer.apply` decrypts each pulled row and
+  merges it into `PortfolioStore` in a single pass.
+- **`/resources/:kind/:id`** — latest-state REST layer with per-kind
+  listing, `expectedVersion` optimistic concurrency, and a tombstone
+  flag for deletions. Written by `ResourcePublisher` alongside every
+  outbox record; read by `ResourceHydrator` on a new-device install or
+  on-demand from Data & sync status. Max ciphertext per row is ~350 KB
+  of base64; writes are rate-limited to 120/min per account; reads to
+  600/min (room for the hydrator's 12 back-to-back GETs).
+
+The REST layer never decrypts `ciphertext`. The only plaintext the
+server inspects is the small `integrity` map (`combined_bps`,
+`ownership_bps`, `amount_ugx`) used for cross-field invariants, and
+the per-device `prev_hash` chain the outbox and the reducer both
+recompute.
+
 ## Accounting invariants
 
 1. All UGX money is stored as integer units. Fractional currency, FX feeds and securities quantity precision need a separate decimal engine before launch.

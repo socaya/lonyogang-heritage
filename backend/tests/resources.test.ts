@@ -124,6 +124,22 @@ describe('resources REST layer', () => {
     expect(after.statusCode).toBe(404);
   });
 
+  it('rejects an oversized ciphertext up front', async () => {
+    const accessToken = await authed(`big-${Date.now()}@example.com`);
+    const h = { authorization: `Bearer ${accessToken}` };
+    const huge = Buffer.alloc(400 * 1024, 65).toString('base64');
+    const put = await harness.app.inject({
+      method: 'PUT',
+      url: '/resources/asset/giant',
+      headers: h,
+      payload: {
+        ciphertext: huge,
+        deviceId: '00000000-0000-0000-0000-000000000082',
+      },
+    });
+    expect(put.statusCode).toBe(400);
+  });
+
   it('includeDeleted surfaces tombstoned rows for forensic queries', async () => {
     const accessToken = await authed(`tomb-${Date.now()}@example.com`);
     const h = { authorization: `Bearer ${accessToken}` };
