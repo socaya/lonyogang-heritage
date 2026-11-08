@@ -45,6 +45,14 @@ class SyncReducer {
       return false;
     }
 
+    // Wrap the entire switch so every store mutation it triggers writes
+    // locally only — the outbox + resource publisher stay quiet. Without
+    // this guard a cross-device write would ping-pong forever.
+    return store.applyingRemote(() => _dispatch(record, json));
+  }
+
+  Future<bool> _dispatch(
+      RemoteSyncEventRecord record, Map<String, dynamic> json) async {
     switch (record.payloadType) {
       case 'asset':
         if (_hasRecentLocalEvent(record)) return false;

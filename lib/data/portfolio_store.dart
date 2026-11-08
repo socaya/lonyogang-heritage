@@ -38,6 +38,24 @@ class PortfolioStore extends ChangeNotifier {
   final ResourcePublisher? resourcePublisher;
   final String deviceId;
 
+  /// When true, _recordOutbox is a no-op. Set by the SyncReducer while
+  /// replaying a pulled record so the store doesn't re-emit the same
+  /// mutation back to the server — which would otherwise ping-pong
+  /// between every pair of devices forever.
+  bool _suppressOutbox = false;
+
+  /// Hook for the reducer. Wraps the block in a flag so every write it
+  /// performs stays local (no outbox, no REST publish).
+  Future<T> applyingRemote<T>(Future<T> Function() block) async {
+    final previous = _suppressOutbox;
+    _suppressOutbox = true;
+    try {
+      return await block();
+    } finally {
+      _suppressOutbox = previous;
+    }
+  }
+
   static int _deviceIdCounter = 0;
   static String _newDeviceId() {
     final ms = DateTime.now().millisecondsSinceEpoch.toString().padLeft(13, '0');
@@ -52,6 +70,10 @@ class PortfolioStore extends ChangeNotifier {
     required Map<String, dynamic> payload,
     Map<String, dynamic>? integrity,
   }) async {
+    // Reducer-triggered mutations must not re-emit, or the server would
+    // ping-pong the same event between every pair of devices. The flag
+    // is scoped via applyingRemote() below.
+    if (_suppressOutbox) return;
     final box = outbox;
     final key = vault.activeKey;
     if (box == null || key == null) return;
