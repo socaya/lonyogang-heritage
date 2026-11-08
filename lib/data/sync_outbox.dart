@@ -72,6 +72,13 @@ class SyncOutbox extends ChangeNotifier {
     final contentKey = await deriveContentKey(vaultKey);
     final bytes = utf8.encode(jsonEncode(payload));
     final ciphertext = await VaultCrypto.encryptBytes(bytes, contentKey);
+    // Chain the new entry to the previous one on this device. The server
+    // also keeps its own chain; this is a client-side belt-and-braces so
+    // tampering the on-disk outbox (e.g. re-ordering events) becomes
+    // visible when the ciphertext is pushed and the server re-hashes.
+    final prevHash = _entries.isEmpty
+        ? null
+        : (await Sha256().hash(_entries.last.ciphertext)).bytes;
     final entry = _OutboxEntry(
       id: _ulid(deviceId),
       payloadType: payloadType,
@@ -79,6 +86,7 @@ class SyncOutbox extends ChangeNotifier {
       integrity: integrity,
       createdAt: DateTime.now().toUtc(),
       deviceId: deviceId,
+      prevHash: prevHash == null ? null : Uint8List.fromList(prevHash),
     );
     _entries.add(entry);
     // Retention cap: oldest entries first. In practice the outbox drains on
@@ -104,6 +112,7 @@ class SyncOutbox extends ChangeNotifier {
               deviceId: e.deviceId,
               payloadType: e.payloadType,
               payload: e.ciphertext,
+              prevHash: e.prevHash,
               integrity: e.integrity,
               createdAt: e.createdAt,
             ))
@@ -172,6 +181,7 @@ class _OutboxEntry {
   final Map<String, dynamic>? integrity;
   final DateTime createdAt;
   final String deviceId;
+  final Uint8List? prevHash;
   const _OutboxEntry({
     required this.id,
     required this.payloadType,
@@ -179,6 +189,7 @@ class _OutboxEntry {
     required this.integrity,
     required this.createdAt,
     required this.deviceId,
+    this.prevHash,
   });
 
   Map<String, dynamic> toJson() => {
@@ -188,6 +199,7 @@ class _OutboxEntry {
         if (integrity != null) 'integrity': integrity,
         'createdAt': createdAt.toIso8601String(),
         'deviceId': deviceId,
+        if (prevHash != null) 'prevHash': base64Encode(prevHash!),
       };
 
   factory _OutboxEntry.fromJson(Map<String, dynamic> j) => _OutboxEntry(
@@ -197,5 +209,8 @@ class _OutboxEntry {
         integrity: j['integrity'] as Map<String, dynamic>?,
         createdAt: DateTime.parse(j['createdAt'] as String),
         deviceId: j['deviceId'] as String,
+        prevHash: j['prevHash'] == null
+            ? null
+            : base64Decode(j['prevHash'] as String),
       );
 }
