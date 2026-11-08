@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -6,6 +7,7 @@ import 'package:flutter/services.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import 'components.dart';
+import 'online_scope.dart';
 import 'widgets.dart';
 
 /// Visible launch screen while we load the portfolio off disk. On load
@@ -521,26 +523,92 @@ class _SignInScreenState extends State<SignInScreen> {
   final form = GlobalKey<FormState>();
   final email = TextEditingController();
   final password = TextEditingController();
+  final totp = TextEditingController();
   bool _busy = false;
   bool _passkeyAttempted = false;
+  bool _needsTotp = false;
+  String? _error;
 
   @override
   void dispose() {
     email.dispose();
     password.dispose();
+    totp.dispose();
     super.dispose();
   }
 
   Future<void> _submit() async {
     if (!form.currentState!.validate()) return;
-    setState(() => _busy = true);
-    await Future<void>.delayed(const Duration(milliseconds: 400));
-    if (!mounted) return;
-    setState(() => _busy = false);
-    Navigator.of(context).popUntil((r) => r.isFirst);
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-            'Sign-in is a design preview. Open More → Encryption to protect this device.')));
+    final scope = OnlineScope.maybeOf(context);
+    final remote = scope?.sync;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+
+    // Preview path — no backend configured. Honour the prior UX: a plausible
+    // email and 8+ char password walks through the design flow.
+    if (remote == null || scope == null) {
+      await Future<void>.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
+      setState(() => _busy = false);
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text(
+              'Sign-in is a design preview. Connect a backend to sign in for real.')));
+      return;
+    }
+
+    try {
+      final deviceId = (await scope.credentials.load())?.deviceId ??
+          _syntheticDeviceId();
+      final creds = await remote.signIn(
+        email: email.text.trim(),
+        password: password.text,
+        deviceId: deviceId,
+        totpCode: _needsTotp ? totp.text.trim() : null,
+      );
+      await scope.credentials.save(creds);
+      if (!mounted) return;
+      setState(() => _busy = false);
+      Navigator.of(context).popUntil((r) => r.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Signed in. Syncing portfolio.')));
+      unawaited(remote.sync());
+    } on HttpException catch (err) {
+      final msg = err.message;
+      if (!_needsTotp && msg.contains('totp_required')) {
+        setState(() {
+          _needsTotp = true;
+          _busy = false;
+          _error = 'Enter the current TOTP code from your authenticator.';
+        });
+        return;
+      }
+      setState(() {
+        _busy = false;
+        _error = msg.contains('bad_credentials')
+            ? 'Email or password is incorrect.'
+            : 'Sign-in failed: $msg';
+      });
+    } catch (err) {
+      setState(() {
+        _busy = false;
+        _error = 'Sign-in failed: $err';
+      });
+    }
+  }
+
+  static String _syntheticDeviceId() {
+    // When we've never spoken to the server before there is no persisted
+    // device id yet. Mint a stable UUID shape; the server will accept any
+    // v4-looking value and scope sessions to it.
+    final bytes = List<int>.generate(16, (i) => (i * 37 + 11) & 0xff);
+    bytes[6] = (bytes[6] & 0x0f) | 0x40;
+    bytes[8] = (bytes[8] & 0x3f) | 0x80;
+    String hex(int from, int to) =>
+        bytes.sublist(from, to).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
+    return '${hex(0, 4)}-${hex(4, 6)}-${hex(6, 8)}-${hex(8, 10)}-${hex(10, 16)}';
   }
 
   @override
@@ -584,6 +652,24 @@ class _SignInScreenState extends State<SignInScreen> {
                       : null,
                 ),
               ),
+              if (_needsTotp)
+                FormFieldBlock(
+                  title: 'TOTP code',
+                  child: TextFormField(
+                    controller: totp,
+                    keyboardType: TextInputType.number,
+                    maxLength: 8,
+                    decoration: const InputDecoration(hintText: '6-digit code'),
+                    validator: (v) => (v == null || v.trim().length < 6)
+                        ? 'Enter the current TOTP code'
+                        : null,
+                  ),
+                ),
+              if (_error != null) ...[
+                const SizedBox(height: 4),
+                Text(_error!,
+                    style: const TextStyle(color: LG.negative, fontSize: 12)),
+              ],
             ]),
           ),
           Align(
