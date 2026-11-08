@@ -569,6 +569,13 @@ class PortfolioStore extends ChangeNotifier {
   Future<void> updateNotificationOptions(NotificationOptions options) async {
     _state = _replace(notificationOptions: options);
     await _save();
+    // Notification preferences are singleton per account; publish as
+    // kind `notification_options` with id "all". A peer device's
+    // hydrate replays the full options map.
+    await _recordOutbox(
+      payloadType: 'notification_options',
+      payload: {'id': 'all', ...options.toJson()},
+    );
   }
 
   /// Composite resource id for an FxRate. The REST layer wants a single

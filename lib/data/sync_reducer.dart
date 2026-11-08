@@ -138,6 +138,20 @@ class SyncReducer {
       case 'fx_rate':
         await store.upsertFxRate(FxRate.fromJson(json));
         return true;
+      case 'notification_options':
+        {
+          // Replay through updateNotificationOptions which also
+          // re-emits the outbox event. Set a guard flag first so the
+          // emission doesn't cause an endless loop? In practice the
+          // server dedupes on `account_id, kind, id` + version, so a
+          // replayed-and-rebroadcast event lands on the same row with
+          // bumped version and then pulls land on us with `deviceId`
+          // === our deviceId → reducer skips.
+          final opts = NotificationOptions.fromJson(
+              Map<String, dynamic>.from(json)..remove('id'));
+          await store.updateNotificationOptions(opts);
+          return true;
+        }
       case 'target_weights':
         {
           final raw = json['weights'];

@@ -23,6 +23,7 @@ const List<String> _hydrationOrder = [
   'beneficiary_batch',
   'alert_dismissal',
   'target_weights',
+  'notification_options',
 ];
 
 /// Progress ticks emitted by [ResourceHydrator.hydrate]. The UI uses this

@@ -145,6 +145,24 @@ void main() {
     expect(afterRemove, hasLength(1));
   });
 
+  test('updateNotificationOptions emits a notification_options event',
+      () async {
+    final outbox = SyncOutbox();
+    final store = PortfolioStore(outbox: outbox);
+    await store.load();
+    await store.setOwner('Owner');
+    await store.enablePassphrase('passphrase-of-length-12');
+    await store.updateNotificationOptions(const NotificationOptions(
+      upcomingReminders: false,
+      expiringDocuments: true,
+      staleValuations: false,
+    ));
+    final events = (await outbox.snapshot())
+        .where((e) => e.payloadType == 'notification_options')
+        .toList();
+    expect(events, hasLength(1));
+  });
+
   test('setTargetWeight emits a target_weights event with the full map',
       () async {
     final outbox = SyncOutbox();
