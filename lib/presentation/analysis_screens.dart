@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../core/design.dart';
+import '../data/fx_remote.dart';
 import '../data/portfolio_store.dart';
 import '../domain/finance.dart';
 import '../domain/models.dart';
 import 'components.dart';
+import 'online_scope.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
 
@@ -114,6 +116,8 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
   final amount = TextEditingController();
   DateTime asOf = DateTime.now();
   final source = TextEditingController();
+  bool _refreshing = false;
+  String? _refreshError;
 
   @override
   void dispose() {
@@ -121,6 +125,28 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
     amount.dispose();
     source.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshFromServer(Uri baseUri) async {
+    setState(() {
+      _refreshing = true;
+      _refreshError = null;
+    });
+    final client = FxRemoteClient(baseUri: baseUri);
+    try {
+      final remote = await client.fetchRates();
+      for (final rate in remote) {
+        await widget.store.upsertFxRate(rate);
+      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('Imported ${remote.length} server-verified rates.')));
+    } catch (e) {
+      setState(() => _refreshError = '$e');
+    } finally {
+      client.close();
+      if (mounted) setState(() => _refreshing = false);
+    }
   }
 
   Future<void> _submit() async {
@@ -144,10 +170,12 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
       builder: (context, _) {
         final rates = [...widget.store.state.fxRates]
           ..sort((a, b) => b.asOf.compareTo(a.asOf));
+        final remote = OnlineScope.maybeOf(context)?.sync?.baseUri;
         return WealthPage(
             title: 'FX reference rates',
-            subtitle:
-                'Private, user-entered rates used only for display. There is no live FX feed.',
+            subtitle: remote == null
+                ? 'Private, user-entered rates used only for display. There is no live FX feed.'
+                : 'Manual entries are kept locally. Tap Refresh from server to fold in the backend\'s signed quotes.',
             children: [
               const SoftCard(
                   color: LG.sageSoft,
@@ -160,6 +188,23 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
                             style: TextStyle(
                                 color: LG.muted, fontSize: 12, height: 1.5)))
                   ])),
+              if (remote != null) ...[
+                const SizedBox(height: 14),
+                PrimaryCTA(
+                  label: _refreshing
+                      ? 'Fetching server rates…'
+                      : 'Refresh from server',
+                  loading: _refreshing,
+                  showArrow: false,
+                  onPressed: () async => _refreshFromServer(remote),
+                ),
+                if (_refreshError != null)
+                  Padding(
+                      padding: const EdgeInsets.only(top: 8),
+                      child: Text(_refreshError!,
+                          style:
+                              const TextStyle(color: LG.negative, fontSize: 12))),
+              ],
               const SizedBox(height: 18),
               FormFieldBlock(
                   title: 'Currency',
