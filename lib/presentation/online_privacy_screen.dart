@@ -9,6 +9,8 @@ import '../core/design.dart';
 import '../data/credentials_store.dart';
 import '../data/remote_sync.dart';
 import 'components.dart';
+import 'online_scope.dart';
+import 'sessions_screen.dart';
 import 'totp_enrol_screen.dart';
 import 'widgets.dart';
 
@@ -239,6 +241,21 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
             label: const Text('Enrol TOTP second factor'),
           ),
           const SizedBox(height: 10),
+          Builder(builder: (context) {
+            final remote = OnlineScope.maybeOf(context)?.sync;
+            if (remote == null) return const SizedBox.shrink();
+            return Column(children: [
+              OutlinedButton.icon(
+                onPressed: _profile == null || _working
+                    ? null
+                    : () => Navigator.of(context).push(MaterialPageRoute<void>(
+                        builder: (_) => SessionsScreen(sync: remote))),
+                icon: const Icon(Icons.devices_other),
+                label: const Text('Active sessions'),
+              ),
+              const SizedBox(height: 10),
+            ]);
+          }),
           OutlinedButton.icon(
             onPressed: _profile == null || _working ? null : _erase,
             icon: const Icon(Icons.delete_forever, color: LG.negative),

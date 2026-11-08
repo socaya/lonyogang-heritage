@@ -426,6 +426,74 @@ class RemoteSyncService implements SyncService {
     _status.value = SyncStatus.ready;
     return creds;
   }
+
+  /// Lists every active + historical session on this account. The server
+  /// marks revoked / expired rows but keeps them around for forensic use.
+  Future<List<RemoteSyncSession>> listSessions() async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/identity/sessions');
+    final text = await _request('GET', uri, creds);
+    final decoded = jsonDecode(text) as Map<String, dynamic>;
+    final rows = (decoded['sessions'] as List<dynamic>? ?? const [])
+        .map((e) => RemoteSyncSession.fromJson(e as Map<String, dynamic>))
+        .toList();
+    return rows;
+  }
+
+  /// Revokes a single session by id. The caller must not revoke the
+  /// session id currently backing [creds.accessToken] — the UI enforces
+  /// that by comparing against the active session.
+  Future<void> revokeSession(String sessionId) async {
+    final creds = await credentialsLoader();
+    if (creds == null) throw StateError('Not signed in');
+    final uri = _baseUri.resolve('/identity/sessions/$sessionId');
+    final request = await _http.openUrl('DELETE', uri);
+    request.headers.set('authorization', 'Bearer ${creds.accessToken}');
+    final response = await request.close().timeout(requestDeadline);
+    await response.drain<void>().timeout(requestDeadline);
+    if (response.statusCode != 204 && response.statusCode != 200) {
+      throw HttpException('Revoke failed: ${response.statusCode}', uri: uri);
+    }
+  }
+}
+
+/// One row from `GET /identity/sessions`.
+class RemoteSyncSession {
+  final String id;
+  final String deviceId;
+  final String? userAgent;
+  final DateTime createdAt;
+  final DateTime? refreshedAt;
+  final DateTime? revokedAt;
+  final DateTime expiresAt;
+  const RemoteSyncSession({
+    required this.id,
+    required this.deviceId,
+    required this.userAgent,
+    required this.createdAt,
+    required this.refreshedAt,
+    required this.revokedAt,
+    required this.expiresAt,
+  });
+  bool get isActive =>
+      revokedAt == null && expiresAt.isAfter(DateTime.now().toUtc());
+  factory RemoteSyncSession.fromJson(Map<String, dynamic> j) =>
+      RemoteSyncSession(
+        id: j['id'] as String,
+        deviceId: j['device_id'] as String? ?? j['deviceId'] as String? ?? '',
+        userAgent: j['user_agent'] as String? ?? j['userAgent'] as String?,
+        createdAt: DateTime.parse(
+            (j['created_at'] ?? j['createdAt']) as String),
+        refreshedAt: (j['refreshed_at'] ?? j['refreshedAt']) == null
+            ? null
+            : DateTime.parse((j['refreshed_at'] ?? j['refreshedAt']) as String),
+        revokedAt: (j['revoked_at'] ?? j['revokedAt']) == null
+            ? null
+            : DateTime.parse((j['revoked_at'] ?? j['revokedAt']) as String),
+        expiresAt: DateTime.parse(
+            (j['expires_at'] ?? j['expiresAt']) as String),
+      );
 }
 
 /// Result of [RemoteSyncService.signUp] handed back to the UI so it can
