@@ -146,10 +146,16 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
         throw HttpException('HTTP ${res.statusCode}: $body', uri: uri);
       }
       await widget.credentials.clear();
+      // Drop every queued outbox event. Those entries were encrypted
+      // for the now-tombstoned account and must not be replayed to a
+      // future account the user might sign up next.
+      try {
+        await widget.store?.outbox?.clear();
+      } catch (_) {}
       if (!mounted) return;
       Navigator.of(context).pop();
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Online account erased. Credentials cleared on device.')));
+          content: Text('Online account erased. Credentials + queued sync events cleared on device.')));
     } catch (e) {
       setState(() => _error = '$e');
     } finally {
