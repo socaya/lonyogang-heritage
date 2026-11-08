@@ -6,6 +6,18 @@ import { requireAuth } from '../auth.js';
 
 const emailSchema = z.string().email().max(254);
 
+// Per-endpoint rate-limit overrides for auth-sensitive paths. All sit
+// below the global 180/min so a credential-stuffing attacker hitting a
+// single endpoint is throttled much earlier than a well-behaved client
+// doing routine traffic.
+const signUpLimit = { rateLimit: { max: 5, timeWindow: '1 hour' } };
+const verifyLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+const resendLimit = { rateLimit: { max: 3, timeWindow: '1 minute' } };
+const sessionLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+const resetBeginLimit = { rateLimit: { max: 5, timeWindow: '1 hour' } };
+const resetCompleteLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+const passkeyAuthLimit = { rateLimit: { max: 15, timeWindow: '1 minute' } };
+
 export async function registerIdentityRoutes(
   app: FastifyInstance,
   deps: { identity: IdentityService; passkeys: PasskeyService },
@@ -13,7 +25,7 @@ export async function registerIdentityRoutes(
   const auth = requireAuth(deps.identity.tokens);
 
   // ---- Accounts ----
-  app.post('/identity/accounts', async (req, reply) => {
+  app.post('/identity/accounts', { config: signUpLimit }, async (req, reply) => {
     const body = z
       .object({
         email: emailSchema,
@@ -32,7 +44,7 @@ export async function registerIdentityRoutes(
     }
   });
 
-  app.post('/identity/accounts/verify', async (req, reply) => {
+  app.post('/identity/accounts/verify', { config: verifyLimit }, async (req, reply) => {
     const body = z
       .object({
         accountId: z.string().uuid(),
@@ -48,7 +60,7 @@ export async function registerIdentityRoutes(
     }
   });
 
-  app.post('/identity/accounts/verify/resend', async (req, reply) => {
+  app.post('/identity/accounts/verify/resend', { config: resendLimit }, async (req, reply) => {
     const body = z
       .object({
         accountId: z.string().uuid(),
@@ -64,7 +76,7 @@ export async function registerIdentityRoutes(
   });
 
   // ---- Password sessions ----
-  app.post('/identity/sessions', async (req, reply) => {
+  app.post('/identity/sessions', { config: sessionLimit }, async (req, reply) => {
     const body = z
       .object({
         email: emailSchema,
@@ -108,7 +120,7 @@ export async function registerIdentityRoutes(
   });
 
   // ---- Password reset ----
-  app.post('/identity/password/reset/begin', async (req, reply) => {
+  app.post('/identity/password/reset/begin', { config: resetBeginLimit }, async (req, reply) => {
     const body = z.object({ email: emailSchema }).parse(req.body);
     // Always 202 to avoid leaking account existence. The server dispatches
     // the reset code through the configured OtpDispatcher; the response
@@ -117,7 +129,7 @@ export async function registerIdentityRoutes(
     return reply.code(202).send({ status: 'accepted' });
   });
 
-  app.post('/identity/password/reset/complete', async (req, reply) => {
+  app.post('/identity/password/reset/complete', { config: resetCompleteLimit }, async (req, reply) => {
     const body = z
       .object({ email: emailSchema, token: z.string().min(8), newPassword: z.string().min(10).max(1024) })
       .parse(req.body);
@@ -150,12 +162,12 @@ export async function registerIdentityRoutes(
     return result;
   });
 
-  app.post('/identity/passkeys/authentication', async (req) => {
+  app.post('/identity/passkeys/authentication', { config: passkeyAuthLimit }, async (req) => {
     const body = z.object({ email: emailSchema.optional() }).parse(req.body);
     return deps.passkeys.authenticationOptions(body.email);
   });
 
-  app.post('/identity/passkeys/authentication/verify', async (req, reply) => {
+  app.post('/identity/passkeys/authentication/verify', { config: passkeyAuthLimit }, async (req, reply) => {
     const body = z
       .object({ response: z.any(), deviceId: z.string().uuid() })
       .parse(req.body);
