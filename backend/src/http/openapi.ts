@@ -270,6 +270,30 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           summary: 'Enroll a TOTP second factor; returns seed + otpauth URI',
           responses: { '200': { description: 'Seed + otpauth URI.' } },
         },
+        delete: {
+          tags: ['identity'],
+          security: [{ bearer: [] }],
+          summary: 'Remove the TOTP second factor (requires a valid current code)',
+          requestBody: {
+            required: true,
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  required: ['code'],
+                  properties: {
+                    code: { type: 'string', minLength: 6, maxLength: 8 },
+                  },
+                },
+              },
+            },
+          },
+          responses: {
+            '204': { description: 'Removed (or already absent).' },
+            '401': { description: 'TOTP code did not match.' },
+            '429': { description: 'Rate limit (10/min) hit.' },
+          },
+        },
       },
       '/identity/password/reset/begin': {
         post: {

@@ -472,6 +472,39 @@ export class IdentityService {
     return { secret, otpauthUrl: otpauth };
   }
 
+  /// Removes the TOTP second factor. Requires a valid current code so a
+  /// stolen access token alone cannot strip the factor off — the user
+  /// must still hold the authenticator app. Returns silently when no
+  /// TOTP is enrolled.
+  async disableTotp(accountId: string, code: string): Promise<void> {
+    const account = await queryOne<AccountRow>(
+      this.db,
+      'select id, totp_secret from accounts where id = $1',
+      [accountId],
+    );
+    if (!account) throw new ClientError('not_found', 'Account not found');
+    if (!account.totp_secret) return;
+    const secret = (
+      await this.kms.unseal(
+        Buffer.from(account.totp_secret, 'base64'),
+        Buffer.from(accountId, 'utf8'),
+      )
+    ).toString('utf8');
+    if (!authenticator.check(code, secret)) {
+      throw new ClientError('totp_invalid', 'TOTP code did not match');
+    }
+    await this.db.query(
+      'update accounts set totp_secret = null where id = $1',
+      [accountId],
+    );
+    await this.audit.record({
+      accountId,
+      actor: { kind: 'user', id: accountId },
+      action: 'totp.disabled',
+      resource: `account:${accountId}`,
+    });
+  }
+
   // ---------- Password reset (anti-enumeration) ----------
 
   /** Initiates recovery. Always succeeds from the client's perspective to

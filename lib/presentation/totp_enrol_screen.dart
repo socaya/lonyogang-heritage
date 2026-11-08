@@ -152,10 +152,88 @@ class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Done', style: TextStyle(color: LG.muted))),
           ],
+          const SizedBox(height: 22),
+          const Divider(),
+          const SizedBox(height: 10),
+          Text('Remove TOTP',
+              style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: 6),
+          const Text(
+            'If you still hold the authenticator app, you can take the second factor off. The server demands a current code so a stolen session cannot do this.',
+            style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5),
+          ),
+          const SizedBox(height: 10),
+          OutlinedButton.icon(
+            onPressed: _working ? null : _disable,
+            icon: const Icon(Icons.remove_moderator_outlined),
+            label: const Text('Remove TOTP…'),
+          ),
           if (_error != null) ...[
             const SizedBox(height: 14),
             Text(_error!, style: const TextStyle(color: LG.negative, fontSize: 12)),
           ],
         ],
       );
+
+  Future<void> _disable() async {
+    final code = await _promptCode();
+    if (code == null || code.isEmpty) return;
+    setState(() {
+      _working = true;
+      _error = null;
+    });
+    try {
+      final creds = await widget.credentials.load();
+      if (creds == null) throw StateError('Not signed in');
+      final uri = widget.baseUri.resolve('/identity/totp');
+      final req = await _http.openUrl('DELETE', uri);
+      req.headers.set('authorization', 'Bearer ${creds.accessToken}');
+      req.headers.contentType = ContentType.json;
+      req.write(jsonEncode({'code': code}));
+      final res = await req.close().timeout(_deadline);
+      final body =
+          await res.transform(utf8.decoder).join().timeout(_deadline);
+      if (res.statusCode == 401) {
+        throw const HttpException('TOTP code did not match.');
+      }
+      if (res.statusCode != 204 && res.statusCode != 200) {
+        throw HttpException('HTTP ${res.statusCode}: $body', uri: uri);
+      }
+      if (!mounted) return;
+      setState(() {
+        _secret = null;
+        _otpauthUrl = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('TOTP removed. Sign-in no longer requires a code.')));
+    } catch (err) {
+      setState(() => _error = '$err');
+    } finally {
+      if (mounted) setState(() => _working = false);
+    }
+  }
+
+  Future<String?> _promptCode() async {
+    final controller = TextEditingController();
+    return showDialog<String?>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Current TOTP code'),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(hintText: '6-digit code'),
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('Cancel')),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(controller.text.trim()),
+              child: const Text('Remove')),
+        ],
+      ),
+    );
+  }
 }

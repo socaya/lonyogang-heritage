@@ -135,6 +135,27 @@ export async function registerIdentityRoutes(
     return deps.identity.enrollTotp(req.auth!.accountId);
   });
 
+  // A stolen access token must not be enough to strip TOTP off the
+  // account — the endpoint demands a valid current code. 10/min is
+  // generous for retries but blocks brute force.
+  const totpDisableLimit = { rateLimit: { max: 10, timeWindow: '1 minute' } };
+  app.delete(
+    '/identity/totp',
+    { preHandler: auth, config: totpDisableLimit },
+    async (req, reply) => {
+      const body = z.object({ code: z.string().min(6).max(8) }).safeParse(req.body);
+      if (!body.success) {
+        return reply.code(400).send({ error: 'bad_body' });
+      }
+      try {
+        await deps.identity.disableTotp(req.auth!.accountId, body.data.code);
+        return reply.code(204).send();
+      } catch (err) {
+        return reply.code(401).send(toError(err));
+      }
+    },
+  );
+
   // ---- Password reset ----
   app.post('/identity/password/reset/begin', { config: resetBeginLimit }, async (req, reply) => {
     const body = z.object({ email: emailSchema }).parse(req.body);
