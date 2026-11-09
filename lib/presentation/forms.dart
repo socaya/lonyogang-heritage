@@ -13,6 +13,41 @@ import 'screens.dart';
 int? parseAmount(String s)=>int.tryParse(s.replaceAll(RegExp(r'[ ,]'),''));
 String? requireAmount(String? v){final n=parseAmount(v??'');return n==null||n<0?'Enter a valid non-negative UGX amount':null;}
 
+/// Parses "1,500.5" / "1500" / "1500.00" into a whole-UGX int. Accepts
+/// commas as thousand separators. Returns null on blank + raises on
+/// malformed so the caller can decide.
+int? parseDecimalAmount(String s) {
+  final trimmed = s.trim().replaceAll(',', '');
+  if (trimmed.isEmpty) return null;
+  final parsed = double.tryParse(trimmed);
+  if (parsed == null) return null;
+  return parsed.round();
+}
+
+String? requireDecimalAmount(String? v) {
+  if (v == null || v.trim().isEmpty) return 'Enter a value';
+  final parsed = double.tryParse(v.replaceAll(',', ''));
+  if (parsed == null || parsed < 0) return 'Enter a valid UGX amount';
+  return null;
+}
+
+/// Liability types — presented as a dropdown on the LiabilityForm so
+/// users pick a category instead of free-typing.
+const List<String> kLiabilityTypes = [
+  'Mortgage',
+  'SACCO loan',
+  'Bank loan',
+  'Personal loan',
+  'Credit card',
+  'Overdraft',
+  'Student loan',
+  'Mobile money loan',
+  'Family loan',
+];
+
+/// Sentinel reused across forms to mean "Other…, I'll type a name".
+const String kOtherSentinel = '__other__';
+
 class AssetForm extends StatefulWidget {
   final PortfolioStore store;final AssetKind kind;final WealthAsset? existing;
   const AssetForm({super.key,required this.store,required this.kind,this.existing});
@@ -79,10 +114,6 @@ const List<String> _kDefaultInstitutions = [
   'Mazima Retirement Plan',
 ];
 
-/// Sentinel label shown at the bottom of the dropdown so the user can
-/// type a value that isn't in the list.
-const String _kOtherSentinel = '__other__';
-
 class _AssetFormState extends State<AssetForm> {
   final key = GlobalKey<FormState>();
   late final name =
@@ -136,7 +167,7 @@ class _AssetFormState extends State<AssetForm> {
     final existing = widget.existing?.category ?? '';
     final options = _kCategoryOptions[widget.kind] ?? const [];
     if (options.contains(existing)) return existing;
-    if (existing.isNotEmpty) return _kOtherSentinel;
+    if (existing.isNotEmpty) return kOtherSentinel;
     return '';
   }
 
@@ -148,7 +179,7 @@ class _AssetFormState extends State<AssetForm> {
       ...widget.store.state.knownInstitutions,
     };
     if (known.contains(existing)) return existing;
-    return _kOtherSentinel;
+    return kOtherSentinel;
   }
 
   @override
@@ -199,6 +230,7 @@ class _AssetFormState extends State<AssetForm> {
                       'Capture value, ownership and the date of the source.'),
               FormFieldBlock(
                 title: 'Asset name',
+                required: true,
                 child: TextFormField(
                   controller: name,
                   decoration: const InputDecoration(
@@ -210,6 +242,7 @@ class _AssetFormState extends State<AssetForm> {
               ),
               FormFieldBlock(
                 title: 'Type or category',
+                required: true,
                 child: DropdownButtonFormField<String>(
                   initialValue: category.isEmpty ? null : category,
                   isExpanded: true,
@@ -217,14 +250,14 @@ class _AssetFormState extends State<AssetForm> {
                     ...categoryOptions.map((o) =>
                         DropdownMenuItem(value: o, child: Text(o))),
                     const DropdownMenuItem(
-                        value: _kOtherSentinel, child: Text('Other…')),
+                        value: kOtherSentinel, child: Text('Other…')),
                   ],
                   onChanged: (v) => setState(() => category = v ?? ''),
                   validator: (v) =>
                       v == null || v.isEmpty ? 'Pick a category' : null,
                 ),
               ),
-              if (category == _kOtherSentinel)
+              if (category == kOtherSentinel)
                 FormFieldBlock(
                   title: 'Custom category',
                   child: TextFormField(
@@ -238,6 +271,7 @@ class _AssetFormState extends State<AssetForm> {
                 ),
               FormFieldBlock(
                 title: 'Current value (UGX)',
+                required: true,
                 help:
                     'Full market or account value before your ownership share. Decimals are rounded to the nearest shilling.',
                 child: TextFormField(
@@ -302,7 +336,7 @@ class _AssetFormState extends State<AssetForm> {
                       ...institutions.map((o) =>
                           DropdownMenuItem(value: o, child: Text(o))),
                       const DropdownMenuItem(
-                          value: _kOtherSentinel, child: Text('Other…')),
+                          value: kOtherSentinel, child: Text('Other…')),
                     ],
                     onChanged: (v) => setState(() => institution = v ?? ''),
                     validator: (v) => v == null || v.isEmpty
@@ -310,7 +344,7 @@ class _AssetFormState extends State<AssetForm> {
                         : null,
                   ),
                 ),
-                if (institution == _kOtherSentinel)
+                if (institution == kOtherSentinel)
                   FormFieldBlock(
                     title: 'New institution name',
                     child: TextFormField(
@@ -405,10 +439,10 @@ class _AssetFormState extends State<AssetForm> {
     if (!key.currentState!.validate()) return;
     setState(() => saving = true);
     try {
-      final resolvedCategory = category == _kOtherSentinel
+      final resolvedCategory = category == kOtherSentinel
           ? customCategory.text.trim()
           : category;
-      final resolvedInstitution = institution == _kOtherSentinel
+      final resolvedInstitution = institution == kOtherSentinel
           ? customInstitution.text.trim()
           : institution;
       final a = WealthAsset(
@@ -442,42 +476,251 @@ class LiabilityForm extends StatefulWidget {
   const LiabilityForm({super.key,required this.store,this.existing});
   @override State<LiabilityForm> createState()=>_LiabilityFormState();
 }
-class _LiabilityFormState extends State<LiabilityForm>{
-  final key=GlobalKey<FormState>();
-  late final name=TextEditingController(text:widget.existing?.name??'');
-  late final lender=TextEditingController(text:widget.existing?.lender??'');
-  late final amount=TextEditingController(text:widget.existing?.outstandingUgx.toString()??'');
-  late final note=TextEditingController(text:widget.existing?.notes??'');
-  late String? propertyId=widget.existing?.propertyId;
-  @override void dispose(){name.dispose();lender.dispose();amount.dispose();note.dispose();super.dispose();}
-  @override Widget build(BuildContext context){
-    final properties=widget.store.state.assets.where((x)=>x.kind==AssetKind.property&&!x.archived).toList();
-    if(propertyId!=null&&!properties.any((x)=>x.id==propertyId))propertyId=null;
-    return Scaffold(appBar:AppBar(title:const Text('Liability')),body:SafeArea(child:Form(key:key,child:ListView(
-      padding:const EdgeInsets.all(22),children:[
-      PageHeading(widget.existing==null?'Add liability':'Edit liability',subtitle:'Record the amount you owe — including mortgages.'),
-      FormFieldBlock(title:'Liability name',child:TextFormField(controller:name,decoration:const InputDecoration(hintText:'e.g. Mortgage'),
-        validator:(v)=>v==null||v.trim().isEmpty?'Required':null)),
-      FormFieldBlock(title:'Lender',child:TextFormField(controller:lender,decoration:const InputDecoration(hintText:'Optional'))),
-      FormFieldBlock(title:'Outstanding balance (UGX)',child:TextFormField(controller:amount,keyboardType:TextInputType.number,
-        inputFormatters:[FilteringTextInputFormatter.digitsOnly],validator:requireAmount,
-        decoration:const InputDecoration(hintText:'0'))),
-      FormFieldBlock(title:'Link to property (optional)',help:'A linked mortgage is counted only once in net worth.',
-        child:DropdownButtonFormField<String?>(initialValue:propertyId,items:[
-          const DropdownMenuItem<String?>(value:null,child:Text('Not linked')),
-          ...properties.map((p)=>DropdownMenuItem<String?>(value:p.id,child:Text(p.name))),
-        ],onChanged:(v)=>setState(()=>propertyId=v))),
-      FormFieldBlock(title:'Notes',child:TextFormField(controller:note,maxLines:3)),
-      const SizedBox(height:16),ElevatedButton(onPressed:()async{
-        if(!key.currentState!.validate())return;
-        await widget.store.upsertLiability(Liability(id:widget.existing?.id??makeId(),name:name.text.trim(),
-          lender:lender.text.trim(),outstandingUgx:parseAmount(amount.text)!,propertyId:propertyId,
-          asOf:DateTime.now(),notes:note.text.trim()));
-        if(context.mounted)Navigator.pop(context);
-      },child:const Text('Save liability')),
-      if(widget.existing!=null)TextButton(onPressed:()=>confirmArchive(context,()=>widget.store.archiveLiability(widget.existing!)),
-        child:const Text('Archive liability',style:TextStyle(color:LG.negative)))
-    ]))));
+class _LiabilityFormState extends State<LiabilityForm> {
+  final key = GlobalKey<FormState>();
+  late final name =
+      TextEditingController(text: widget.existing?.name ?? '');
+  late final customLender = TextEditingController(
+      text: _isCustomLender(widget.existing?.lender)
+          ? widget.existing!.lender
+          : '');
+  late final amount = TextEditingController(
+      text: widget.existing == null
+          ? ''
+          : widget.existing!.outstandingUgx.toString());
+  late final accountNumber = TextEditingController(
+      text: widget.existing?.accountNumber ?? '');
+  late final note =
+      TextEditingController(text: widget.existing?.notes ?? '');
+  late String category = _initialCategoryChoice();
+  late String lender = _initialLenderChoice();
+  late String? propertyId = widget.existing?.propertyId;
+
+  bool _isCustomLender(String? v) {
+    if (v == null || v.isEmpty) return false;
+    final known = {
+      ..._kDefaultInstitutions,
+      ...widget.store.state.knownInstitutions,
+    };
+    return !known.contains(v);
+  }
+
+  String _initialCategoryChoice() {
+    final v = widget.existing?.category ?? '';
+    if (v.isEmpty) return '';
+    return kLiabilityTypes.contains(v) ? v : kOtherSentinel;
+  }
+
+  String _initialLenderChoice() {
+    final v = widget.existing?.lender ?? '';
+    if (v.isEmpty) return '';
+    final known = {
+      ..._kDefaultInstitutions,
+      ...widget.store.state.knownInstitutions,
+    };
+    return known.contains(v) ? v : kOtherSentinel;
+  }
+
+  @override
+  void dispose() {
+    name.dispose();
+    customLender.dispose();
+    amount.dispose();
+    accountNumber.dispose();
+    note.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final properties = widget.store.state.assets
+        .where((x) => x.kind == AssetKind.property && !x.archived)
+        .toList();
+    if (propertyId != null && !properties.any((x) => x.id == propertyId)) {
+      propertyId = null;
+    }
+    final lenders = <String>{
+      ..._kDefaultInstitutions,
+      ...widget.store.state.knownInstitutions,
+    }.toList()
+      ..sort();
+    final customCategory = TextEditingController(
+        text: category == kOtherSentinel &&
+                widget.existing != null &&
+                !kLiabilityTypes.contains(widget.existing!.category)
+            ? widget.existing!.category
+            : '');
+    return Scaffold(
+      appBar: AppBar(
+          title: Text(widget.existing == null
+              ? 'Add liability'
+              : 'Edit liability')),
+      body: SafeArea(
+        child: Form(
+          key: key,
+          child: ListView(
+            padding: const EdgeInsets.all(22),
+            children: [
+              PageHeading(
+                  widget.existing == null
+                      ? 'Add liability'
+                      : 'Edit liability',
+                  subtitle:
+                      'Record what you owe — including mortgages, SACCO loans and cards.'),
+              FormFieldBlock(
+                title: 'Liability name',
+                required: true,
+                child: TextFormField(
+                  controller: name,
+                  decoration: const InputDecoration(
+                      hintText: 'e.g. KCB SACCO loan'),
+                  validator: (v) => v == null || v.trim().isEmpty
+                      ? 'Required'
+                      : null,
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Liability type',
+                required: true,
+                child: DropdownButtonFormField<String>(
+                  initialValue: category.isEmpty ? null : category,
+                  isExpanded: true,
+                  items: [
+                    ...kLiabilityTypes.map(
+                        (t) => DropdownMenuItem(value: t, child: Text(t))),
+                    const DropdownMenuItem(
+                        value: kOtherSentinel, child: Text('Other…')),
+                  ],
+                  onChanged: (v) => setState(() => category = v ?? ''),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Pick a type' : null,
+                ),
+              ),
+              if (category == kOtherSentinel)
+                FormFieldBlock(
+                  title: 'Custom liability type',
+                  child: TextFormField(
+                    controller: customCategory,
+                    decoration: const InputDecoration(
+                        hintText: 'Describe the liability type'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Describe the type'
+                        : null,
+                  ),
+                ),
+              FormFieldBlock(
+                title: 'Lender',
+                required: true,
+                help:
+                    'Pick from your institutions or add a new one via "Other…".',
+                child: DropdownButtonFormField<String>(
+                  initialValue: lender.isEmpty ? null : lender,
+                  isExpanded: true,
+                  items: [
+                    ...lenders.map(
+                        (o) => DropdownMenuItem(value: o, child: Text(o))),
+                    const DropdownMenuItem(
+                        value: kOtherSentinel, child: Text('Other…')),
+                  ],
+                  onChanged: (v) => setState(() => lender = v ?? ''),
+                  validator: (v) =>
+                      v == null || v.isEmpty ? 'Pick a lender' : null,
+                ),
+              ),
+              if (lender == kOtherSentinel)
+                FormFieldBlock(
+                  title: 'New lender name',
+                  child: TextFormField(
+                    controller: customLender,
+                    decoration: const InputDecoration(
+                        hintText: 'Bank, SACCO or individual'),
+                    validator: (v) => v == null || v.trim().isEmpty
+                        ? 'Enter the lender name'
+                        : null,
+                  ),
+                ),
+              FormFieldBlock(
+                title: 'Loan / account reference',
+                help:
+                    'The reference the lender holds. Stored encrypted on this device.',
+                child: TextFormField(
+                  controller: accountNumber,
+                  decoration: const InputDecoration(
+                      hintText: 'e.g. LN-7788-22 or your reference'),
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Outstanding balance (UGX)',
+                required: true,
+                help:
+                    'Current amount owed. Decimals are rounded to the nearest shilling.',
+                child: TextFormField(
+                  controller: amount,
+                  keyboardType: const TextInputType.numberWithOptions(
+                      decimal: true),
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                  ],
+                  decoration: const InputDecoration(hintText: '0'),
+                  validator: requireDecimalAmount,
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Link to property (optional)',
+                help:
+                    'A linked mortgage is counted only once in net worth.',
+                child: DropdownButtonFormField<String?>(
+                  initialValue: propertyId,
+                  isExpanded: true,
+                  items: [
+                    const DropdownMenuItem<String?>(
+                        value: null, child: Text('Not linked')),
+                    ...properties.map((p) => DropdownMenuItem<String?>(
+                        value: p.id, child: Text(p.name))),
+                  ],
+                  onChanged: (v) => setState(() => propertyId = v),
+                ),
+              ),
+              FormFieldBlock(
+                title: 'Notes',
+                child: TextFormField(controller: note, maxLines: 3),
+              ),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () async {
+                  if (!key.currentState!.validate()) return;
+                  final resolvedCategory = category == kOtherSentinel
+                      ? customCategory.text.trim()
+                      : category;
+                  final resolvedLender = lender == kOtherSentinel
+                      ? customLender.text.trim()
+                      : lender;
+                  await widget.store.upsertLiability(Liability(
+                      id: widget.existing?.id ?? makeId(),
+                      name: name.text.trim(),
+                      category: resolvedCategory,
+                      lender: resolvedLender,
+                      accountNumber: accountNumber.text.trim(),
+                      outstandingUgx: parseDecimalAmount(amount.text) ?? 0,
+                      propertyId: propertyId,
+                      asOf: DateTime.now(),
+                      notes: note.text.trim()));
+                  if (context.mounted) Navigator.pop(context);
+                },
+                child: const Text('Save liability'),
+              ),
+              if (widget.existing != null)
+                TextButton(
+                  onPressed: () => confirmArchive(context,
+                      () => widget.store.archiveLiability(widget.existing!)),
+                  child: const Text('Archive liability',
+                      style: TextStyle(color: LG.negative)),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 
@@ -493,31 +736,100 @@ class _EventFormState extends State<EventForm>{
   @override void dispose(){desc.dispose();amt.dispose();notes.dispose();super.dispose();}
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const Text('Record transaction')),
     body:SafeArea(child:Form(key:form,child:ListView(padding:const EdgeInsets.all(22),children:[
-      const PageHeading('New transaction',subtitle:'Post an immutable entry to your portfolio activity log.'),
-      FormFieldBlock(title:'Description',child:TextFormField(controller:desc,decoration:const InputDecoration(hintText:'e.g. Savings contribution'),
-        validator:(v)=>v==null||v.trim().isEmpty?'Required':null)),
-      FormFieldBlock(title:'Type',child:DropdownButtonFormField<EventKind>(initialValue:kind,
-        items:EventKind.values.where((x)=>x!=EventKind.reversal).map((x)=>DropdownMenuItem(value:x,child:Text(x.name))).toList(),
-        onChanged:(v)=>setState(()=>kind=v??kind))),
-      FormFieldBlock(title:'Amount (UGX)',child:TextFormField(controller:amt,keyboardType:TextInputType.number,
-        inputFormatters:[FilteringTextInputFormatter.digitsOnly],validator:requireAmount)),
-      FormFieldBlock(title:'Related asset (optional)',child:DropdownButtonFormField<String?>(initialValue:assetId,
-        items:[const DropdownMenuItem(value:null,child:Text('Portfolio-level entry')),...widget.store.state.assets.where((x)=>!x.archived)
-          .map((a)=>DropdownMenuItem(value:a.id,child:Text(a.name)))],onChanged:(v)=>setState(()=>assetId=v))),
-      FormFieldBlock(title:'Date',child:SoftCard(onTap:()async{final picked=await showDatePicker(context:context,initialDate:day,
-        firstDate:DateTime(1990),lastDate:DateTime.now().add(const Duration(days:365)));
-        if(picked!=null)setState(()=>day=picked);},child:Row(children:[const Icon(Icons.calendar_today_outlined,color:LG.sage),
-        const SizedBox(width:12),Text(LG.date(day))]))),
-      FormFieldBlock(title:'Notes',child:TextFormField(controller:notes,maxLines:3)),
-      const SizedBox(height:10),const SoftCard(color:LG.sageSoft,child:Text(
-        'An activity entry does not automatically change asset valuations. Update the asset value separately after reconciling statements.',
-        style:TextStyle(color:LG.muted,fontSize:12,height:1.5))),
-      const SizedBox(height:18),ElevatedButton(onPressed:()async{
-        if(!form.currentState!.validate())return;
-        await widget.store.postEvent(LedgerEvent(id:makeId(),description:desc.text.trim(),kind:kind,
-          amountUgx:parseAmount(amt.text)!,occurredAt:day,assetId:assetId,notes:notes.text));
-        if(context.mounted)Navigator.pop(context);
-      },child:const Text('Post transaction')),
+      const PageHeading('New transaction',
+          subtitle:
+              'Post an immutable entry to your portfolio activity log.'),
+      FormFieldBlock(
+          title: 'Description',
+          required: true,
+          child: TextFormField(
+              controller: desc,
+              decoration:
+                  const InputDecoration(hintText: 'e.g. Savings contribution'),
+              validator: (v) =>
+                  v == null || v.trim().isEmpty ? 'Required' : null)),
+      FormFieldBlock(
+          title: 'Type',
+          required: true,
+          child: DropdownButtonFormField<EventKind>(
+              initialValue: kind,
+              isExpanded: true,
+              items: EventKind.values
+                  .where((x) => x != EventKind.reversal)
+                  .map((x) =>
+                      DropdownMenuItem(value: x, child: Text(x.name)))
+                  .toList(),
+              onChanged: (v) => setState(() => kind = v ?? kind))),
+      FormFieldBlock(
+          title: 'Amount (UGX)',
+          required: true,
+          help:
+              'Positive amount; decimals are rounded to the nearest shilling.',
+          child: TextFormField(
+              controller: amt,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              inputFormatters: [
+                FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))
+              ],
+              validator: requireDecimalAmount)),
+      FormFieldBlock(
+          title: 'Related asset (optional)',
+          child: DropdownButtonFormField<String?>(
+              initialValue: assetId,
+              isExpanded: true,
+              items: [
+                const DropdownMenuItem(
+                    value: null, child: Text('Portfolio-level entry')),
+                ...widget.store.state.assets
+                    .where((x) => !x.archived)
+                    .map((a) =>
+                        DropdownMenuItem(value: a.id, child: Text(a.name)))
+              ],
+              onChanged: (v) => setState(() => assetId = v))),
+      FormFieldBlock(
+          title: 'Date',
+          required: true,
+          child: SoftCard(
+              onTap: () async {
+                final picked = await showDatePicker(
+                    context: context,
+                    initialDate: day,
+                    firstDate: DateTime(1990),
+                    lastDate:
+                        DateTime.now().add(const Duration(days: 365)));
+                if (picked != null) setState(() => day = picked);
+              },
+              child: Row(children: [
+                const Icon(Icons.calendar_today_outlined, color: LG.sage),
+                const SizedBox(width: 12),
+                Text(LG.date(day))
+              ]))),
+      FormFieldBlock(
+          title: 'Notes',
+          child: TextFormField(controller: notes, maxLines: 3)),
+      const SizedBox(height: 10),
+      const SoftCard(
+          color: LG.sageSoft,
+          child: Text(
+              'An activity entry does not automatically change asset valuations. Update the asset value separately after reconciling statements.',
+              style:
+                  TextStyle(color: LG.muted, fontSize: 13, height: 1.5))),
+      const SizedBox(height: 22),
+      ElevatedButton(
+          onPressed: () async {
+            if (!form.currentState!.validate()) return;
+            await widget.store.postEvent(LedgerEvent(
+                id: makeId(),
+                description: desc.text.trim(),
+                kind: kind,
+                amountUgx: parseDecimalAmount(amt.text) ?? 0,
+                occurredAt: day,
+                assetId: assetId,
+                notes: notes.text));
+            if (context.mounted) Navigator.pop(context);
+          },
+          child: const Text('Post transaction')),
     ]))));
 }
 

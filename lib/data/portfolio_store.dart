@@ -264,7 +264,14 @@ class PortfolioStore extends ChangeNotifier {
     } else {
       list[i] = liability;
     }
-    _state = _replace(liabilities: list);
+    Set<String>? nextInstitutions;
+    final trimmed = liability.lender.trim();
+    if (trimmed.isNotEmpty &&
+        !_state.knownInstitutions.contains(trimmed)) {
+      nextInstitutions = {..._state.knownInstitutions, trimmed};
+    }
+    _state = _replace(
+        liabilities: list, knownInstitutions: nextInstitutions);
     await _save();
     await _recordOutbox(payloadType: 'liability', payload: liability.toJson());
   }

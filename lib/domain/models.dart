@@ -77,7 +77,9 @@ class WealthAsset {
 class Liability {
   final String id;
   final String name;
+  final String category; // "Mortgage", "SACCO loan", etc.
   final String lender;
+  final String accountNumber; // Loan reference.
   final int outstandingUgx;
   final int principalUgx;
   final String? propertyId;
@@ -85,15 +87,62 @@ class Liability {
   final DateTime? dueAt;
   final String notes;
   final bool archived;
-  const Liability({required this.id,required this.name,this.lender='',required this.outstandingUgx,
-    this.principalUgx=0,this.propertyId,required this.asOf,this.dueAt,this.notes='',this.archived=false});
-  Json toJson()=>{'id':id,'name':name,'lender':lender,'outstandingUgx':outstandingUgx,'principalUgx':principalUgx,
-    'propertyId':propertyId,'asOf':asOf.toIso8601String(),'dueAt':dueAt?.toIso8601String(),'notes':notes,'archived':archived};
-  factory Liability.fromJson(Json j)=>Liability(id:asString(j['id']),name:asString(j['name']),lender:asString(j['lender']),
-    outstandingUgx:asInt(j['outstandingUgx']),principalUgx:asInt(j['principalUgx']),propertyId:j['propertyId'] as String?,
-    asOf:readDate(j['asOf']),dueAt:j['dueAt']==null?null:readDate(j['dueAt']),notes:asString(j['notes']),archived:j['archived']==true);
-  Liability copyWith({bool? archived})=>Liability(id:id,name:name,lender:lender,outstandingUgx:outstandingUgx,
-    principalUgx:principalUgx,propertyId:propertyId,asOf:asOf,dueAt:dueAt,notes:notes,archived:archived??this.archived);
+  const Liability({
+    required this.id,
+    required this.name,
+    this.category = '',
+    this.lender = '',
+    this.accountNumber = '',
+    required this.outstandingUgx,
+    this.principalUgx = 0,
+    this.propertyId,
+    required this.asOf,
+    this.dueAt,
+    this.notes = '',
+    this.archived = false,
+  });
+  Json toJson() => {
+        'id': id,
+        'name': name,
+        'category': category,
+        'lender': lender,
+        'accountNumber': accountNumber,
+        'outstandingUgx': outstandingUgx,
+        'principalUgx': principalUgx,
+        'propertyId': propertyId,
+        'asOf': asOf.toIso8601String(),
+        'dueAt': dueAt?.toIso8601String(),
+        'notes': notes,
+        'archived': archived,
+      };
+  factory Liability.fromJson(Json j) => Liability(
+        id: asString(j['id']),
+        name: asString(j['name']),
+        category: asString(j['category']),
+        lender: asString(j['lender']),
+        accountNumber: asString(j['accountNumber']),
+        outstandingUgx: asInt(j['outstandingUgx']),
+        principalUgx: asInt(j['principalUgx']),
+        propertyId: j['propertyId'] as String?,
+        asOf: readDate(j['asOf']),
+        dueAt: j['dueAt'] == null ? null : readDate(j['dueAt']),
+        notes: asString(j['notes']),
+        archived: j['archived'] == true,
+      );
+  Liability copyWith({bool? archived}) => Liability(
+        id: id,
+        name: name,
+        category: category,
+        lender: lender,
+        accountNumber: accountNumber,
+        outstandingUgx: outstandingUgx,
+        principalUgx: principalUgx,
+        propertyId: propertyId,
+        asOf: asOf,
+        dueAt: dueAt,
+        notes: notes,
+        archived: archived ?? this.archived,
+      );
 }
 
 class LedgerEvent {

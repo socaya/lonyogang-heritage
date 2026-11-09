@@ -19,13 +19,35 @@ class BrandMark extends StatelessWidget {
 }
 
 class PageHeading extends StatelessWidget {
-  final String title;final String? subtitle;final Widget? trailing;
-  const PageHeading(this.title,{super.key,this.subtitle,this.trailing});
-  @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(bottom:22),child:Row(
-    crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text(title,style:Theme.of(context).textTheme.headlineMedium),
-      if(subtitle!=null)...[const SizedBox(height:7),Text(subtitle!,style:const TextStyle(color:LG.muted,height:1.5))],
-    ])),if(trailing!=null)trailing!]));
+  final String title;
+  final String? subtitle;
+  final Widget? trailing;
+  const PageHeading(this.title, {super.key, this.subtitle, this.trailing});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 26),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(title,
+                      style: Theme.of(context).textTheme.headlineMedium),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 10),
+                    Text(subtitle!,
+                        style: const TextStyle(
+                            color: LG.muted, fontSize: 15, height: 1.5)),
+                  ],
+                ],
+              ),
+            ),
+            if (trailing != null) trailing!
+          ],
+        ),
+      );
 }
 
 class SoftCard extends StatelessWidget {
@@ -37,19 +59,56 @@ class SoftCard extends StatelessWidget {
 }
 
 class SectionTitle extends StatelessWidget {
-  final String title;final Widget? action;
-  const SectionTitle(this.title,{super.key,this.action});
-  @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(bottom:12,top:8),child:Row(children:[
-    Expanded(child:Text(title,style:Theme.of(context).textTheme.titleMedium)),if(action!=null)action!]));
+  final String title;
+  final Widget? action;
+  const SectionTitle(this.title, {super.key, this.action});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 14, top: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 4,
+              height: 20,
+              decoration: BoxDecoration(
+                  color: LG.gold, borderRadius: BorderRadius.circular(2)),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+                child: Text(title,
+                    style: Theme.of(context).textTheme.titleMedium)),
+            if (action != null) action!
+          ],
+        ),
+      );
 }
 
 class InfoLabel extends StatelessWidget {
-  final String label;final String value;final Color? valueColor;
-  const InfoLabel({super.key,required this.label,required this.value,this.valueColor});
-  @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.symmetric(vertical:10),child:Row(children:[
-    Expanded(child:Text(label,style:const TextStyle(color:LG.muted,fontSize:13))),
-    Flexible(child:Text(value,style:TextStyle(color:valueColor??LG.navy,fontWeight:FontWeight.w700,fontSize:13),textAlign:TextAlign.end)),
-  ]));
+  final String label;
+  final String value;
+  final Color? valueColor;
+  const InfoLabel(
+      {super.key, required this.label, required this.value, this.valueColor});
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 11),
+        child: Row(
+          children: [
+            Expanded(
+                child: Text(label,
+                    style: const TextStyle(
+                        color: LG.muted, fontSize: 14, height: 1.3))),
+            Flexible(
+              child: Text(value,
+                  style: TextStyle(
+                      color: valueColor ?? LG.navy,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14),
+                  textAlign: TextAlign.end),
+            ),
+          ],
+        ),
+      );
 }
 
 class Pill extends StatelessWidget {
@@ -144,12 +203,54 @@ class EmptySection extends StatelessWidget {
 }
 
 class FormFieldBlock extends StatelessWidget {
-  final String title;final Widget child;final String? help;
-  const FormFieldBlock({super.key,required this.title,required this.child,this.help});
-  @override Widget build(BuildContext context)=>Padding(padding:const EdgeInsets.only(bottom:18),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-    Text(title,style:const TextStyle(fontWeight:FontWeight.w700,fontSize:13)),const SizedBox(height:8),child,
-    if(help!=null)...[const SizedBox(height:6),Text(help!,style:const TextStyle(fontSize:11,color:LG.muted))],
-  ]));
+  final String title;
+  final Widget child;
+  final String? help;
+  final bool required;
+  const FormFieldBlock({
+    super.key,
+    required this.title,
+    required this.child,
+    this.help,
+    this.required = false,
+  });
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.only(bottom: 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Text(title,
+                    style: const TextStyle(
+                        fontWeight: FontWeight.w700,
+                        fontSize: 15,
+                        color: LG.navy,
+                        letterSpacing: -.1)),
+                if (required) ...[
+                  const SizedBox(width: 6),
+                  const Text('•',
+                      style: TextStyle(
+                          color: LG.gold,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900)),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            child,
+            if (help != null) ...[
+              const SizedBox(height: 8),
+              Text(help!,
+                  style: const TextStyle(
+                      fontSize: 13, color: LG.muted, height: 1.4)),
+            ],
+          ],
+        ),
+      );
 }
 
 class PrivacyBanner extends StatelessWidget {
