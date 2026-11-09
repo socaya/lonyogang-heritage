@@ -16,7 +16,8 @@ export type ResourceKind =
   | 'fx_rate'
   | 'alert_dismissal'
   | 'target_weights'
-  | 'notification_options';
+  | 'notification_options'
+  | 'expense';
 
 export const RESOURCE_KINDS: ResourceKind[] = [
   'asset',
@@ -33,6 +34,7 @@ export const RESOURCE_KINDS: ResourceKind[] = [
   'alert_dismissal',
   'target_weights',
   'notification_options',
+  'expense',
 ];
 
 export interface ResourceRow {

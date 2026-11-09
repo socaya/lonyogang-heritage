@@ -1,6 +1,15 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- image_picker on Android: declare the camera + write-media permissions
+         so the system shows the capture + save sheet instead of silently
+         failing. READ_MEDIA_IMAGES is API 33+, legacy READ_EXTERNAL_STORAGE
+         covers older devices. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
+        android:maxSdkVersion="32" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
     <application
-        android:label="lonyogang_heritage"
+        android:label="LonyoGang Heritage"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

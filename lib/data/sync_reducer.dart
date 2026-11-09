@@ -146,6 +146,15 @@ class SyncReducer {
       case 'fx_rate':
         await store.upsertFxRate(FxRate.fromJson(json));
         return true;
+      case 'expense':
+        await store.upsertExpense(ExpenseRecord.fromJson(json));
+        return true;
+      case 'expense_delete':
+        {
+          final id = json['id']?.toString() ?? '';
+          if (id.isNotEmpty) await store.removeExpense(id);
+          return true;
+        }
       case 'notification_options':
         {
           // Replay through updateNotificationOptions which also

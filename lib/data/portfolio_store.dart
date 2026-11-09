@@ -427,6 +427,59 @@ class PortfolioStore extends ChangeNotifier {
   Future<void> restoreDocument(DocumentRecord document) async =>
       upsertDocument(document.copyWith(archived: false));
 
+  /// Upserts an expense. When `assetId` is set, reduce the matching
+  /// asset's current value by the expense amount — mirrors how
+  /// Record-deposit on AssetDetails bumps the value up.
+  Future<void> upsertExpense(ExpenseRecord expense,
+      {int? previousAmountForLinkedAsset}) async {
+    if (expense.description.trim().isEmpty || expense.amountUgx < 0) {
+      throw ArgumentError('Invalid expense');
+    }
+    final list = [..._state.expenses];
+    final i = list.indexWhere((x) => x.id == expense.id);
+    final existing = i < 0 ? null : list[i];
+    if (i < 0) {
+      list.add(expense);
+    } else {
+      list[i] = expense;
+    }
+    _state = _replace(expenses: list);
+    await _save();
+    // Only draw down the linked asset on the first write. Subsequent
+    // edits are treated as corrections of the record itself, not a
+    // second withdrawal — the user can hand-edit the asset value if
+    // they want a more granular reconciliation.
+    if (existing == null && expense.assetId != null && expense.amountUgx > 0) {
+      final idx = _state.assets
+          .indexWhere((a) => a.id == expense.assetId && !a.archived);
+      if (idx >= 0) {
+        final asset = _state.assets[idx];
+        final nextValue = (asset.valueUgx - expense.amountUgx).clamp(0, 1 << 62).toInt();
+        await upsertAsset(asset.copyWith(valueUgx: nextValue));
+      }
+    }
+    // `previousAmountForLinkedAsset` is a hook for a future edit flow
+    // that wants to restore then re-subtract; the no-op reference below
+    // keeps the parameter non-unused while we keep this method's
+    // contract minimal today.
+    previousAmountForLinkedAsset ?? 0;
+    await _recordOutbox(
+      payloadType: 'expense',
+      payload: expense.toJson(),
+      integrity: {'amount_ugx': expense.amountUgx},
+    );
+  }
+
+  Future<void> archiveExpense(ExpenseRecord expense) async =>
+      upsertExpense(expense.copyWith(archived: true));
+  Future<void> removeExpense(String id) async {
+    _state = _replace(
+        expenses: _state.expenses.where((x) => x.id != id).toList());
+    await _save();
+    await _recordOutbox(
+        payloadType: 'expense_delete', payload: {'id': id});
+  }
+
   /// Maximum attachment size enforced client-side. Larger files are rejected
   /// before they ever touch disk so we never half-write an encrypted blob.
   /// The current cap mirrors the online-service plan's free-tier soft limit.
@@ -836,6 +889,7 @@ class PortfolioStore extends ChangeNotifier {
     List<DocumentRecord>? documents,
     List<BeneficiaryRecord>? beneficiaries,
     List<ValuationRecord>? valuations,
+    List<ExpenseRecord>? expenses,
     NotificationOptions? notificationOptions,
     List<FxRate>? fxRates,
     List<ScheduledContribution>? scheduled,
@@ -855,6 +909,7 @@ class PortfolioStore extends ChangeNotifier {
           documents: documents ?? _state.documents,
           beneficiaries: beneficiaries ?? _state.beneficiaries,
           valuations: valuations ?? _state.valuations,
+          expenses: expenses ?? _state.expenses,
           notificationOptions:
               notificationOptions ?? _state.notificationOptions,
           fxRates: fxRates ?? _state.fxRates,

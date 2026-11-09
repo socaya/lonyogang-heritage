@@ -259,6 +259,7 @@ class PortfolioState {
   final List<DocumentRecord> documents;
   final List<BeneficiaryRecord> beneficiaries;
   final List<ValuationRecord> valuations;
+  final List<ExpenseRecord> expenses;
   final NotificationOptions notificationOptions;
   final List<FxRate> fxRates;
   final List<ScheduledContribution> scheduled;
@@ -275,6 +276,7 @@ class PortfolioState {
   const PortfolioState({this.ownerName='',this.onboardingDone=false,this.assets=const [],this.liabilities=const [],
     this.events=const [],this.goals=const [],this.contacts=const [],this.reminders=const [],
     this.documents=const [],this.beneficiaries=const [],this.valuations=const [],
+    this.expenses=const [],
     this.notificationOptions=const NotificationOptions(),
     this.fxRates=const [],this.scheduled=const [],
     this.targetWeightsBps=const <String,int>{},
@@ -287,6 +289,7 @@ class PortfolioState {
     'documents':documents.map((x)=>x.toJson()).toList(),
     'beneficiaries':beneficiaries.map((x)=>x.toJson()).toList(),
     'valuations':valuations.map((x)=>x.toJson()).toList(),
+    'expenses':expenses.map((x)=>x.toJson()).toList(),
     'notificationOptions':notificationOptions.toJson(),
     'fxRates':fxRates.map((x)=>x.toJson()).toList(),
     'scheduled':scheduled.map((x)=>x.toJson()).toList(),
@@ -310,6 +313,7 @@ class PortfolioState {
       documents:read('documents',DocumentRecord.fromJson),
       beneficiaries:read('beneficiaries',BeneficiaryRecord.fromJson),
       valuations:read('valuations',ValuationRecord.fromJson),
+      expenses:read('expenses',ExpenseRecord.fromJson),
       fxRates:read('fxRates',FxRate.fromJson),
       scheduled:read('scheduled',ScheduledContribution.fromJson),
       targetWeightsBps:weights,
@@ -449,6 +453,81 @@ class AttachmentRef {
     originalFilename:originalFilename,mimeType:mimeType,
     relativePath:relativePath,sizeBytes:sizeBytes,sha256Hex:sha256Hex,
     addedAt:addedAt,serverId:id);
+}
+
+/// Daily purchase / expense record. Separate from LedgerEvent because an
+/// expense is consumer-facing (receipt, merchant, category, payment
+/// method) and users think of it as "what did I spend today", not an
+/// entry on the portfolio ledger. When `assetId` is set the matching
+/// asset's current value is reduced by `amountUgx` on write — mirrors
+/// the Record-deposit button on AssetDetails.
+class ExpenseRecord {
+  final String id;
+  final String description;
+  final String category; // Food, Transport, Housing, …
+  final String merchant;
+  final int amountUgx;
+  final DateTime occurredAt;
+  final String paymentMethod; // Cash, MoMo, Bank card, Cheque, Other
+  final String? assetId; // Optional: account the money came from.
+  final String notes;
+  final AttachmentRef? receipt;
+  final bool archived;
+  const ExpenseRecord({
+    required this.id,
+    required this.description,
+    this.category = '',
+    this.merchant = '',
+    required this.amountUgx,
+    required this.occurredAt,
+    this.paymentMethod = '',
+    this.assetId,
+    this.notes = '',
+    this.receipt,
+    this.archived = false,
+  });
+  Json toJson() => {
+        'id': id,
+        'description': description,
+        'category': category,
+        'merchant': merchant,
+        'amountUgx': amountUgx,
+        'occurredAt': occurredAt.toIso8601String(),
+        'paymentMethod': paymentMethod,
+        if (assetId != null) 'assetId': assetId,
+        'notes': notes,
+        if (receipt != null) 'receipt': receipt!.toJson(),
+        'archived': archived,
+      };
+  factory ExpenseRecord.fromJson(Json j) => ExpenseRecord(
+        id: asString(j['id']),
+        description: asString(j['description']),
+        category: asString(j['category']),
+        merchant: asString(j['merchant']),
+        amountUgx: asInt(j['amountUgx']),
+        occurredAt: readDate(j['occurredAt']),
+        paymentMethod: asString(j['paymentMethod']),
+        assetId: j['assetId'] as String?,
+        notes: asString(j['notes']),
+        receipt: j['receipt'] is Map
+            ? AttachmentRef.fromJson(Map<String, dynamic>.from(j['receipt'] as Map))
+            : null,
+        archived: j['archived'] == true,
+      );
+  ExpenseRecord copyWith({bool? archived, AttachmentRef? receipt, bool clearReceipt = false}) =>
+      ExpenseRecord(
+        id: id,
+        description: description,
+        category: category,
+        merchant: merchant,
+        amountUgx: amountUgx,
+        occurredAt: occurredAt,
+        paymentMethod: paymentMethod,
+        assetId: assetId,
+        notes: notes,
+        receipt: clearReceipt ? null : (receipt ?? this.receipt),
+        archived: archived ?? this.archived,
+      );
 }
 
 /// A planning note, NOT a registered beneficiary nomination or legal instrument.

@@ -11,6 +11,7 @@ import 'legacy_screens.dart';
 import 'account_screens.dart';
 import 'analysis_screens.dart';
 import 'detail_screens.dart';
+import 'expenses_screen.dart';
 import 'security_screens.dart';
 
 Widget paddedBody(List<Widget> children)=>ListView(padding:const EdgeInsets.fromLTRB(22,18,22,28),children:children);
@@ -900,6 +901,7 @@ class MoreScreen extends StatelessWidget {
       const Divider(),_moreItem(context,Icons.receipt_long_outlined,'Transactions',TransactionsScreen(store:store)),
       const Divider(),_moreItem(context,Icons.payments_outlined,'Cash flow & income',CashFlowScreen(store:store)),
       const Divider(),_moreItem(context,Icons.home_work_outlined,'Property income',RentalIncomeScreen(store:store)),
+      const Divider(),_moreItem(context,Icons.shopping_bag_outlined,'Daily expenses',ExpensesScreen(store:store)),
     ])),
     const SizedBox(height:22),const SectionTitle('Plan & protect'),
     SoftCard(child:Column(children:[

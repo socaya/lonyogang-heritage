@@ -24,6 +24,7 @@ const List<String> _hydrationOrder = [
   'alert_dismissal',
   'target_weights',
   'notification_options',
+  'expense',
 ];
 
 /// Progress ticks emitted by [ResourceHydrator.hydrate]. The UI uses this
@@ -171,6 +172,10 @@ class ResourceHydrator {
         for (final b in [...store.state.beneficiaries]) {
           await store.deleteBeneficiary(b.id);
         }
+        return true;
+      case 'expense':
+        if (!store.state.expenses.any((e) => e.id == id)) return false;
+        await store.removeExpense(id);
         return true;
       case 'fx_rate':
         {
