@@ -1,7 +1,7 @@
 name: lonyogang_heritage
 description: LonyoGang Heritage — personal wealth, assets and legacy tracker.
 publish_to: none
-version: 0.4.6+9
+version: 0.4.7+10
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
@@ -24,6 +24,21 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
+
+flutter_launcher_icons:
+  android: true
+  ios: false
+  # Legacy / round launcher icons — the granary on the brand navy.
+  image_path: "assets/launcher/legacy.png"
+  min_sdk_android: 21
+  # Adaptive icon (Android 8+): foreground on a solid navy background.
+  adaptive_icon_background: "#102D3F"
+  adaptive_icon_foreground: "assets/launcher/foreground.png"
+  # Keep the monochrome icon (Android 13+ themed icons) consistent with
+  # the foreground silhouette.
+  adaptive_icon_monochrome: "assets/launcher/foreground.png"
+  remove_alpha_ios: false
 
 flutter:
   uses-material-design: true
