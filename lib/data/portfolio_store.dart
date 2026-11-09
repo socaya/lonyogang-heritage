@@ -248,6 +248,114 @@ class PortfolioStore extends ChangeNotifier {
     );
   }
 
+  /// Attaches a file to an asset. Bytes are AES-GCM encrypted under
+  /// the vault key and parked beside the asset id so the file can be
+  /// decrypted back into a temp file for preview. The AttachmentRef is
+  /// appended to the asset's attachments list via upsertAsset, which
+  /// handles the outbox + resource publish.
+  Future<AttachmentRef> addAssetAttachment({
+    required String assetId,
+    required List<int> bytes,
+    required String filename,
+    required String mimeType,
+  }) async {
+    final asset = _state.assets.firstWhere((a) => a.id == assetId);
+    final ref = await attachments.write(
+      documentId: 'asset-$assetId',
+      bytes: bytes,
+      filename: filename,
+      mimeType: mimeType,
+      key: vault.activeKey,
+    );
+    await upsertAsset(
+        asset.copyWith(attachments: [...asset.attachments, ref]));
+    return ref;
+  }
+
+  /// Removes one attachment from an asset by index. Deletes the on-disk
+  /// ciphertext too so the vault doesn't accumulate orphans.
+  Future<void> removeAssetAttachment(String assetId, int index) async {
+    final asset = _state.assets.firstWhere((a) => a.id == assetId);
+    if (index < 0 || index >= asset.attachments.length) return;
+    final ref = asset.attachments[index];
+    try {
+      await attachments.delete(ref);
+    } catch (_) {}
+    final next = [...asset.attachments]..removeAt(index);
+    await upsertAsset(asset.copyWith(attachments: next));
+  }
+
+  /// Attaches a file to a ledger event. Events are notionally immutable
+  /// (amount / kind / date), but attachments are metadata that can be
+  /// updated — we replace the event in place rather than appending a
+  /// new one. Outbox carries the full payload so peer devices converge.
+  /// Replace an existing ledger event row with [event] (same id).
+  /// Used by the sync reducer when a peer updates metadata that
+  /// is legal to change post-write — today that's the attachments
+  /// list.
+  Future<void> replaceEvent(LedgerEvent event) async {
+    final idx = _state.events.indexWhere((e) => e.id == event.id);
+    if (idx < 0) return;
+    final next = [..._state.events];
+    next[idx] = event;
+    _state = _replace(events: next);
+    await _save();
+    await _recordOutbox(
+      payloadType: 'ledger_event',
+      payload: event.toJson(),
+      integrity: {'amount_ugx': event.amountUgx},
+    );
+  }
+
+  Future<AttachmentRef> addEventAttachment({
+    required String eventId,
+    required List<int> bytes,
+    required String filename,
+    required String mimeType,
+  }) async {
+    final idx = _state.events.indexWhere((e) => e.id == eventId);
+    if (idx < 0) throw ArgumentError('Event not found');
+    final ref = await attachments.write(
+      documentId: 'event-$eventId',
+      bytes: bytes,
+      filename: filename,
+      mimeType: mimeType,
+      key: vault.activeKey,
+    );
+    final event = _state.events[idx];
+    final next = [..._state.events];
+    next[idx] =
+        event.copyWith(attachments: [...event.attachments, ref]);
+    _state = _replace(events: next);
+    await _save();
+    await _recordOutbox(
+      payloadType: 'ledger_event',
+      payload: next[idx].toJson(),
+      integrity: {'amount_ugx': event.amountUgx},
+    );
+    return ref;
+  }
+
+  Future<void> removeEventAttachment(String eventId, int index) async {
+    final i = _state.events.indexWhere((e) => e.id == eventId);
+    if (i < 0) return;
+    final event = _state.events[i];
+    if (index < 0 || index >= event.attachments.length) return;
+    try {
+      await attachments.delete(event.attachments[index]);
+    } catch (_) {}
+    final nextAtt = [...event.attachments]..removeAt(index);
+    final next = [..._state.events];
+    next[i] = event.copyWith(attachments: nextAtt);
+    _state = _replace(events: next);
+    await _save();
+    await _recordOutbox(
+      payloadType: 'ledger_event',
+      payload: next[i].toJson(),
+      integrity: {'amount_ugx': event.amountUgx},
+    );
+  }
+
   Future<void> archiveAsset(WealthAsset asset) async =>
       upsertAsset(asset.copyWith(archived: true));
   Future<void> restoreAsset(WealthAsset asset) async =>

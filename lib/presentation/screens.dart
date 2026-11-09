@@ -10,6 +10,7 @@ import 'wealth_screens.dart';
 import 'legacy_screens.dart';
 import 'account_screens.dart';
 import 'analysis_screens.dart';
+import 'attachments_block.dart';
 import 'detail_screens.dart';
 import 'expenses_screen.dart';
 import 'security_screens.dart';
@@ -517,6 +518,21 @@ class AssetDetails extends StatelessWidget {
           Icon(Icons.real_estate_agent_outlined,color:LG.sage),SizedBox(width:12),
           Expanded(child:Text('Recorded property income',style:TextStyle(fontWeight:FontWeight.w700))),
           Icon(Icons.chevron_right,color:LG.muted)]))],
+      const SizedBox(height: 18),
+      AttachmentsBlock(
+        title: 'Statements & documents',
+        helpText:
+            'Keep account statements, title deeds and reports with the asset. Stored encrypted on this device.',
+        store: store,
+        attachments: asset.attachments,
+        onAdd: ({required bytes, required filename, required mimeType}) =>
+            store.addAssetAttachment(
+                assetId: asset.id,
+                bytes: bytes,
+                filename: filename,
+                mimeType: mimeType),
+        onRemove: (i) => store.removeAssetAttachment(asset.id, i),
+      ),
       if (asset.interestFrequency != InterestFrequency.none ||
           asset.kind == AssetKind.investment ||
           asset.kind == AssetKind.savings) ...[

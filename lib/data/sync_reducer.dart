@@ -63,10 +63,25 @@ class SyncReducer {
         await store.upsertLiability(Liability.fromJson(json));
         return true;
       case 'ledger_event':
-        final event = LedgerEvent.fromJson(json);
-        if (store.state.events.any((e) => e.id == event.id)) return false;
-        await store.postEvent(event);
-        return true;
+        {
+          final event = LedgerEvent.fromJson(json);
+          final existingIdx =
+              store.state.events.indexWhere((e) => e.id == event.id);
+          if (existingIdx < 0) {
+            await store.postEvent(event);
+            return true;
+          }
+          // The event already exists locally: only metadata that is
+          // legal to update (attachments) may have changed. Re-sync
+          // the attachments list so a peer's upload lands here.
+          final local = store.state.events[existingIdx];
+          if (local.attachments.length != event.attachments.length ||
+              !_sameRefs(local.attachments, event.attachments)) {
+            await store.replaceEvent(event);
+            return true;
+          }
+          return false;
+        }
       case 'beneficiary_batch':
         final raw = json['beneficiaries'];
         if (raw is! List) return false;
@@ -272,5 +287,18 @@ class SyncReducer {
     for (final person in replacement) {
       await store.upsertBeneficiary(person);
     }
+  }
+
+  /// Compare two attachment lists by their sha + path (cheap proxy for
+  /// deep equality).
+  static bool _sameRefs(List<AttachmentRef> a, List<AttachmentRef> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i].sha256Hex != b[i].sha256Hex ||
+          a[i].relativePath != b[i].relativePath) {
+        return false;
+      }
+    }
+    return true;
   }
 }

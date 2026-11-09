@@ -63,13 +63,18 @@ class WealthAsset {
   // 0.9% monthly → interestFrequency=monthly, interestRateBps=90.
   final InterestFrequency interestFrequency;
   final int interestRateBps;
+  /// Account statements, title deeds, portfolio reports etc. Stored
+  /// encrypted on this device the same way DocumentRecord attachments
+  /// are.
+  final List<AttachmentRef> attachments;
 
   const WealthAsset({required this.id, required this.name, required this.kind, this.category = '', required this.valueUgx,
     this.ownershipBps = 10000, this.costUgx = 0, this.institution = '', this.accountNumber = '',
     this.location = '',
     this.status = RecordStatus.userEntered, required this.valuedAt, this.notes = '', this.archived = false,
     this.interestFrequency = InterestFrequency.none,
-    this.interestRateBps = 0});
+    this.interestRateBps = 0,
+    this.attachments = const []});
 
   int get attributableUgx => (valueUgx * ownershipBps) ~/ 10000;
   /// Projected interest for one period at the stored frequency on the
@@ -84,7 +89,8 @@ class WealthAsset {
     'accountNumber':accountNumber,'location':location,
     'status':status.name,'valuedAt':valuedAt.toIso8601String(),'notes':notes,'archived':archived,
     'interestFrequency':interestFrequency.name,
-    'interestRateBps':interestRateBps};
+    'interestRateBps':interestRateBps,
+    'attachments':attachments.map((a)=>a.toJson()).toList()};
   factory WealthAsset.fromJson(Json j) => WealthAsset(
     id:asString(j['id']),name:asString(j['name']),
     kind:AssetKind.values.firstWhere((x)=>x.name==j['kind'],orElse:()=>AssetKind.other),
@@ -96,15 +102,18 @@ class WealthAsset {
     valuedAt:readDate(j['valuedAt']),notes:asString(j['notes']),archived:j['archived']==true,
     interestFrequency:InterestFrequency.values.firstWhere(
         (x)=>x.name==j['interestFrequency'],orElse:()=>InterestFrequency.none),
-    interestRateBps:asInt(j['interestRateBps']));
-  WealthAsset copyWith({bool? archived,int? valueUgx,DateTime? valuedAt,RecordStatus? status,String? accountNumber,String? institution,String? category,InterestFrequency? interestFrequency,int? interestRateBps}) => WealthAsset(id:id,name:name,kind:kind,
+    interestRateBps:asInt(j['interestRateBps']),
+    attachments:(j['attachments'] as List<dynamic>? ?? const [])
+      .map((e)=>AttachmentRef.fromJson(Map<String,dynamic>.from(e as Map))).toList());
+  WealthAsset copyWith({bool? archived,int? valueUgx,DateTime? valuedAt,RecordStatus? status,String? accountNumber,String? institution,String? category,InterestFrequency? interestFrequency,int? interestRateBps,List<AttachmentRef>? attachments}) => WealthAsset(id:id,name:name,kind:kind,
     category:category??this.category,valueUgx:valueUgx??this.valueUgx,
     ownershipBps:ownershipBps,costUgx:costUgx,institution:institution??this.institution,
     accountNumber:accountNumber??this.accountNumber,
     location:location,status:status??this.status,
     valuedAt:valuedAt??this.valuedAt,notes:notes,archived:archived??this.archived,
     interestFrequency:interestFrequency??this.interestFrequency,
-    interestRateBps:interestRateBps??this.interestRateBps);
+    interestRateBps:interestRateBps??this.interestRateBps,
+    attachments:attachments??this.attachments);
 }
 
 class Liability {
@@ -187,14 +196,56 @@ class LedgerEvent {
   final String? assetId;
   final String? reversalOf;
   final String notes;
-  const LedgerEvent({required this.id,required this.description,required this.kind,required this.amountUgx,
-    required this.occurredAt,this.assetId,this.reversalOf,this.notes=''});
-  Json toJson()=>{'id':id,'description':description,'kind':kind.name,'amountUgx':amountUgx,
-    'occurredAt':occurredAt.toIso8601String(),'assetId':assetId,'reversalOf':reversalOf,'notes':notes};
-  factory LedgerEvent.fromJson(Json j)=>LedgerEvent(id:asString(j['id']),description:asString(j['description']),
-    kind:EventKind.values.firstWhere((x)=>x.name==j['kind'],orElse:()=>EventKind.adjustment),
-    amountUgx:asInt(j['amountUgx']),occurredAt:readDate(j['occurredAt']),assetId:j['assetId'] as String?,
-    reversalOf:j['reversalOf'] as String?,notes:asString(j['notes']));
+  /// Receipts, statements, invoices related to this transaction. Stored
+  /// encrypted on-device the same way DocumentRecord attachments are.
+  final List<AttachmentRef> attachments;
+  const LedgerEvent({
+    required this.id,
+    required this.description,
+    required this.kind,
+    required this.amountUgx,
+    required this.occurredAt,
+    this.assetId,
+    this.reversalOf,
+    this.notes = '',
+    this.attachments = const [],
+  });
+  Json toJson() => {
+        'id': id,
+        'description': description,
+        'kind': kind.name,
+        'amountUgx': amountUgx,
+        'occurredAt': occurredAt.toIso8601String(),
+        'assetId': assetId,
+        'reversalOf': reversalOf,
+        'notes': notes,
+        'attachments': attachments.map((a) => a.toJson()).toList(),
+      };
+  factory LedgerEvent.fromJson(Json j) => LedgerEvent(
+        id: asString(j['id']),
+        description: asString(j['description']),
+        kind: EventKind.values.firstWhere((x) => x.name == j['kind'],
+            orElse: () => EventKind.adjustment),
+        amountUgx: asInt(j['amountUgx']),
+        occurredAt: readDate(j['occurredAt']),
+        assetId: j['assetId'] as String?,
+        reversalOf: j['reversalOf'] as String?,
+        notes: asString(j['notes']),
+        attachments: (j['attachments'] as List<dynamic>? ?? const [])
+            .map((e) => AttachmentRef.fromJson(Map<String, dynamic>.from(e as Map)))
+            .toList(),
+      );
+  LedgerEvent copyWith({List<AttachmentRef>? attachments}) => LedgerEvent(
+        id: id,
+        description: description,
+        kind: kind,
+        amountUgx: amountUgx,
+        occurredAt: occurredAt,
+        assetId: assetId,
+        reversalOf: reversalOf,
+        notes: notes,
+        attachments: attachments ?? this.attachments,
+      );
 }
 
 class WealthGoal {

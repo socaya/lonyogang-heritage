@@ -1,13 +1,17 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- image_picker on Android: declare the camera + write-media permissions
-         so the system shows the capture + save sheet instead of silently
-         failing. READ_MEDIA_IMAGES is API 33+, legacy READ_EXTERNAL_STORAGE
-         covers older devices. -->
-    <uses-permission android:name="android.permission.CAMERA" />
+    <!-- image_picker uses ACTION_IMAGE_CAPTURE to delegate to the OS
+         camera app, so we deliberately DO NOT declare the CAMERA
+         permission — if it were declared, Android 6+ would require a
+         runtime grant that we weren't requesting, and the scan button
+         would silently fail. The intent-based flow works without a
+         runtime check.
+
+         READ_MEDIA_IMAGES (API 33+) + legacy READ_EXTERNAL_STORAGE
+         (≤ API 32) cover the "pick from gallery" path. -->
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.any" android:required="false" />
     <application
         android:label="LonyoGang Heritage"
         android:name="${applicationName}"

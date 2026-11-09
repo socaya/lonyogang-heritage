@@ -6,6 +6,7 @@ import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/finance.dart';
 import '../domain/models.dart';
+import 'attachments_block.dart';
 import 'components.dart';
 import 'forms.dart';
 import 'legacy_screens.dart';
@@ -128,8 +129,26 @@ class TransactionDetailScreen extends StatelessWidget {
                 ),
               ],
               const SizedBox(height: 18),
+              AttachmentsBlock(
+                title: 'Receipts & evidence',
+                helpText:
+                    'Attach the receipt, statement screenshot or confirmation for this entry. Stored encrypted on this device.',
+                store: store,
+                attachments: current.attachments,
+                onAdd: ({required bytes,
+                        required filename,
+                        required mimeType}) =>
+                    store.addEventAttachment(
+                        eventId: current.id,
+                        bytes: bytes,
+                        filename: filename,
+                        mimeType: mimeType),
+                onRemove: (i) =>
+                    store.removeEventAttachment(current.id, i),
+              ),
+              const SizedBox(height: 18),
               const Text(
-                  'The transaction ledger is append-only. Every reversal preserves the original entry so audit history stays intact.',
+                  'The transaction ledger is append-only. Every reversal preserves the original entry so audit history stays intact. Attachments are metadata and can be added or removed after posting.',
                   style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
             ]);
       });
