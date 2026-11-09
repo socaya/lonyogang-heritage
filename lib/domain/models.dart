@@ -6,6 +6,18 @@ import 'dart:math';
 enum AssetKind { investment, property, savings, other }
 enum RecordStatus { estimated, userEntered, verified, stale }
 enum EventKind { contribution, withdrawal, dividend, interest, rent, expense, fee, tax, transfer, adjustment, reversal }
+enum InterestFrequency { none, daily, weekly, monthly, quarterly, semiAnnual, annual }
+
+/// Human-readable label for the UI + semantics.
+String interestFrequencyLabel(InterestFrequency f) => switch (f) {
+      InterestFrequency.none => 'Not interest-bearing',
+      InterestFrequency.daily => 'Daily',
+      InterestFrequency.weekly => 'Weekly',
+      InterestFrequency.monthly => 'Monthly',
+      InterestFrequency.quarterly => 'Quarterly',
+      InterestFrequency.semiAnnual => 'Semi-annual',
+      InterestFrequency.annual => 'Annual',
+    };
 
 typedef Json = Map<String, dynamic>;
 
@@ -46,17 +58,33 @@ class WealthAsset {
   final DateTime valuedAt;
   final String notes;
   final bool archived;
+  // Interest posture. interestRateBps is the rate at `interestFrequency`
+  // expressed in basis points (10,000 = 100%). A savings account paying
+  // 0.9% monthly → interestFrequency=monthly, interestRateBps=90.
+  final InterestFrequency interestFrequency;
+  final int interestRateBps;
 
   const WealthAsset({required this.id, required this.name, required this.kind, this.category = '', required this.valueUgx,
     this.ownershipBps = 10000, this.costUgx = 0, this.institution = '', this.accountNumber = '',
     this.location = '',
-    this.status = RecordStatus.userEntered, required this.valuedAt, this.notes = '', this.archived = false});
+    this.status = RecordStatus.userEntered, required this.valuedAt, this.notes = '', this.archived = false,
+    this.interestFrequency = InterestFrequency.none,
+    this.interestRateBps = 0});
 
   int get attributableUgx => (valueUgx * ownershipBps) ~/ 10000;
+  /// Projected interest for one period at the stored frequency on the
+  /// attributable value. Pure helper for the UI pre-fill; the user can
+  /// override before posting.
+  int get projectedPeriodInterestUgx =>
+      interestRateBps == 0 || interestFrequency == InterestFrequency.none
+          ? 0
+          : (attributableUgx * interestRateBps) ~/ 10000;
   Json toJson() => {'id':id,'name':name,'kind':kind.name,'category':category,'valueUgx':valueUgx,
     'ownershipBps':ownershipBps,'costUgx':costUgx,'institution':institution,
     'accountNumber':accountNumber,'location':location,
-    'status':status.name,'valuedAt':valuedAt.toIso8601String(),'notes':notes,'archived':archived};
+    'status':status.name,'valuedAt':valuedAt.toIso8601String(),'notes':notes,'archived':archived,
+    'interestFrequency':interestFrequency.name,
+    'interestRateBps':interestRateBps};
   factory WealthAsset.fromJson(Json j) => WealthAsset(
     id:asString(j['id']),name:asString(j['name']),
     kind:AssetKind.values.firstWhere((x)=>x.name==j['kind'],orElse:()=>AssetKind.other),
@@ -65,13 +93,18 @@ class WealthAsset {
     institution:asString(j['institution']),accountNumber:asString(j['accountNumber']),
     location:asString(j['location']),
     status:RecordStatus.values.firstWhere((x)=>x.name==j['status'],orElse:()=>RecordStatus.userEntered),
-    valuedAt:readDate(j['valuedAt']),notes:asString(j['notes']),archived:j['archived']==true);
-  WealthAsset copyWith({bool? archived,int? valueUgx,DateTime? valuedAt,RecordStatus? status,String? accountNumber,String? institution,String? category}) => WealthAsset(id:id,name:name,kind:kind,
+    valuedAt:readDate(j['valuedAt']),notes:asString(j['notes']),archived:j['archived']==true,
+    interestFrequency:InterestFrequency.values.firstWhere(
+        (x)=>x.name==j['interestFrequency'],orElse:()=>InterestFrequency.none),
+    interestRateBps:asInt(j['interestRateBps']));
+  WealthAsset copyWith({bool? archived,int? valueUgx,DateTime? valuedAt,RecordStatus? status,String? accountNumber,String? institution,String? category,InterestFrequency? interestFrequency,int? interestRateBps}) => WealthAsset(id:id,name:name,kind:kind,
     category:category??this.category,valueUgx:valueUgx??this.valueUgx,
     ownershipBps:ownershipBps,costUgx:costUgx,institution:institution??this.institution,
     accountNumber:accountNumber??this.accountNumber,
     location:location,status:status??this.status,
-    valuedAt:valuedAt??this.valuedAt,notes:notes,archived:archived??this.archived);
+    valuedAt:valuedAt??this.valuedAt,notes:notes,archived:archived??this.archived,
+    interestFrequency:interestFrequency??this.interestFrequency,
+    interestRateBps:interestRateBps??this.interestRateBps);
 }
 
 class Liability {

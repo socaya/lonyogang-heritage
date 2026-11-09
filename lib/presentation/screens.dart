@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
 import '../domain/finance.dart';
@@ -207,12 +208,292 @@ class AssetDetails extends StatelessWidget {
           Icon(Icons.real_estate_agent_outlined,color:LG.sage),SizedBox(width:12),
           Expanded(child:Text('Recorded property income',style:TextStyle(fontWeight:FontWeight.w700))),
           Icon(Icons.chevron_right,color:LG.muted)]))],
+      if (asset.interestFrequency != InterestFrequency.none ||
+          asset.kind == AssetKind.investment ||
+          asset.kind == AssetKind.savings) ...[
+        const SizedBox(height: 18),
+        const SectionTitle('Quick actions'),
+        Row(children: [
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: LG.sage,
+                  foregroundColor: LG.white),
+              onPressed: () =>
+                  _recordInterestSheet(context, store, asset),
+              icon: const Icon(Icons.percent_rounded),
+              label: const Text('Record interest'),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                  backgroundColor: LG.gold,
+                  foregroundColor: LG.white),
+              onPressed: () =>
+                  _recordDepositSheet(context, store, asset),
+              icon: const Icon(Icons.north_east_rounded),
+              label: const Text('Record deposit'),
+            ),
+          ),
+        ]),
+        if (asset.interestFrequency != InterestFrequency.none &&
+            asset.interestRateBps > 0) ...[
+          const SizedBox(height: 10),
+          Text(
+              '${interestFrequencyLabel(asset.interestFrequency)} • ${(asset.interestRateBps / 100).toStringAsFixed(2)}% → estimated ${LG.money(asset.projectedPeriodInterestUgx)} per period',
+              style: const TextStyle(color: LG.muted, fontSize: 13)),
+        ],
+      ],
       const SizedBox(height:24),ElevatedButton.icon(onPressed:()=>push(context,
         AssetForm(store:store,kind:asset.kind,existing:asset)),icon:const Icon(Icons.edit_outlined),label:const Text('Edit asset')),
       const SizedBox(height:10),TextButton(onPressed:()=>confirmArchive(context,()=>store.archiveAsset(asset)),
         child:const Text('Archive asset',style:TextStyle(color:LG.negative))),
     ]);
   }
+}
+
+/// Bottom sheet that posts an interest LedgerEvent against [asset]. The
+/// amount pre-fills from the asset's stored rate × attributable value so
+/// a one-tap "accept" works for routine entries; users can override.
+Future<void> _recordInterestSheet(
+    BuildContext context, PortfolioStore store, WealthAsset asset) {
+  final amount = TextEditingController(
+      text: asset.projectedPeriodInterestUgx > 0
+          ? asset.projectedPeriodInterestUgx.toString()
+          : '');
+  final notes = TextEditingController();
+  DateTime day = DateTime.now();
+  final key = GlobalKey<FormState>();
+  bool busy = false;
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (ctx) {
+      return StatefulBuilder(builder: (ctx, setSheetState) {
+        return Padding(
+          padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Form(
+            key: key,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [
+                  const Icon(Icons.percent_rounded, color: LG.sage),
+                  const SizedBox(width: 10),
+                  Text('Record interest',
+                      style: Theme.of(ctx).textTheme.titleLarge),
+                ]),
+                const SizedBox(height: 6),
+                Text('Posts an immutable interest entry for ${asset.name}.',
+                    style:
+                        const TextStyle(color: LG.muted, fontSize: 13)),
+                const SizedBox(height: 18),
+                FormFieldBlock(
+                  title: 'Amount (UGX)',
+                  required: true,
+                  help: asset.interestRateBps > 0
+                      ? 'Pre-filled from ${(asset.interestRateBps / 100).toStringAsFixed(2)}% at ${interestFrequencyLabel(asset.interestFrequency).toLowerCase()}. Override if the statement differs.'
+                      : null,
+                  child: TextFormField(
+                    controller: amount,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))
+                    ],
+                    decoration: const InputDecoration(hintText: '0'),
+                    validator: requireDecimalAmount,
+                  ),
+                ),
+                FormFieldBlock(
+                  title: 'Date credited',
+                  child: SoftCard(
+                    onTap: () async {
+                      final d = await showDatePicker(
+                          context: ctx,
+                          initialDate: day,
+                          firstDate: DateTime(1990),
+                          lastDate: DateTime.now());
+                      if (d != null) setSheetState(() => day = d);
+                    },
+                    child: Row(children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          color: LG.sage, size: 18),
+                      const SizedBox(width: 12),
+                      Text(LG.date(day)),
+                    ]),
+                  ),
+                ),
+                FormFieldBlock(
+                  title: 'Notes (optional)',
+                  child: TextFormField(
+                    controller: notes,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                        hintText: 'Statement reference, period'),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ElevatedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          if (!key.currentState!.validate()) return;
+                          setSheetState(() => busy = true);
+                          await store.postEvent(LedgerEvent(
+                              id: makeId(),
+                              description:
+                                  'Interest: ${asset.name}',
+                              kind: EventKind.interest,
+                              amountUgx:
+                                  parseDecimalAmount(amount.text) ?? 0,
+                              occurredAt: day,
+                              assetId: asset.id,
+                              notes: notes.text.trim()));
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                  icon: const Icon(Icons.check),
+                  label: Text(busy ? 'Posting…' : 'Post interest'),
+                ),
+              ],
+            ),
+          ),
+        );
+      });
+    },
+  );
+}
+
+/// Bottom sheet that posts a contribution LedgerEvent AND bumps the
+/// asset's current value by the deposit amount. Keeps the mental model
+/// simple: "deposit" = money in + valuation rises by the same amount.
+Future<void> _recordDepositSheet(
+    BuildContext context, PortfolioStore store, WealthAsset asset) {
+  final amount = TextEditingController();
+  final notes = TextEditingController();
+  DateTime day = DateTime.now();
+  final key = GlobalKey<FormState>();
+  bool busy = false;
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    useSafeArea: true,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (ctx) {
+      return StatefulBuilder(builder: (ctx, setSheetState) {
+        return Padding(
+          padding: EdgeInsets.only(
+              left: 24,
+              right: 24,
+              top: 20,
+              bottom: MediaQuery.of(ctx).viewInsets.bottom + 24),
+          child: Form(
+            key: key,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                Row(children: [
+                  const Icon(Icons.north_east_rounded, color: LG.gold),
+                  const SizedBox(width: 10),
+                  Text('Record deposit',
+                      style: Theme.of(ctx).textTheme.titleLarge),
+                ]),
+                const SizedBox(height: 6),
+                Text(
+                    'Logs a contribution into ${asset.name} and increases the current value by the same amount.',
+                    style:
+                        const TextStyle(color: LG.muted, fontSize: 13)),
+                const SizedBox(height: 18),
+                FormFieldBlock(
+                  title: 'Deposit amount (UGX)',
+                  required: true,
+                  child: TextFormField(
+                    controller: amount,
+                    keyboardType:
+                        const TextInputType.numberWithOptions(decimal: true),
+                    inputFormatters: [
+                      FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))
+                    ],
+                    decoration: const InputDecoration(hintText: '0'),
+                    validator: requireDecimalAmount,
+                  ),
+                ),
+                FormFieldBlock(
+                  title: 'Date deposited',
+                  child: SoftCard(
+                    onTap: () async {
+                      final d = await showDatePicker(
+                          context: ctx,
+                          initialDate: day,
+                          firstDate: DateTime(1990),
+                          lastDate: DateTime.now());
+                      if (d != null) setSheetState(() => day = d);
+                    },
+                    child: Row(children: [
+                      const Icon(Icons.calendar_today_outlined,
+                          color: LG.sage, size: 18),
+                      const SizedBox(width: 12),
+                      Text(LG.date(day)),
+                    ]),
+                  ),
+                ),
+                FormFieldBlock(
+                  title: 'Notes (optional)',
+                  child: TextFormField(
+                    controller: notes,
+                    maxLines: 2,
+                    decoration: const InputDecoration(
+                        hintText: 'Source, reference'),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                ElevatedButton.icon(
+                  onPressed: busy
+                      ? null
+                      : () async {
+                          if (!key.currentState!.validate()) return;
+                          setSheetState(() => busy = true);
+                          final delta =
+                              parseDecimalAmount(amount.text) ?? 0;
+                          await store.postEvent(LedgerEvent(
+                              id: makeId(),
+                              description:
+                                  'Deposit: ${asset.name}',
+                              kind: EventKind.contribution,
+                              amountUgx: delta,
+                              occurredAt: day,
+                              assetId: asset.id,
+                              notes: notes.text.trim()));
+                          // Push the asset value up by the deposit so
+                          // the net-worth number stays consistent with
+                          // the ledger. Keeps the previous valuedAt so
+                          // we don't accidentally reset staleness.
+                          await store.upsertAsset(asset.copyWith(
+                              valueUgx: asset.valueUgx + delta));
+                          if (ctx.mounted) Navigator.pop(ctx);
+                        },
+                  icon: const Icon(Icons.check),
+                  label: Text(busy ? 'Posting…' : 'Post deposit'),
+                ),
+              ],
+            ),
+          ),
+        );
+      });
+    },
+  );
 }
 
 class DebtsScreen extends StatelessWidget {

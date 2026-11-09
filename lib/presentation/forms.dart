@@ -146,6 +146,12 @@ class _AssetFormState extends State<AssetForm> {
   late DateTime date = widget.existing?.valuedAt ?? DateTime.now();
   late RecordStatus status =
       widget.existing?.status ?? RecordStatus.userEntered;
+  late InterestFrequency interestFrequency =
+      widget.existing?.interestFrequency ?? InterestFrequency.none;
+  late final interestRate = TextEditingController(
+      text: widget.existing == null || widget.existing!.interestRateBps == 0
+          ? ''
+          : (widget.existing!.interestRateBps / 100).toStringAsFixed(2));
   bool saving = false;
 
   bool _isCustomCategory(String? value) {
@@ -193,7 +199,8 @@ class _AssetFormState extends State<AssetForm> {
       customInstitution,
       accountNumber,
       location,
-      notes
+      notes,
+      interestRate,
     ]) {
       c.dispose();
     }
@@ -368,6 +375,51 @@ class _AssetFormState extends State<AssetForm> {
                         hintText: 'e.g. CSD-12345 or your account number'),
                   ),
                 ),
+              if (widget.kind == AssetKind.investment ||
+                  widget.kind == AssetKind.savings) ...[
+                FormFieldBlock(
+                  title: 'Interest frequency',
+                  help:
+                      'How often the institution credits interest or coupons. Pick "Not interest-bearing" to hide interest actions.',
+                  child: DropdownButtonFormField<InterestFrequency>(
+                    initialValue: interestFrequency,
+                    isExpanded: true,
+                    items: InterestFrequency.values
+                        .map((f) => DropdownMenuItem(
+                            value: f,
+                            child: Text(interestFrequencyLabel(f))))
+                        .toList(),
+                    onChanged: (v) => setState(
+                        () => interestFrequency = v ?? interestFrequency),
+                  ),
+                ),
+                if (interestFrequency != InterestFrequency.none)
+                  FormFieldBlock(
+                    title:
+                        'Current average rate per period (%)',
+                    help:
+                        'Rate at the frequency you selected. 0.9 for 0.9% monthly, 12.5 for 12.5% annual. Used to pre-fill the next interest posting.',
+                    child: TextFormField(
+                      controller: interestRate,
+                      keyboardType: const TextInputType.numberWithOptions(
+                          decimal: true),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[\d.,]')),
+                      ],
+                      decoration:
+                          const InputDecoration(hintText: 'e.g. 0.9'),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null;
+                        final d =
+                            double.tryParse(v.replaceAll(',', ''));
+                        if (d == null || d < 0 || d > 100) {
+                          return 'Enter 0–100%';
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+              ],
               FormFieldBlock(
                 title: 'Valuation date',
                 child: SoftCard(
@@ -445,6 +497,12 @@ class _AssetFormState extends State<AssetForm> {
       final resolvedInstitution = institution == kOtherSentinel
           ? customInstitution.text.trim()
           : institution;
+      final rawRate = interestRate.text.trim();
+      final rateBps = rawRate.isEmpty ||
+              interestFrequency == InterestFrequency.none
+          ? 0
+          : ((double.tryParse(rawRate.replaceAll(',', '')) ?? 0) * 100)
+              .round();
       final a = WealthAsset(
           id: widget.existing?.id ?? makeId(),
           name: name.text.trim(),
@@ -460,7 +518,9 @@ class _AssetFormState extends State<AssetForm> {
           location: location.text.trim(),
           status: status,
           valuedAt: date,
-          notes: notes.text.trim());
+          notes: notes.text.trim(),
+          interestFrequency: interestFrequency,
+          interestRateBps: rateBps);
       await widget.store.upsertAsset(a);
       if (mounted) Navigator.pop(context);
     } catch (e) {
