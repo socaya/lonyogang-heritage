@@ -15,46 +15,287 @@ import 'security_screens.dart';
 
 Widget paddedBody(List<Widget> children)=>ListView(padding:const EdgeInsets.fromLTRB(22,18,22,28),children:children);
 
-class HomeScreen extends StatelessWidget {
-  final PortfolioStore store;final ValueChanged<int> onNavigate;final VoidCallback onAdd;
-  const HomeScreen({super.key,required this.store,required this.onNavigate,required this.onAdd});
-  @override Widget build(BuildContext context){
-    final total=store.totals;final assets=store.state.assets.where((x)=>!x.archived).toList();
+class HomeScreen extends StatefulWidget {
+  final PortfolioStore store;
+  final ValueChanged<int> onNavigate;
+  final VoidCallback onAdd;
+  const HomeScreen(
+      {super.key,
+      required this.store,
+      required this.onNavigate,
+      required this.onAdd});
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _maskBalances = false;
+
+  String _greeting() {
+    final h = DateTime.now().hour;
+    if (h < 5) return 'Still up,';
+    if (h < 12) return 'Good morning,';
+    if (h < 17) return 'Good afternoon,';
+    if (h < 22) return 'Good evening,';
+    return 'Still up,';
+  }
+
+  String _formatMoney(int amount) =>
+      _maskBalances ? 'UGX •••••••' : LG.money(amount);
+
+  @override
+  Widget build(BuildContext context) {
+    final store = widget.store;
+    final total = store.totals;
+    final assets =
+        store.state.assets.where((x) => !x.archived).toList();
+    final ownerFirst = store.state.ownerName.split(' ').first.isEmpty
+        ? 'there'
+        : store.state.ownerName.split(' ').first;
     return paddedBody([
-      Row(children:[const BrandMark(height:30),const Spacer(),IconButton(tooltip:'Search',
-        onPressed:()=>push(context,PortfolioSearchScreen(store:store)),icon:const Icon(Icons.search_rounded)),
-        IconButton(tooltip:'Notifications',onPressed:()=>push(context,NotificationsCenterScreen(store:store)),
-          icon:const Icon(Icons.notifications_none_rounded))]),
-      const SizedBox(height:32),Text('Good morning,',style:Theme.of(context).textTheme.bodyMedium?.copyWith(color:LG.muted)),
-      Text(store.state.ownerName,style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:24),
-      Semantics(container:true,label:'Total net worth ${LG.money(total.netWorth)}, owner-attributable assets minus liabilities',
-        child:SoftCard(color:LG.navy,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        const Row(children:[Text('TOTAL NET WORTH',style:TextStyle(color:Color(0xFFC3D3D6),fontSize:11,fontWeight:FontWeight.w700,letterSpacing:1.1)),
-          Spacer(),Icon(Icons.visibility_outlined,color:Color(0xFFC3D3D6),size:18)]),const SizedBox(height:12),
-        FittedBox(fit:BoxFit.scaleDown,alignment:Alignment.centerLeft,child:Text(LG.money(total.netWorth),
-          style:const TextStyle(fontSize:31,fontWeight:FontWeight.w800,color:Colors.white))),
-        const SizedBox(height:10),const Text('Owner-attributable assets minus liabilities',
-          style:TextStyle(fontSize:11,color:Color(0xFFB9C9CF))),
-      ]))),const SizedBox(height:14),Row(children:[
-        Expanded(child:SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          const Text('Total assets',style:TextStyle(color:LG.muted,fontSize:12)),const SizedBox(height:8),
-          FittedBox(child:Text(LG.money(total.grossAssets,compact:true),style:const TextStyle(fontSize:19,fontWeight:FontWeight.w800)))]))),
-        const SizedBox(width:12),Expanded(child:SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-          const Text('Total liabilities',style:TextStyle(color:LG.muted,fontSize:12)),const SizedBox(height:8),
-          FittedBox(child:Text(LG.money(total.liabilities,compact:true),style:const TextStyle(fontSize:19,fontWeight:FontWeight.w800)))]))),
-      ]),const SizedBox(height:24),SectionTitle('Wealth composition',action:TextButton(
-        onPressed:()=>onNavigate(3),child:const Text('View reports'))),
-      SoftCard(child:WealthBreakdown(values:{'Investments':total.investments,'Properties':total.property,
-        'Savings':total.savings,'Other assets':total.other})),
-      const SizedBox(height:20),SectionTitle('Your assets',action:TextButton(onPressed:()=>onNavigate(1),child:const Text('View all'))),
-      if(assets.isEmpty)EmptySection(title:'Start building your portfolio',detail:'Add an investment, property or savings account.',onAdd:onAdd)
-      else ...assets.take(3).map((a)=>Padding(padding:const EdgeInsets.only(bottom:8),child:AssetTile(asset:a,
-        onTap:()=>push(context,AssetDetails(store:store,asset:a))))),
-      const SizedBox(height:18),SyncOutboxBadge(store:store),
-      const SizedBox(height:18),HomeRecentActivity(store:store),
-      const SizedBox(height:18),const PrivacyBanner(),
+      Row(children: [
+        const BrandMark(height: 32),
+        const Spacer(),
+        IconButton(
+            tooltip: 'Search',
+            onPressed: () =>
+                push(context, PortfolioSearchScreen(store: store)),
+            icon: const Icon(Icons.search_rounded)),
+        IconButton(
+            tooltip: 'Notifications',
+            onPressed: () => push(
+                context, NotificationsCenterScreen(store: store)),
+            icon: const Icon(Icons.notifications_none_rounded))
+      ]),
+      const SizedBox(height: 28),
+      Text(_greeting(),
+          style: Theme.of(context)
+              .textTheme
+              .bodyLarge
+              ?.copyWith(color: LG.muted, fontSize: 16)),
+      const SizedBox(height: 2),
+      Text(ownerFirst,
+          style: Theme.of(context)
+              .textTheme
+              .displaySmall
+              ?.copyWith(height: 1.05)),
+      const SizedBox(height: 22),
+      _NetWorthHero(
+        netWorth: _formatMoney(total.netWorth),
+        subtitle: 'Owner-attributable assets minus liabilities',
+        masked: _maskBalances,
+        onToggle: () => setState(() => _maskBalances = !_maskBalances),
+      ),
+      const SizedBox(height: 14),
+      Row(children: [
+        Expanded(
+            child: _StatCard(
+                label: 'Total assets',
+                value: _maskBalances
+                    ? 'UGX •••'
+                    : LG.money(total.grossAssets, compact: true),
+                icon: Icons.account_balance_wallet_outlined,
+                tint: LG.sageSoft,
+                iconColor: LG.sage)),
+        const SizedBox(width: 12),
+        Expanded(
+            child: _StatCard(
+                label: 'Total liabilities',
+                value: _maskBalances
+                    ? 'UGX •••'
+                    : LG.money(total.liabilities, compact: true),
+                icon: Icons.trending_down_rounded,
+                tint: LG.goldSoft,
+                iconColor: LG.gold)),
+      ]),
+      const SizedBox(height: 24),
+      SectionTitle('Wealth composition',
+          action: TextButton(
+              onPressed: () => widget.onNavigate(3),
+              child: const Text('View reports'))),
+      SoftCard(
+          child: WealthBreakdown(values: {
+        'Investments': total.investments,
+        'Properties': total.property,
+        'Savings': total.savings,
+        'Other assets': total.other
+      })),
+      const SizedBox(height: 20),
+      SectionTitle('Your assets',
+          action: TextButton(
+              onPressed: () => widget.onNavigate(1),
+              child: const Text('View all'))),
+      if (assets.isEmpty)
+        EmptySection(
+            title: 'Start building your portfolio',
+            detail: 'Add an investment, property or savings account.',
+            onAdd: widget.onAdd)
+      else
+        ...assets.take(3).map((a) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: AssetTile(
+                asset: a,
+                onTap: () =>
+                    push(context, AssetDetails(store: store, asset: a))))),
+      const SizedBox(height: 18),
+      SyncOutboxBadge(store: store),
+      const SizedBox(height: 18),
+      HomeRecentActivity(store: store),
+      const SizedBox(height: 18),
+      const PrivacyBanner(),
     ]);
   }
+}
+
+/// Hero card with the brand navy gradient, a bigger net-worth number,
+/// and a visibility toggle that masks the amount if someone is looking
+/// over the user's shoulder.
+class _NetWorthHero extends StatelessWidget {
+  final String netWorth;
+  final String subtitle;
+  final bool masked;
+  final VoidCallback onToggle;
+  const _NetWorthHero({
+    required this.netWorth,
+    required this.subtitle,
+    required this.masked,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      container: true,
+      label: masked
+          ? 'Total net worth hidden. Tap the eye to reveal.'
+          : 'Total net worth $netWorth, owner-attributable assets minus liabilities',
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(LG.r),
+          gradient: const LinearGradient(
+            colors: [LG.navy, LG.navyDark],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        padding: const EdgeInsets.fromLTRB(20, 20, 16, 22),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              const Text('TOTAL NET WORTH',
+                  style: TextStyle(
+                      color: Color(0xFFC3D3D6),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 1.3)),
+              const Spacer(),
+              IconButton(
+                tooltip: masked ? 'Reveal' : 'Hide',
+                onPressed: onToggle,
+                icon: Icon(
+                    masked
+                        ? Icons.visibility_outlined
+                        : Icons.visibility_off_outlined,
+                    color: const Color(0xFFC3D3D6),
+                    size: 20),
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints(),
+              ),
+            ]),
+            const SizedBox(height: 14),
+            FittedBox(
+              fit: BoxFit.scaleDown,
+              alignment: Alignment.centerLeft,
+              child: Text(netWorth,
+                  style: const TextStyle(
+                      fontSize: 36,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white,
+                      letterSpacing: -.6)),
+            ),
+            const SizedBox(height: 10),
+            Row(children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                    color: LG.gold.withValues(alpha: 0.22),
+                    borderRadius: BorderRadius.circular(999)),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.shield_moon_outlined,
+                      color: LG.gold, size: 11),
+                  SizedBox(width: 4),
+                  Text('Heritage Portfolio',
+                      style: TextStyle(
+                          color: LG.gold,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800)),
+                ]),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(subtitle,
+                    style: const TextStyle(
+                        fontSize: 11.5, color: Color(0xFFB9C9CF))),
+              ),
+            ]),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Compact stat card used for the two top-line tiles under the hero.
+class _StatCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final Color tint;
+  final Color iconColor;
+  const _StatCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.tint,
+    required this.iconColor,
+  });
+
+  @override
+  Widget build(BuildContext context) => SoftCard(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(children: [
+              Container(
+                width: 32,
+                height: 32,
+                decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(10)),
+                child: Icon(icon, size: 17, color: iconColor),
+              ),
+              const Spacer(),
+            ]),
+            const SizedBox(height: 14),
+            Text(label,
+                style:
+                    const TextStyle(color: LG.muted, fontSize: 12.5)),
+            const SizedBox(height: 6),
+            FittedBox(
+              alignment: Alignment.centerLeft,
+              child: Text(value,
+                  style: const TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -.3)),
+            ),
+          ],
+        ),
+      );
 }
 
 /// Subtle indicator on Home that lets the user see how many mutations are

@@ -145,31 +145,115 @@ class AssetTile extends StatelessWidget {
     ];
     return parts.join('. ');
   }
-  @override Widget build(BuildContext context)=>Semantics(
-    container:true,button:true,label:_semanticLabel,
-    child:SoftCard(onTap:onTap,padding:const EdgeInsets.symmetric(horizontal:14,vertical:15),child:Row(children:[
-      Container(width:42,height:42,decoration:BoxDecoration(color:LG.sageSoft,borderRadius:BorderRadius.circular(12)),
-        child:Icon(assetIcon(asset.kind),color:LG.sage,size:22)),
-      const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Row(children:[
-          Flexible(child:Text(asset.name,maxLines:1,overflow:TextOverflow.ellipsis,
-            style:const TextStyle(fontSize:14,fontWeight:FontWeight.w700))),
-          if(_isStale)...[
-            const SizedBox(width:6),
-            Container(padding:const EdgeInsets.symmetric(horizontal:8,vertical:2),
-              decoration:BoxDecoration(color:const Color(0xFFFBF3DD),
-                borderRadius:BorderRadius.circular(999)),
-              child:const Text('Stale',style:TextStyle(
-                color:Color(0xFF8C6A1D),fontSize:10,fontWeight:FontWeight.w800))),
-          ],
-        ]),
-        const SizedBox(height:4),Text('${asset.category.isNotEmpty?asset.category:assetTitle(asset.kind)} · ${LG.date(asset.valuedAt)}',
-          maxLines:1,overflow:TextOverflow.ellipsis,style:const TextStyle(fontSize:11,color:LG.muted)),
-      ])),const SizedBox(width:6),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
-        Text(LG.money(asset.attributableUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800,fontSize:13)),
-        if(asset.ownershipBps<10000)Text('${(asset.ownershipBps/100).toStringAsFixed(0)}% owned',
-          style:const TextStyle(fontSize:10,color:LG.sage)),
-      ]),const SizedBox(width:4),const Icon(Icons.chevron_right_rounded,size:20,color:LG.muted)])));
+  bool get _hasInterest =>
+      asset.interestFrequency != InterestFrequency.none &&
+      asset.interestRateBps > 0;
+  String get _interestLabel {
+    if (!_hasInterest) return '';
+    final rate = (asset.interestRateBps / 100).toStringAsFixed(2);
+    final freq = switch (asset.interestFrequency) {
+      InterestFrequency.daily => '/day',
+      InterestFrequency.weekly => '/week',
+      InterestFrequency.monthly => '/mo',
+      InterestFrequency.quarterly => '/qtr',
+      InterestFrequency.semiAnnual => '/half',
+      InterestFrequency.annual => '/yr',
+      InterestFrequency.none => '',
+    };
+    return '$rate%$freq';
+  }
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        container: true,
+        button: true,
+        label: _semanticLabel,
+        child: SoftCard(
+          onTap: onTap,
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+          child: Row(children: [
+            Container(
+                width: 46,
+                height: 46,
+                decoration: BoxDecoration(
+                    color: LG.sageSoft,
+                    borderRadius: BorderRadius.circular(13)),
+                child: Icon(assetIcon(asset.kind),
+                    color: LG.sage, size: 23)),
+            const SizedBox(width: 13),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Row(children: [
+                    Flexible(
+                        child: Text(asset.name,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                                fontSize: 15.5,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: -.1))),
+                    if (_isStale) ...[
+                      const SizedBox(width: 6),
+                      Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                              color: const Color(0xFFFBF3DD),
+                              borderRadius: BorderRadius.circular(999)),
+                          child: const Text('Stale',
+                              style: TextStyle(
+                                  color: Color(0xFF8C6A1D),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800))),
+                    ],
+                  ]),
+                  const SizedBox(height: 4),
+                  Text(
+                      '${asset.category.isNotEmpty ? asset.category : assetTitle(asset.kind)} · ${LG.date(asset.valuedAt)}',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style:
+                          const TextStyle(fontSize: 12.5, color: LG.muted)),
+                  if (_hasInterest) ...[
+                    const SizedBox(height: 7),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                          color: LG.goldSoft,
+                          borderRadius: BorderRadius.circular(999)),
+                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                        const Icon(Icons.percent_rounded,
+                            size: 10.5, color: LG.gold),
+                        const SizedBox(width: 4),
+                        Text(_interestLabel,
+                            style: const TextStyle(
+                                color: LG.gold,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800)),
+                      ]),
+                    ),
+                  ],
+                ])),
+            const SizedBox(width: 6),
+            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(LG.money(asset.attributableUgx, compact: true),
+                  style: const TextStyle(
+                      fontWeight: FontWeight.w900,
+                      fontSize: 14.5,
+                      letterSpacing: -.2)),
+              if (asset.ownershipBps < 10000)
+                Text('${(asset.ownershipBps / 100).toStringAsFixed(0)}% owned',
+                    style: const TextStyle(fontSize: 10.5, color: LG.sage)),
+            ]),
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right_rounded,
+                size: 20, color: LG.muted),
+          ]),
+        ),
+      );
 }
 
 class WealthBreakdown extends StatelessWidget {

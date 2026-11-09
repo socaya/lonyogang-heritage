@@ -1,7 +1,7 @@
 name: lonyogang_heritage
 description: LonyoGang Heritage — personal wealth, assets and legacy tracker.
 publish_to: none
-version: 0.4.3+6
+version: 0.4.4+7
 
 environment:
   sdk: '>=3.5.0 <4.0.0'
