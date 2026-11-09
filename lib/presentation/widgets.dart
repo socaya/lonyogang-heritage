@@ -111,6 +111,45 @@ class InfoLabel extends StatelessWidget {
       );
 }
 
+/// Pill-shaped filter chip used across the portfolio / transactions /
+/// expenses surfaces. Selected state is navy + white; unselected is
+/// white with a hairline border and navy text. Shared here so every
+/// filter row has the same geometry.
+class LGFilterChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+  const LGFilterChip(
+      {super.key,
+      required this.label,
+      required this.selected,
+      required this.onTap});
+  @override
+  Widget build(BuildContext context) => Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(999),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 160),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+            decoration: BoxDecoration(
+              color: selected ? LG.navy : LG.white,
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(
+                  color: selected ? LG.navy : LG.line, width: 1.2),
+            ),
+            child: Text(label,
+                style: TextStyle(
+                    color: selected ? LG.white : LG.navy,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700)),
+          ),
+        ),
+      );
+}
+
 class Pill extends StatelessWidget {
   final String label;final Color color;
   const Pill(this.label,{super.key,this.color=LG.sageSoft});

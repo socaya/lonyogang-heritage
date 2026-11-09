@@ -489,6 +489,7 @@ class _AssetFormState extends State<AssetForm> {
 
   Future<void> save() async {
     if (!key.currentState!.validate()) return;
+    HapticFeedback.mediumImpact();
     setState(() => saving = true);
     try {
       final resolvedCategory = category == kOtherSentinel

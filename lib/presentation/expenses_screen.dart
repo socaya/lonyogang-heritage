@@ -106,18 +106,18 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                   const SizedBox(height: 22),
                   if (categories.isNotEmpty)
                     SizedBox(
-                      height: 40,
+                      height: 42,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: [
-                          _FilterChip(
+                          LGFilterChip(
                             label: 'All',
                             selected: _filter == null,
                             onTap: () => setState(() => _filter = null),
                           ),
                           const SizedBox(width: 8),
                           for (final c in categories) ...[
-                            _FilterChip(
+                            LGFilterChip(
                                 label: c,
                                 selected: _filter == c,
                                 onTap: () => setState(() => _filter = c)),
@@ -181,33 +181,6 @@ class _SummaryTile extends StatelessWidget {
                       fontWeight: FontWeight.w900,
                       letterSpacing: -.3))),
         ]),
-      );
-}
-
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool selected;
-  final VoidCallback onTap;
-  const _FilterChip(
-      {required this.label, required this.selected, required this.onTap});
-  @override
-  Widget build(BuildContext context) => InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(999),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-          decoration: BoxDecoration(
-            color: selected ? LG.navy : LG.white,
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(
-                color: selected ? LG.navy : LG.line, width: 1.2),
-          ),
-          child: Text(label,
-              style: TextStyle(
-                  color: selected ? LG.white : LG.navy,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w700)),
-        ),
       );
 }
 

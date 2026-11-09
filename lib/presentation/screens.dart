@@ -53,7 +53,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final ownerFirst = store.state.ownerName.split(' ').first.isEmpty
         ? 'there'
         : store.state.ownerName.split(' ').first;
-    return paddedBody([
+    return RefreshIndicator(
+      color: LG.gold,
+      backgroundColor: LG.white,
+      onRefresh: () async {
+        HapticFeedback.selectionClick();
+        setState(() {});
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      },
+      child: paddedBody([
       Row(children: [
         const BrandMark(height: 32),
         const Spacer(),
@@ -85,7 +93,10 @@ class _HomeScreenState extends State<HomeScreen> {
         netWorth: _formatMoney(total.netWorth),
         subtitle: 'Owner-attributable assets minus liabilities',
         masked: _maskBalances,
-        onToggle: () => setState(() => _maskBalances = !_maskBalances),
+        onToggle: () {
+          HapticFeedback.selectionClick();
+          setState(() => _maskBalances = !_maskBalances);
+        },
       ),
       const SizedBox(height: 14),
       Row(children: [
@@ -144,7 +155,8 @@ class _HomeScreenState extends State<HomeScreen> {
       HomeRecentActivity(store: store),
       const SizedBox(height: 18),
       const PrivacyBanner(),
-    ]);
+    ]),
+    );
   }
 }
 
@@ -380,29 +392,84 @@ class PortfolioScreen extends StatefulWidget {
 }
 class _PortfolioScreenState extends State<PortfolioScreen> {
   AssetKind? filter;
-  @override Widget build(BuildContext context){
-    final assets=widget.store.state.assets.where((x)=>!x.archived&&(filter==null||x.kind==filter)).toList();
-    return paddedBody([
-      const SizedBox(height:8),const PageHeading('Your portfolio',subtitle:'Every asset and account in one view.'),
-      SizedBox(height:42,child:ListView(scrollDirection:Axis.horizontal,children:[
-        choice('All assets',null),const SizedBox(width:8),...AssetKind.values.map((k)=>Padding(
-          padding:const EdgeInsets.only(right:8),child:choice(assetTitle(k),k)))
-      ])),const SizedBox(height:22),
-      Row(children:[Expanded(child:Text('${assets.length} assets',style:Theme.of(context).textTheme.titleMedium)),
-        Text(LG.money(assets.fold<int>(0,(n,a)=>n+a.attributableUgx),compact:true),
-          style:const TextStyle(fontWeight:FontWeight.w800))]),const SizedBox(height:16),
-      if(assets.isEmpty)const EmptySection(title:'Nothing here yet',detail:'Choose Add to create your first asset.')
-      else ...assets.map((a)=>Padding(padding:const EdgeInsets.only(bottom:10),child:AssetTile(asset:a,
-        onTap:()=>push(context,AssetDetails(store:widget.store,asset:a))))),
-      const SizedBox(height:16),SectionTitle('Liabilities',action:TextButton(onPressed:()=>push(context,
-        DebtsScreen(store:widget.store)),child:const Text('View all'))),
-      SoftCard(child:InfoLabel(label:'Outstanding debt',value:LG.money(widget.store.totals.liabilities))),
-    ]);
+  @override
+  Widget build(BuildContext context) {
+    final assets = widget.store.state.assets
+        .where((x) =>
+            !x.archived && (filter == null || x.kind == filter))
+        .toList();
+    return RefreshIndicator(
+      color: LG.gold,
+      backgroundColor: LG.white,
+      onRefresh: () async {
+        HapticFeedback.selectionClick();
+        // Rebuild via setState; a parent Sync hook isn't wired at this
+        // layer, so the refresh is a UX affordance that lets the user
+        // make sure the list is current.
+        setState(() {});
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+      },
+      child: paddedBody([
+        const SizedBox(height: 8),
+        const PageHeading('Your portfolio',
+            subtitle: 'Every asset and account in one view.'),
+        SizedBox(
+          height: 42,
+          child: ListView(scrollDirection: Axis.horizontal, children: [
+            LGFilterChip(
+                label: 'All assets',
+                selected: filter == null,
+                onTap: () => setState(() => filter = null)),
+            const SizedBox(width: 8),
+            for (final k in AssetKind.values) ...[
+              LGFilterChip(
+                  label: assetTitle(k),
+                  selected: filter == k,
+                  onTap: () => setState(() => filter = k)),
+              const SizedBox(width: 8),
+            ],
+          ]),
+        ),
+        const SizedBox(height: 22),
+        Row(children: [
+          Expanded(
+              child: Text('${assets.length} assets',
+                  style: Theme.of(context).textTheme.titleMedium)),
+          Text(
+              LG.money(
+                  assets.fold<int>(0, (n, a) => n + a.attributableUgx),
+                  compact: true),
+              style: const TextStyle(
+                  fontWeight: FontWeight.w900, fontSize: 16)),
+        ]),
+        const SizedBox(height: 16),
+        if (assets.isEmpty)
+          const EmptySection(
+              title: 'Nothing here yet',
+              detail: 'Choose Add to create your first asset.')
+        else
+          ...assets.map((a) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: AssetTile(
+                  asset: a,
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    push(context,
+                        AssetDetails(store: widget.store, asset: a));
+                  }))),
+        const SizedBox(height: 16),
+        SectionTitle('Liabilities',
+            action: TextButton(
+                onPressed: () =>
+                    push(context, DebtsScreen(store: widget.store)),
+                child: const Text('View all'))),
+        SoftCard(
+            child: InfoLabel(
+                label: 'Outstanding debt',
+                value: LG.money(widget.store.totals.liabilities))),
+      ]),
+    );
   }
-  Widget choice(String label,AssetKind? kind){final selected=filter==kind;return ChoiceChip(
-    label:Text(label),selected:selected,onSelected:(_)=>setState(()=>filter=kind),
-    selectedColor:LG.sageSoft,backgroundColor:LG.white,side:BorderSide.none,
-    labelStyle:TextStyle(color:selected?LG.sage:LG.navy,fontWeight:FontWeight.w700,fontSize:12));}
 }
 
 class AssetDetails extends StatelessWidget {
@@ -591,6 +658,7 @@ Future<void> _recordInterestSheet(
                       ? null
                       : () async {
                           if (!key.currentState!.validate()) return;
+                          HapticFeedback.mediumImpact();
                           setSheetState(() => busy = true);
                           await store.postEvent(LedgerEvent(
                               id: makeId(),
@@ -706,6 +774,7 @@ Future<void> _recordDepositSheet(
                       ? null
                       : () async {
                           if (!key.currentState!.validate()) return;
+                          HapticFeedback.mediumImpact();
                           setSheetState(() => busy = true);
                           final delta =
                               parseDecimalAmount(amount.text) ?? 0;
