@@ -258,35 +258,6 @@ export class IdentityService {
 
   // ---------- Sign-in ----------
 
-  async signIn(input: {
-    email: string;
-    password: string;
-    totpCode?: string;
-    deviceId: string;
-    userAgent?: string;
-  }): Promise<SessionResult> {
-    const account = await this.checkPassword(input);
-
-    if (account.totp_secret) {
-      if (!input.totpCode) {
-        throw new ClientError('totp_required', 'Second factor is required');
-      }
-      const secret = (
-        await this.kms.unseal(Buffer.from(account.totp_secret, 'base64'), Buffer.from(account.id, 'utf8'))
-      ).toString('utf8');
-      if (!authenticator.check(input.totpCode, secret)) {
-        await this.recordFailedAttempt(account.id);
-        throw new ClientError('bad_totp', 'Second factor code is invalid');
-      }
-    }
-
-    await this.db.query(
-      `update accounts set failed_login_count = 0, locked_until = null where id = $1`,
-      [account.id],
-    );
-    return await this.openSession(account.id, input.deviceId, input.userAgent);
-  }
-
   private async checkPassword(input: { email: string; password: string }): Promise<AccountRow> {
     const normalised = input.email.trim().toLowerCase();
     const account = await queryOne<AccountRow>(

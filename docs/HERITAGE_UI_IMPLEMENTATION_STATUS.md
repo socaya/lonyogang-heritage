@@ -58,3 +58,8 @@ This is an incremental implementation, not a 100% completion or production readi
 
 ## Batch 10b — restricted authentication challenge endpoints
 - Database-backed hashed challenge tokens, five-minute expiry, attempt and account limits, credential binding, single-use verification, cancellation, email delivery and TOTP replay protection on new challenge endpoints. Session creation and consumption are transactional. Legacy endpoint remains available for compatibility until client and test migration; mandatory enforcement is NOT complete. Resend endpoint and Flutter wiring remain outstanding. Backend integration tests not run.
+
+## Batch 10c–e — mandatory password sign-in verification
+- Server-side resend rotation and independent Flutter email and authenticator routes use restricted sign-in challenges. Registration verifies all required channels before navigating to sign-in; no registration password is reused to issue sessions.
+- Legacy password session issuance removed from client and service. Historical POST /identity/sessions now issues only a challenge (202), never credentials. The separate passkey authentication path remains unchanged.
+- Existing integration test callers of the historical endpoint require contract migration; native and backend builds and tests have not yet been executed. Mandatory password authentication source changes are committed; release readiness is not established.

@@ -219,13 +219,10 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
       '/identity/sessions': {
         post: {
           tags: ['identity'],
-          summary: 'Email + password (+ optional TOTP) sign-in',
+          summary: 'Password validation and restricted verification challenge (legacy URL alias)',
           responses: {
-            '200': {
-              description: 'Session issued.',
-              content: { 'application/json': { schema: { $ref: '#/components/schemas/SessionResult' } } },
-            },
-            '401': { description: 'Bad credentials or TOTP.' },
+            '202': {description:'Verification challenge issued. No access or refresh tokens.'},
+            '401': {description:'Credentials or challenge request rejected.'},
           },
         },
         get: {

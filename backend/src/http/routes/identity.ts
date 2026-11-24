@@ -80,21 +80,11 @@ export async function registerIdentityRoutes(
   });
 
   // ---- Password sessions ----
+  // Retain the historical URL as a challenge-only alias. It cannot issue tokens.
   app.post('/identity/sessions', { config: sessionLimit }, async (req, reply) => {
-    const body = z
-      .object({
-        email: emailSchema,
-        password: z.string().min(1),
-        totpCode: z.string().min(6).max(8).optional(),
-        deviceId: z.string().uuid(),
-      })
-      .parse(req.body);
-    try {
-      const result = await deps.identity.signIn({ ...body, userAgent: req.headers['user-agent'] });
-      return reply.send(result);
-    } catch (err) {
-      return reply.code(401).send(toError(err));
-    }
+    const body=z.object({email:emailSchema,password:z.string().min(1).max(1024),deviceId:z.string().uuid()}).parse(req.body);
+    try {return reply.code(202).send(await deps.identity.beginSignIn({...body,userAgent:req.headers['user-agent']}));}
+    catch(err){return reply.code(401).send(toError(err));}
   });
 
   app.post('/identity/sessions/challenge', { config: sessionLimit }, async (req, reply) => {
