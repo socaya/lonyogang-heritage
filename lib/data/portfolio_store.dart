@@ -362,7 +362,7 @@ class PortfolioStore extends ChangeNotifier {
       upsertAsset(asset.copyWith(archived: false));
 
   Future<void> upsertLiability(Liability liability) async {
-    if (liability.name.trim().isEmpty || liability.outstandingUgx < 0) {
+    if (liability.name.trim().isEmpty || liability.outstandingUgx < 0 || liability.principalUgx < 0) {
       throw ArgumentError('Invalid debt');
     }
     final list = [..._state.liabilities];

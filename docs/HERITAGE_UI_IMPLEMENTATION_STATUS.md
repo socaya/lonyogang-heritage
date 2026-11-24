@@ -26,3 +26,6 @@ This is an incremental implementation, not a 100% completion or production readi
 - Expense period and search filters, real category totals, accurate local-day and month bounds (future records excluded from daily/monthly summaries).
 - Existing recording, editing, attachment and reversal flows retained.
 - Native tests remain unexecuted; no Verified status asserted.
+
+## Batch 5 — liability entry and detail
+- Original principal, balance date and repayment due date now editable and persisted using existing model fields. Preserve archive state, custom category input and previously linked archived or unavailable property. Stable ID during retry, duplicate-submit guard and inline save failure feedback. Detail shows category/reference and unknown principal explicitly. Added store validation for negative principal and persistence regression test. Flutter tests not run.

@@ -207,13 +207,13 @@ class LiabilityDetailScreen extends StatelessWidget {
                             color: Colors.white70,
                             fontSize: 11,
                             letterSpacing: 1.3,
-                            fontWeight: FontWeight.w800)),
+                            fontWeight: FontWeight.w700)),
                     const SizedBox(height: 10),
                     Text(LG.money(current.outstandingUgx),
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 28,
-                            fontWeight: FontWeight.w800)),
+                            fontWeight: FontWeight.w700)),
                     const SizedBox(height: 6),
                     Text('As of ${LG.date(current.asOf)}',
                         style: const TextStyle(color: Colors.white70, fontSize: 12)),
@@ -221,12 +221,13 @@ class LiabilityDetailScreen extends StatelessWidget {
               const SizedBox(height: 18),
               SoftCard(
                   child: Column(children: [
+                if (current.category.isNotEmpty)
+                  InfoLabel(label: 'Category', value: current.category),
+                if (current.accountNumber.isNotEmpty)
+                  InfoLabel(label: 'Loan reference', value: current.accountNumber),
                 if (current.lender.isNotEmpty)
                   InfoLabel(label: 'Lender', value: current.lender),
-                if (current.principalUgx > 0)
-                  InfoLabel(
-                      label: 'Original principal',
-                      value: LG.money(current.principalUgx)),
+                InfoLabel(label: 'Original principal', value: current.principalUgx > 0 ? LG.money(current.principalUgx) : 'Not recorded'),
                 if (current.dueAt != null)
                   InfoLabel(label: 'Due', value: LG.date(current.dueAt!)),
                 if (linkedProperty != null)

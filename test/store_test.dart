@@ -54,4 +54,24 @@ void main() {
     expect(store.totals.grossAssets,390000000);
     expect(store.totals.netWorth,320000000);
   });
+  test('Liability principal, balance date, repayment date and archive persist', () async {
+    final store = PortfolioStore();
+    await store.load();
+    final debt = Liability(id: 'debt-1', name: 'Loan', category: 'Mortgage',
+      lender: 'Bank', accountNumber: 'REF-01', outstandingUgx: 7000000,
+      principalUgx: 10000000, asOf: DateTime(2026, 10, 1),
+      dueAt: DateTime(2027, 10, 1), notes: 'Statement');
+    await store.upsertLiability(debt);
+    await store.archiveLiability(debt);
+    final reloaded = PortfolioStore();
+    await reloaded.load();
+    final actual = reloaded.state.liabilities.single;
+    expect(actual.principalUgx, 10000000);
+    expect(actual.outstandingUgx, 7000000);
+    expect(actual.asOf, debt.asOf);
+    expect(actual.dueAt, debt.dueAt);
+    expect(actual.accountNumber, 'REF-01');
+    expect(actual.archived, isTrue);
+    expect(reloaded.totals.liabilities, 0);
+  });
 }

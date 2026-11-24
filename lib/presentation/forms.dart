@@ -20,14 +20,14 @@ int? parseDecimalAmount(String s) {
   final trimmed = s.trim().replaceAll(',', '');
   if (trimmed.isEmpty) return null;
   final parsed = double.tryParse(trimmed);
-  if (parsed == null) return null;
+  if (parsed == null || !parsed.isFinite || parsed.abs() > 9007199254740991) return null;
   return parsed.round();
 }
 
 String? requireDecimalAmount(String? v) {
   if (v == null || v.trim().isEmpty) return 'Enter a value';
   final parsed = double.tryParse(v.replaceAll(',', ''));
-  if (parsed == null || parsed < 0) return 'Enter a valid UGX amount';
+  if (parsed == null || !parsed.isFinite || parsed < 0 || parsed > 9007199254740991) return 'Enter a valid UGX amount';
   return null;
 }
 
@@ -560,6 +560,17 @@ class _LiabilityFormState extends State<LiabilityForm> {
       text: widget.existing?.accountNumber ?? '');
   late final note =
       TextEditingController(text: widget.existing?.notes ?? '');
+  late final customCategory = TextEditingController(
+    text: _initialCategoryChoice() == kOtherSentinel ? widget.existing!.category : '',
+  );
+  late final principal = TextEditingController(
+    text: (widget.existing?.principalUgx ?? 0) == 0 ? '' : widget.existing!.principalUgx.toString(),
+  );
+  late DateTime asOf = widget.existing?.asOf ?? DateTime.now();
+  late DateTime? dueAt = widget.existing?.dueAt;
+  late final String liabilityId = widget.existing?.id ?? makeId();
+  bool saving = false;
+  String? saveError;
   late String category = _initialCategoryChoice();
   late String lender = _initialLenderChoice();
   late String? propertyId = widget.existing?.propertyId;
@@ -592,6 +603,8 @@ class _LiabilityFormState extends State<LiabilityForm> {
   @override
   void dispose() {
     name.dispose();
+    customCategory.dispose();
+    principal.dispose();
     customLender.dispose();
     amount.dispose();
     accountNumber.dispose();
@@ -602,22 +615,14 @@ class _LiabilityFormState extends State<LiabilityForm> {
   @override
   Widget build(BuildContext context) {
     final properties = widget.store.state.assets
-        .where((x) => x.kind == AssetKind.property && !x.archived)
+        .where((x) => x.kind == AssetKind.property && (!x.archived || x.id == propertyId))
         .toList();
-    if (propertyId != null && !properties.any((x) => x.id == propertyId)) {
-      propertyId = null;
-    }
+    final missingProperty = propertyId != null && !properties.any((x) => x.id == propertyId);
     final lenders = <String>{
       ..._kDefaultInstitutions,
       ...widget.store.state.knownInstitutions,
     }.toList()
       ..sort();
-    final customCategory = TextEditingController(
-        text: category == kOtherSentinel &&
-                widget.existing != null &&
-                !kLiabilityTypes.contains(widget.existing!.category)
-            ? widget.existing!.category
-            : '');
     return Scaffold(
       appBar: AppBar(
           title: Text(widget.existing == null
@@ -627,7 +632,7 @@ class _LiabilityFormState extends State<LiabilityForm> {
         child: Form(
           key: key,
           child: ListView(
-            padding: const EdgeInsets.all(22),
+            padding: const EdgeInsets.all(LG.hPad),
             children: [
               PageHeading(
                   widget.existing == null
@@ -635,6 +640,7 @@ class _LiabilityFormState extends State<LiabilityForm> {
                       : 'Edit liability',
                   subtitle:
                       'Record what you owe — including mortgages, SACCO loans and cards.'),
+              const SectionTitle('Liability information'),
               FormFieldBlock(
                 title: 'Liability name',
                 required: true,
@@ -676,6 +682,7 @@ class _LiabilityFormState extends State<LiabilityForm> {
                         : null,
                   ),
                 ),
+              const SectionTitle('Lender and reference'),
               FormFieldBlock(
                 title: 'Lender',
                 required: true,
@@ -717,6 +724,7 @@ class _LiabilityFormState extends State<LiabilityForm> {
                       hintText: 'e.g. LN-7788-22 or your reference'),
                 ),
               ),
+              const SectionTitle('Balance and repayment'),
               FormFieldBlock(
                 title: 'Outstanding balance (UGX)',
                 required: true,
@@ -734,6 +742,24 @@ class _LiabilityFormState extends State<LiabilityForm> {
                 ),
               ),
               FormFieldBlock(
+                title: 'Original principal (UGX)',
+                help: 'Optional. The original borrowed amount, not an additional liability.',
+                child: TextFormField(
+                  key: const ValueKey('liability-principal'),
+                  controller: principal,
+                  keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                  inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'[\d.,]'))],
+                  decoration: const InputDecoration(hintText: 'Not recorded'),
+                  validator: (v) => (v ?? '').trim().isEmpty ? null : requireDecimalAmount(v),
+                ),
+              ),
+              _dateControl(context, 'Balance as of', asOf, (value) => setState(() => asOf = value)),
+              _dateControl(context, 'Repayment due date (optional)', dueAt, (value) => setState(() => dueAt = value)),
+              if (dueAt != null)
+                TextButton(onPressed: saving ? null : () => setState(() => dueAt = null),
+                  child: const Text('Clear due date')),
+              const SectionTitle('Linked property and notes'),
+              FormFieldBlock(
                 title: 'Link to property (optional)',
                 help:
                     'A linked mortgage is counted only once in net worth.',
@@ -743,8 +769,9 @@ class _LiabilityFormState extends State<LiabilityForm> {
                   items: [
                     const DropdownMenuItem<String?>(
                         value: null, child: Text('Not linked')),
+                    if (missingProperty) DropdownMenuItem<String?>(value: propertyId, child: const Text('Previously linked property (unavailable)')),
                     ...properties.map((p) => DropdownMenuItem<String?>(
-                        value: p.id, child: Text(p.name))),
+                        value: p.id, child: Text(p.archived ? '${p.name} (archived)' : p.name))),
                   ],
                   onChanged: (v) => setState(() => propertyId = v),
                 ),
@@ -754,32 +781,17 @@ class _LiabilityFormState extends State<LiabilityForm> {
                 child: TextFormField(controller: note, maxLines: 3),
               ),
               const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () async {
-                  if (!key.currentState!.validate()) return;
-                  final resolvedCategory = category == kOtherSentinel
-                      ? customCategory.text.trim()
-                      : category;
-                  final resolvedLender = lender == kOtherSentinel
-                      ? customLender.text.trim()
-                      : lender;
-                  await widget.store.upsertLiability(Liability(
-                      id: widget.existing?.id ?? makeId(),
-                      name: name.text.trim(),
-                      category: resolvedCategory,
-                      lender: resolvedLender,
-                      accountNumber: accountNumber.text.trim(),
-                      outstandingUgx: parseDecimalAmount(amount.text) ?? 0,
-                      propertyId: propertyId,
-                      asOf: DateTime.now(),
-                      notes: note.text.trim()));
-                  if (context.mounted) Navigator.pop(context);
-                },
-                child: const Text('Save liability'),
+              if (saveError != null)
+                Padding(padding: const EdgeInsets.only(bottom: 12),
+                  child: Text(saveError!, style: const TextStyle(color: LG.negative))),
+              PrimaryCTA(
+                label: 'Save liability',
+                loading: saving,
+                onPressed: _save,
               ),
-              if (widget.existing != null)
+              if (widget.existing != null && !widget.existing!.archived)
                 TextButton(
-                  onPressed: () => confirmArchive(context,
+                  onPressed: saving ? null : () => confirmArchive(context,
                       () => widget.store.archiveLiability(widget.existing!)),
                   child: const Text('Archive liability',
                       style: TextStyle(color: LG.negative)),
@@ -789,6 +801,47 @@ class _LiabilityFormState extends State<LiabilityForm> {
         ),
       ),
     );
+  }
+  Widget _dateControl(BuildContext context, String label, DateTime? value, ValueChanged<DateTime> onChanged) =>
+    FormFieldBlock(
+      title: label,
+      child: OutlinedButton.icon(
+        icon: const Icon(Icons.calendar_today_outlined),
+        label: Text(value == null ? 'Choose date' : LG.date(value)),
+        onPressed: saving ? null : () async {
+          final initial = DateUtils.dateOnly(value ?? DateTime.now());
+          final first = DateTime(initial.year < 1900 ? initial.year : 1900);
+          final last = DateTime(initial.year > 2200 ? initial.year + 1 : 2201);
+          final selected = await showDatePicker(context: context, initialDate: initial, firstDate: first, lastDate: last);
+          if (mounted && selected != null) onChanged(selected);
+        },
+      ),
+    );
+
+  Future<void> _save() async {
+    if (saving || !key.currentState!.validate()) return;
+    setState(() { saving = true; saveError = null; });
+    try {
+      await widget.store.upsertLiability(Liability(
+        id: liabilityId,
+        name: name.text.trim(),
+        category: category == kOtherSentinel ? customCategory.text.trim() : category,
+        lender: lender == kOtherSentinel ? customLender.text.trim() : lender,
+        accountNumber: accountNumber.text.trim(),
+        outstandingUgx: parseDecimalAmount(amount.text)!,
+        principalUgx: parseDecimalAmount(principal.text) ?? 0,
+        propertyId: propertyId,
+        asOf: asOf,
+        dueAt: dueAt,
+        notes: note.text.trim(),
+        archived: widget.existing?.archived ?? false,
+      ));
+      if (mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) setState(() => saveError = 'Could not save the liability. Your entries are retained. Try again.');
+    } finally {
+      if (mounted) setState(() => saving = false);
+    }
   }
 }
 
