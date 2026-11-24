@@ -86,9 +86,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                 Text('Unlock your portfolio',
                     style: Theme.of(context).textTheme.headlineMedium),
                 const SizedBox(height: 10),
-                const Text(
+                Text(
                     'Enter the passphrase you set when you turned on encryption on this device.',
-                    style: TextStyle(color: LG.muted, height: 1.5)),
+                    style: TextStyle(color: LG.adaptive(context,LG.muted), height: 1.5)),
                 const SizedBox(height: 28),
                 FormFieldBlock(
                     title: 'Passphrase',
@@ -105,7 +105,7 @@ class _UnlockScreenState extends State<UnlockScreen> {
                   Padding(
                       padding: const EdgeInsets.only(bottom: 14),
                       child: Text(error!,
-                          style: const TextStyle(color: LG.negative, fontSize: 12))),
+                          style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12))),
                 ElevatedButton(
                     onPressed: working ? null : _submit,
                     child: Text(working ? 'Checking…' : 'Unlock')),
@@ -118,9 +118,9 @@ class _UnlockScreenState extends State<UnlockScreen> {
                       label: const Text('Use biometrics')),
                 ],
                 const SizedBox(height: 24),
-                const Text(
+                Text(
                     'Lost your passphrase? The encrypted data on this device cannot be recovered without it. Restore from an unencrypted JSON export if you kept one.',
-                    style: TextStyle(fontSize: 12, color: LG.muted, height: 1.5)),
+                    style: TextStyle(fontSize: 12, color: LG.adaptive(context,LG.muted), height: 1.5)),
               ]),
             ),
           ),
@@ -225,7 +225,7 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
                   color: hasPassphrase ? LG.sageSoft : LG.white,
                   child: Row(children: [
                     Icon(hasPassphrase ? Icons.lock : Icons.lock_open,
-                        color: hasPassphrase ? LG.sage : LG.muted),
+                        color: LG.adaptive(context,hasPassphrase ? LG.sage : LG.muted)),
                     const SizedBox(width: 12),
                     Expanded(
                         child: Text(
@@ -283,23 +283,23 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
                   if (widget.store.vault.hasBiometricStash)
                     TextButton(
                         onPressed: () => widget.store.vault.clearBiometricStash(),
-                        child: const Text('Remove biometric link',
-                            style: TextStyle(color: LG.negative))),
+                        child: Text('Remove biometric link',
+                            style: TextStyle(color: LG.adaptive(context,LG.negative)))),
                 ],
                 const SizedBox(height: 10),
                 TextButton(
                     onPressed: _disable,
-                    child: const Text('Remove passphrase',
-                        style: TextStyle(color: LG.negative))),
+                    child: Text('Remove passphrase',
+                        style: TextStyle(color: LG.adaptive(context,LG.negative)))),
               ],
               if (message != null) ...[
                 const SizedBox(height: 14),
-                Text(message!, style: const TextStyle(color: LG.sage, fontSize: 12))
+                Text(message!, style: TextStyle(color: LG.adaptive(context,LG.sage), fontSize: 12))
               ],
               const SizedBox(height: 20),
-              const Text(
+              Text(
                   'Only this device holds the encrypted portfolio. There is no cloud key recovery. Keep an unencrypted JSON export in a safe place or a trusted physical backup.',
-                  style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+                  style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.5)),
             ]);
       });
 }

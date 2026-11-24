@@ -39,7 +39,7 @@ class DataSyncStatusScreen extends StatelessWidget {
                   color: encrypted ? LG.sageSoft : LG.white,
                   child: Row(children: [
                     Icon(encrypted ? Icons.lock : Icons.devices_outlined,
-                        color: encrypted ? LG.sage : LG.muted, size: 28),
+                        color: LG.adaptive(context,encrypted ? LG.sage : LG.muted), size: 28),
                     const SizedBox(width: 12),
                     Expanded(
                         child: Text(
@@ -292,7 +292,7 @@ class _ResourceHydrateCtaState extends State<_ResourceHydrateCta> {
         if (_status != null) ...[
           const SizedBox(height: 6),
           Text(_status!,
-              style: const TextStyle(color: LG.muted, fontSize: 12)),
+              style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12)),
         ],
       ]),
     );

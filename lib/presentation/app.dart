@@ -47,7 +47,7 @@ class _AppRootState extends State<AppRoot> {
 }
 
 void openCreateSheet(BuildContext context,PortfolioStore store) {
-  showModalBottomSheet<void>(context:context,showDragHandle:true,backgroundColor:LG.canvas,
+  showModalBottomSheet<void>(context:context,showDragHandle:true,backgroundColor:LG.adaptive(context,LG.canvas),
     isScrollControlled:true,builder:(sheetContext)=>SafeArea(child:Padding(padding:const EdgeInsets.fromLTRB(20,8,20,24),child:
       Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Add to your wealth',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:16),
@@ -58,8 +58,8 @@ void openCreateSheet(BuildContext context,PortfolioStore store) {
           (Icons.inventory_2_outlined,'Other asset',()=>AssetForm(store:store,kind:AssetKind.other)),
           (Icons.account_balance_outlined,'Liability / loan',()=>LiabilityForm(store:store)),
           (Icons.receipt_long_outlined,'Transaction',()=>EventForm(store:store)),
-        ].map((item)=>ListTile(leading:Icon(item.$1,color:LG.sage),title:Text(item.$2),
-          trailing:const Icon(Icons.chevron_right,color:LG.muted),onTap:(){
+        ].map((item)=>ListTile(leading:Icon(item.$1,color:LG.adaptive(context,LG.sage)),title:Text(item.$2),
+          trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),onTap:(){
             Navigator.pop(sheetContext);
             Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>item.$3()));
           })),
@@ -71,7 +71,7 @@ class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key, required this.store});
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: LG.canvas,
+        backgroundColor: LG.adaptive(context,LG.canvas),
         body: SafeArea(
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: LG.hPad, vertical: 30),
@@ -84,9 +84,9 @@ class WelcomeScreen extends StatelessWidget {
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontSize: 36, height: 1.13)),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                   'A home for your investments, property, savings and lasting worth.',
-                  style: TextStyle(color: LG.muted, fontSize: 16, height: 1.55)),
+                  style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 16, height: 1.55)),
               const SizedBox(height: 28),
               const SecurityNotice(
                 title: 'Local preview mode',
@@ -113,15 +113,15 @@ class WelcomeScreen extends StatelessWidget {
                 child: TextButton(
                   onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                       builder: (_) => const CreateAccountStep1Screen())),
-                  child: const Text('View account design preview',
-                      style: TextStyle(color: LG.muted)),
+                  child: Text('View account design preview',
+                      style: TextStyle(color: LG.adaptive(context,LG.muted))),
                 ),
               ),
               const SizedBox(height: 18),
-              const Center(
+              Center(
                 child: Text(
                   'No real account or cloud sign-in is created in this preview.',
-                  style: TextStyle(fontSize: 12, color: LG.muted),
+                  style: TextStyle(fontSize: 12, color: LG.adaptive(context,LG.muted)),
                   textAlign: TextAlign.center,
                 ),
               ),

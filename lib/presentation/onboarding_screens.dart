@@ -118,9 +118,9 @@ class _CreateAccountStep1ScreenState extends State<CreateAccountStep1Screen> {
           Text('Create your account',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Set up a private LonyoGang owner profile. This is a design preview — no live account is registered yet.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
           const StepProgress(
@@ -212,14 +212,14 @@ class _CreateAccountStep1ScreenState extends State<CreateAccountStep1Screen> {
                 TextButton(
                   onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                       builder: (_) => const SignInScreen())),
-                  child: const Text('Sign in instead',
-                      style: TextStyle(color: LG.muted)),
+                  child: Text('Sign in instead',
+                      style: TextStyle(color: LG.adaptive(context,LG.muted))),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                       builder: (_) => const RecoverAccountScreen())),
-                  child: const Text('Recover access',
-                      style: TextStyle(color: LG.muted)),
+                  child: Text('Recover access',
+                      style: TextStyle(color: LG.adaptive(context,LG.muted))),
                 ),
               ],
             ),
@@ -308,9 +308,9 @@ class _CreateAccountStep2ScreenState extends State<CreateAccountStep2Screen> {
           Text('Secure your account',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Choose how you want to unlock your device copy. Server-backed passkey enrolment is not available yet; this preview protects data on-device only.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
           const StepProgress(
@@ -358,7 +358,7 @@ class _CreateAccountStep2ScreenState extends State<CreateAccountStep2Screen> {
           if (_error != null) ...[
             const SizedBox(height: 4),
             Text(_error!,
-                style: const TextStyle(color: LG.negative, fontSize: 12)),
+                style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12)),
           ],
           const SizedBox(height: 10),
           const SecurityNotice(
@@ -400,8 +400,8 @@ class _OptionTile extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-                color: LG.sageSoft, borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: LG.sage),
+                color: LG.adaptive(context,LG.sageSoft), borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: LG.adaptive(context,LG.sage)),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -414,12 +414,12 @@ class _OptionTile extends StatelessWidget {
                 const SizedBox(height: 4),
                 Text(subtitle,
                     style:
-                        const TextStyle(color: LG.muted, fontSize: 12, height: 1.4)),
+                        TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.4)),
               ])),
           const SizedBox(width: 8),
           Switch.adaptive(
               value: value,
-              activeTrackColor: LG.sageSoft,
+              activeTrackColor: LG.adaptive(context,LG.sageSoft),
               onChanged: onChanged),
         ]),
       );
@@ -481,7 +481,7 @@ class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
     const Center(child:BrandMark(height:32)),const SizedBox(height:28),
     PageHeading(phoneStage?'Verify mobile number':'Verify email address',subtitle:'Enter the registration code sent to ${phoneStage?'your mobile number':'your email address'}. You will sign in separately after verification.'),
     FormFieldBlock(title:'Registration code',child:TextField(controller:controller,enabled:!busy,keyboardType:TextInputType.number,autofillHints:const [AutofillHints.oneTimeCode],inputFormatters:[FilteringTextInputFormatter.digitsOnly,LengthLimitingTextInputFormatter(6)])),
-    if(error!=null)Text(error!,style:const TextStyle(color:LG.negative)),
+    if(error!=null)Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative))),
     PrimaryCTA(label:'Verify registration',loading:busy,onPressed:submit),
     TextButton(onPressed:busy||cooldown>0?null:resend,child:Text(cooldown>0?'Resend in $cooldown s':'Resend code')),
   ]);
@@ -539,7 +539,7 @@ class _SignInScreenState extends State<SignInScreen> {
       FormFieldBlock(title:'Password',required:true,child:TextFormField(controller:password,enabled:!busy,obscureText:true,
         autofillHints:const [AutofillHints.password],validator:(v)=>v==null||v.isEmpty?'Enter your password':null)),
     ])),
-    if(error!=null)Text(error!,style:const TextStyle(color:LG.negative)),
+    if(error!=null)Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative))),
     Align(alignment:Alignment.centerRight,child:TextButton(onPressed:busy?null:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>const RecoverAccountScreen())),child:const Text('Forgot password?'))),
     PrimaryCTA(label:'Continue',loading:busy,onPressed:submit),
     if(OnlineScope.maybeOf(context)?.sync==null)
@@ -605,7 +605,7 @@ class _SignInVerificationState extends State<_SignInVerification> {
   @override Widget build(BuildContext context)=>PopScope(canPop:!busy,child:AppPage(appBar:const AppHeader(),children:[
     const Center(child:BrandMark(height:32)),
     const SizedBox(height:28),
-    Icon(widget.email?Icons.mail_outline:Icons.shield_outlined,color:LG.sage,size:48),
+    Icon(widget.email?Icons.mail_outline:Icons.shield_outlined,color:LG.adaptive(context,LG.sage),size:48),
     PageHeading(widget.email?'Email verification':'Authenticator verification',subtitle:widget.email
       ?'Enter the six-digit code sent to ${widget.challenge.maskedDestination??"your verified email"}.'
       :'Open your authenticator app and enter the current six-digit code.'),
@@ -614,8 +614,8 @@ class _SignInVerificationState extends State<_SignInVerification> {
       inputFormatters:[FilteringTextInputFormatter.digitsOnly,LengthLimitingTextInputFormatter(6)],
       validator:(v)=>v?.length==6?null:'Enter six digits',
     ))),
-    if(expired)const Text('Verification expired. Return to sign in.',style:TextStyle(color:LG.negative)),
-    if(error!=null)Text(error!,style:const TextStyle(color:LG.negative)),
+    if(expired)Text('Verification expired. Return to sign in.',style:TextStyle(color:LG.adaptive(context,LG.negative))),
+    if(error!=null)Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative))),
     PrimaryCTA(label:'Verify and sign in',loading:busy,onPressed:expired?null:submit),
     if(widget.email)TextButton(onPressed:busy||expired||cooldown>0||resends>=2?null:resend,
       child:Text(resends>=2?'Resend limit reached':cooldown>0?'Resend in $cooldown s':'Resend code')),
@@ -682,9 +682,9 @@ class _RecoverAccountScreenState extends State<RecoverAccountScreen> {
           Text('Recover access',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Enter the email or phone number you used when you set up your account. If it matches, we would send recovery instructions there.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
           Form(
@@ -720,8 +720,8 @@ class _RecoverAccountScreenState extends State<RecoverAccountScreen> {
             child: TextButton(
               onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                   builder: (_) => const PasswordResetCompleteScreen())),
-              child: const Text('I already have a reset code',
-                  style: TextStyle(color: LG.muted)),
+              child: Text('I already have a reset code',
+                  style: TextStyle(color: LG.adaptive(context,LG.muted))),
             ),
           ),
           const SizedBox(height: 18),
@@ -809,9 +809,9 @@ class _PasswordResetCompleteScreenState
           Text('Choose a new password',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Paste the reset code from the email the server sent you. All existing sessions are revoked when the password changes.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
           Form(
@@ -854,7 +854,7 @@ class _PasswordResetCompleteScreenState
               if (_error != null) ...[
                 const SizedBox(height: 4),
                 Text(_error!,
-                    style: const TextStyle(color: LG.negative, fontSize: 12)),
+                    style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12)),
               ],
             ]),
           ),
@@ -925,9 +925,9 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
         Text('What should we call your portfolio?',
             style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 10),
-        const Text(
+        Text(
             'This is a label you will see at the top of every screen. It never leaves this device.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5)),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5)),
         const SizedBox(height: 22),
         FormFieldBlock(
           title: 'Portfolio name',
@@ -950,9 +950,9 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
         Text('What do you plan to track?',
             style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 10),
-        const Text(
+        Text(
             'Choose any combination. You can enable more categories later; we will not add things you did not choose.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5)),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5)),
         const SizedBox(height: 22),
         for (final category in const [
           ('Investments', Icons.trending_up_rounded,
@@ -981,9 +981,9 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
                   width: 44,
                   height: 44,
                   decoration: BoxDecoration(
-                      color: LG.sageSoft,
+                      color: LG.adaptive(context,LG.sageSoft),
                       borderRadius: BorderRadius.circular(12)),
-                  child: Icon(category.$2, color: LG.sage),
+                  child: Icon(category.$2, color: LG.adaptive(context,LG.sage)),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
@@ -995,14 +995,14 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
                               fontWeight: FontWeight.w800, fontSize: 14)),
                       const SizedBox(height: 4),
                       Text(category.$3,
-                          style: const TextStyle(
-                              color: LG.muted, fontSize: 12, height: 1.4)),
+                          style: TextStyle(
+                              color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.4)),
                     ])),
                 Icon(
                   picks.contains(category.$1)
                       ? Icons.check_circle
                       : Icons.radio_button_unchecked,
-                  color: picks.contains(category.$1) ? LG.sage : LG.muted,
+                  color: LG.adaptive(context,picks.contains(category.$1) ? LG.sage : LG.muted),
                 )
               ]),
             ),
@@ -1016,7 +1016,7 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
         Center(
           child: TextButton(
               onPressed: () => setState(() => step = 0),
-              child: const Text('Back', style: TextStyle(color: LG.muted))),
+              child: Text('Back', style: TextStyle(color: LG.adaptive(context,LG.muted)))),
         ),
       ];
 
@@ -1024,9 +1024,9 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
         Text('Ready to begin',
             style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 10),
-        const Text(
+        Text(
             'Here is what we will set up on this device. You can change everything later.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5)),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5)),
         const SizedBox(height: 22),
         SoftCard(
             child: Column(children: [
@@ -1052,7 +1052,7 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
         Center(
           child: TextButton(
               onPressed: () => setState(() => step = 1),
-              child: const Text('Back', style: TextStyle(color: LG.muted))),
+              child: Text('Back', style: TextStyle(color: LG.adaptive(context,LG.muted)))),
         ),
       ];
 }
@@ -1067,7 +1067,7 @@ class NotFoundScreen extends StatelessWidget {
         appBar: const AppHeader(),
         children: [
           const SizedBox(height: 40),
-          const Icon(Icons.search_off_rounded, size: 56, color: LG.muted),
+          Icon(Icons.search_off_rounded, size: 56, color: LG.adaptive(context,LG.muted)),
           const SizedBox(height: 16),
           Text("We couldn't find that record",
               style: Theme.of(context).textTheme.headlineMedium),
@@ -1076,7 +1076,7 @@ class NotFoundScreen extends StatelessWidget {
             attemptedTarget == null
                 ? 'The item may have been archived, restored elsewhere, or imported from an older export. No data has been lost.'
                 : "The route '$attemptedTarget' did not resolve to any active entity. It may have been archived or imported from an older export.",
-            style: const TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 22),
           PrimaryCTA(
@@ -1089,8 +1089,8 @@ class NotFoundScreen extends StatelessWidget {
           Center(
             child: TextButton(
                 onPressed: () => Navigator.of(context).maybePop(),
-                child: const Text('Go back',
-                    style: TextStyle(color: LG.muted))),
+                child: Text('Go back',
+                    style: TextStyle(color: LG.adaptive(context,LG.muted)))),
           ),
         ],
       );
@@ -1109,7 +1109,7 @@ class _TermsCheckbox extends StatelessWidget {
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Icon(
               value ? Icons.check_box : Icons.check_box_outline_blank,
-              color: value ? LG.sage : LG.muted,
+              color: LG.adaptive(context,value ? LG.sage : LG.muted),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -1117,15 +1117,15 @@ class _TermsCheckbox extends StatelessWidget {
                 TextSpan(
                   text: 'I agree to the ',
                   style:
-                      const TextStyle(color: LG.muted, fontSize: 13, height: 1.45),
+                      TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13, height: 1.45),
                   children: [
                     TextSpan(
                       text: 'LonyoGang Preview Terms',
                       style: TextStyle(
-                          color: LG.navy,
+                          color: LG.adaptive(context,LG.navy),
                           fontWeight: FontWeight.w700,
                           decoration: TextDecoration.underline,
-                          decorationColor: LG.navy.withValues(alpha: 0.3)),
+                          decorationColor: LG.adaptive(context,LG.navy).withValues(alpha: 0.3)),
                     ),
                     const TextSpan(text: ' and the data-handling notice.'),
                   ],
@@ -1140,11 +1140,11 @@ class _TermsCheckbox extends StatelessWidget {
 class _PrototypeDisclaimer extends StatelessWidget {
   const _PrototypeDisclaimer();
   @override
-  Widget build(BuildContext context) => const Center(
+  Widget build(BuildContext context) => Center(
         child: Text(
           'Design preview · No real account is created or verified.',
           textAlign: TextAlign.center,
-          style: TextStyle(color: LG.muted, fontSize: 11),
+          style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 11),
         ),
       );
 }
