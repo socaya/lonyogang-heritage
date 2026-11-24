@@ -68,3 +68,7 @@ This is an incremental implementation, not a 100% completion or production readi
 - Adaptive page gutters and centered maximum content widths on AppPage and WealthPage; keyboard dismissal on scroll; orientation lock removed to allow platform-supported landscape.
 - Responsive heading and detail label/value rows, wrapping form labels, 48dp filter targets with selected semantics and reduced-motion support, scrollable confirmation sheets, wrapped error and list headings. Existing logo and palette preserved.
 - Native viewport and text-scale tests remain unexecuted; individual screen overflow and tablet layouts remain to be audited. No claim of overall screen completion.
+
+## Batch 13 — Native appearance
+- Explicit light/dark palettes, locally persisted System/Light/Dark preference, Settings appearance route, adaptive shared and screen-specific colour migration across finance, heritage, forms, onboarding, identity, sessions, privacy and supporting screens.
+- Added appearance persistence, contrast, switching and shared-component widget test cases in test/appearance_test.dart. Tests are not executed in the connector-only environment. Remaining hardcoded colours, actual native contrast, visual regressions and compilation must be checked before marking this milestone verified. Overall 104-screen functional completion remains unquantified.
