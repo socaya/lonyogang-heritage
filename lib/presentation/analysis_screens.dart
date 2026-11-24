@@ -286,7 +286,7 @@ class ScheduledContributionsScreen extends StatelessWidget {
         return WealthPage(
             title: 'Scheduled contributions',
             subtitle:
-                'Recurring contributions you plan to post automatically on due dates.',
+                'Recurring contributions you review and post when due.',
             children: [
               if (due.isNotEmpty) ...[
                 const SectionTitle('Due now'),
@@ -384,6 +384,8 @@ class _ScheduleFormState extends State<ScheduleForm> {
   late DateTime nextFire = widget.existing?.nextFire ??
       DateTime.now().add(const Duration(days: 30));
   late String? assetId = widget.existing?.assetId;
+  late final scheduleId = widget.existing?.id ?? makeId();
+  bool saving = false;
 
   @override
   void dispose() {
@@ -395,7 +397,8 @@ class _ScheduleFormState extends State<ScheduleForm> {
   @override
   Widget build(BuildContext context) {
     final assets =
-        widget.store.state.assets.where((x) => !x.archived).toList();
+        widget.store.state.assets.where((x) => !x.archived || x.id == assetId).toList();
+    final missingAsset = assetId != null && !assets.any((a) => a.id == assetId);
     return Scaffold(
         appBar: AppBar(title: const BrandMark(height: 28)),
         body: SafeArea(
@@ -445,10 +448,9 @@ class _ScheduleFormState extends State<ScheduleForm> {
                             final v = await showDatePicker(
                                 context: context,
                                 initialDate: nextFire,
-                                firstDate: DateTime.now()
-                                    .subtract(const Duration(days: 30)),
-                                lastDate: DateTime(2100));
-                            if (v != null) setState(() => nextFire = v);
+                                firstDate: DateTime(nextFire.year < 1900 ? nextFire.year : 1900),
+                                lastDate: DateTime(nextFire.year > 2100 ? nextFire.year + 1 : 2101));
+                            if (mounted && v != null) setState(() => nextFire = v);
                           },
                           child: Row(children: [
                             const Icon(Icons.event_available_outlined,
@@ -460,20 +462,22 @@ class _ScheduleFormState extends State<ScheduleForm> {
                       title: 'Associated asset (optional)',
                       child: DropdownButtonFormField<String?>(
                           initialValue: assetId,
+                          isExpanded: true,
                           items: [
                             const DropdownMenuItem(
                                 value: null, child: Text('Portfolio-level')),
+                            if (missingAsset) DropdownMenuItem(value: assetId, child: const Text('Previously linked asset (unavailable)')),
                             ...assets.map((a) => DropdownMenuItem(
-                                value: a.id, child: Text(a.name)))
+                                value: a.id, child: Text(a.archived ? '${a.name} (archived)' : a.name)))
                           ],
                           onChanged: (v) => setState(() => assetId = v))),
                   const SizedBox(height: 10),
                   ElevatedButton(
-                      onPressed: () async {
-                        if (!form.currentState!.validate()) return;
+                      onPressed: saving ? null : () async {
+                        if (saving || !form.currentState!.validate()) return;
                         final earliest =
                             DateTime.now().subtract(const Duration(days: 30));
-                        if (nextFire.isBefore(earliest)) {
+                        if (nextFire.isBefore(earliest) && nextFire != widget.existing?.nextFire) {
                           ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                   content: Text(
@@ -481,8 +485,9 @@ class _ScheduleFormState extends State<ScheduleForm> {
                           return;
                         }
                         final n = int.parse(amount.text.replaceAll(',', ''));
-                        await widget.store.upsertSchedule(ScheduledContribution(
-                            id: widget.existing?.id ?? makeId(),
+                        setState(() => saving = true);
+                        try { await widget.store.upsertSchedule(ScheduledContribution(
+                            id: scheduleId,
                             name: name.text.trim(),
                             amountUgx: n,
                             assetId: assetId,
@@ -491,14 +496,20 @@ class _ScheduleFormState extends State<ScheduleForm> {
                             lastFired: widget.existing?.lastFired,
                             active: widget.existing?.active ?? true));
                         if (context.mounted) Navigator.pop(context);
+                        } catch (_) { if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not save schedule. Try again.'))); }
+                        finally {if(mounted)setState(()=>saving=false);}
                       },
-                      child: const Text('Save schedule')),
+                      child: Text(saving?'Saving…':'Save schedule')),
                   if (widget.existing != null) ...[
                     const SizedBox(height: 10),
                     TextButton(
-                        onPressed: () async {
-                          await widget.store.deleteSchedule(widget.existing!.id);
-                          if (context.mounted) Navigator.pop(context);
+                        onPressed: saving ? null : () async {
+                          final confirmed = await confirmActionSheet(context, title: 'Delete schedule?', consequence: 'Future postings are removed. Previously posted ledger entries remain.', confirmLabel: 'Delete');
+                          if(!confirmed || !mounted || saving)return;
+                          setState(()=>saving=true);
+                          try {await widget.store.deleteSchedule(widget.existing!.id); if(mounted) Navigator.pop(context);}
+                          catch (_) {if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not delete schedule. Try again.')));}
+                          finally {if(mounted)setState(()=>saving=false);}
                         },
                         child: const Text('Delete schedule',
                             style: TextStyle(color: LG.negative))),

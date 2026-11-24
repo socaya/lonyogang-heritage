@@ -25,10 +25,11 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
   String category='All';
   @override void dispose(){query.dispose();super.dispose();}
   @override Widget build(BuildContext context)=>AnimatedBuilder(animation:widget.store,builder:(context,_){
+    final categories = <String>{'All','Property','Investment','Insurance','Identity','Other', ...widget.store.state.documents.where((d) => !d.archived).map((d) => d.category)};
     final docs=widget.store.state.documents.where((d)=>!d.archived &&
         (category=='All'||d.category==category)&&
         (d.title.toLowerCase().contains(query.text.toLowerCase())||
-         d.category.toLowerCase().contains(query.text.toLowerCase()))).toList()
+         d.category.toLowerCase().contains(query.text.toLowerCase()) || d.notes.toLowerCase().contains(query.text.toLowerCase()))).toList()
        ..sort((a,b)=>a.title.toLowerCase().compareTo(b.title.toLowerCase()));
     final encryptionOn=widget.store.vault.hasPassphrase;
     return WealthPage(title:'Documents & records',subtitle:'A private catalog of important financial and property records.',children:[
@@ -41,15 +42,15 @@ class _DocumentsScreenState extends State<DocumentsScreen> {
       const SizedBox(height:18),
       TextField(controller:query,onChanged:(_)=>setState((){}),
         decoration:const InputDecoration(prefixIcon:Icon(Icons.search,color:LG.sage),hintText:'Find a document record')),
-      const SizedBox(height:14),SizedBox(height:38,child:ListView(scrollDirection:Axis.horizontal,children:[
-        for(final item in ['All','Property','Investment','Insurance','Identity','Other'])
+      const SizedBox(height:14),SizedBox(height:48,child:ListView(scrollDirection:Axis.horizontal,children:[
+        for(final item in categories)
           Padding(padding:const EdgeInsets.only(right:8),child:ChoiceChip(label:Text(item),selected:category==item,
             onSelected:(_)=>setState(()=>category=item),backgroundColor:LG.white,
             selectedColor:LG.sageSoft,side:BorderSide.none)),
       ])),
       const SizedBox(height:20),
-      if(docs.isEmpty)const AppEmptyState(title:'No document records',
-        detail:'Create a record for a deed, policy, contract or statement.',
+      if(docs.isEmpty)AppEmptyState(title:query.text.isNotEmpty || category != 'All' ? 'No matching documents' : 'No document records',
+        detail:query.text.isNotEmpty || category != 'All' ? 'Change your search or category.' : 'Create a record for a deed, policy, contract or statement.',
         icon:Icons.folder_outlined)
       else ...docs.map((d){
         final overdue=d.expiresAt!=null&&d.expiresAt!.isBefore(DateTime.now());
@@ -94,6 +95,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
   late DateTime? issued = widget.existing?.issuedAt;
   late DateTime? expires = widget.existing?.expiresAt;
   bool saving = false;
+  late final recordId = widget.existing?.id ?? makeId();
   @override
   void dispose() {
     title.dispose();
@@ -103,10 +105,8 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final assets = widget.store.state.assets.where((x) => !x.archived).toList();
-    if (linkedAssetId != null && !assets.any((a) => a.id == linkedAssetId)) {
-      linkedAssetId = null;
-    }
+    final assets = widget.store.state.assets.where((x) => !x.archived || x.id == linkedAssetId).toList();
+    final missingAsset = linkedAssetId != null && !assets.any((a) => a.id == linkedAssetId);
     return AppPage(
       appBar: const AppHeader(),
       children: [
@@ -131,7 +131,8 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                   title: 'Category',
                   child: DropdownButtonFormField<String>(
                       initialValue: category,
-                      items: ['Property', 'Investment', 'Insurance', 'Identity', 'Other']
+                      isExpanded: true,
+                      items: <String>{'Property', 'Investment', 'Insurance', 'Identity', 'Other', category}
                           .map((v) => DropdownMenuItem(value: v, child: Text(v)))
                           .toList(),
                       onChanged: (v) => setState(() => category = v ?? category))),
@@ -139,11 +140,13 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                   title: 'Related asset (optional)',
                   child: DropdownButtonFormField<String?>(
                       initialValue: linkedAssetId,
+                      isExpanded: true,
                       items: [
                         const DropdownMenuItem(value: null, child: Text('No linked asset')),
+                        if (missingAsset) DropdownMenuItem(value: linkedAssetId, child: const Text('Previously linked asset (unavailable)')),
                         ...assets.map((a) => DropdownMenuItem(
                             value: a.id,
-                            child: Text(a.name,
+                            child: Text(a.archived ? '${a.name} (archived)' : a.name,
                                 maxLines: 1, overflow: TextOverflow.ellipsis)))
                       ],
                       onChanged: (v) => setState(() => linkedAssetId = v))),
@@ -160,7 +163,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
                             initialDate: issued ?? today,
                             firstDate: DateTime(1950),
                             lastDate: today);
-                        if (v != null) setState(() => issued = v);
+                        if (mounted && v != null) setState(() => issued = v);
                       },
                       child: Row(children: [
                         const Icon(Icons.event_outlined, color: LG.sage),
@@ -215,7 +218,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
           label: saving ? 'Saving…' : 'Save document record',
           loading: saving,
           onPressed: () async {
-            if (!key.currentState!.validate()) return;
+            if (saving || !key.currentState!.validate()) return;
             if (issued != null &&
                 expires != null &&
                 expires!.isBefore(issued!)) {
@@ -231,14 +234,15 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
             setState(() => saving = true);
             try {
               final record = DocumentRecord(
-                  id: widget.existing?.id ?? makeId(),
+                  id: recordId,
                   title: title.text.trim(),
                   category: category,
                   linkedAssetId: linkedAssetId,
                   issuedAt: issued,
                   expiresAt: expires,
                   notes: notes.text.trim(),
-                  attachment: widget.existing?.attachment);
+                  attachment: widget.existing?.attachment,
+                  archived: widget.existing?.archived ?? false);
               await widget.store.upsertDocument(record);
               if (!context.mounted) return;
               Navigator.of(context).pop();
@@ -253,7 +257,7 @@ class _DocumentFormScreenState extends State<DocumentFormScreen> {
         ),
         const SizedBox(height: 18),
         const Text(
-            'Attachments, previews and removal live on the document detail page. Metadata captured here stays on this device only.',
+            'Attachments, previews and removal live on the document detail page. Metadata follows your configured local storage and synchronization settings.',
             style: TextStyle(fontSize: 12, color: LG.muted, height: 1.5)),
       ],
     );
@@ -274,14 +278,14 @@ class BeneficiariesScreen extends StatelessWidget {
       const SizedBox(height:22),
       SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('INTENDED ALLOCATION',style:TextStyle(color:LG.sage,fontWeight:FontWeight.w800,fontSize:11,letterSpacing:1.1)),
-        const SizedBox(height:8),Text('${(total/100).toStringAsFixed(0)}% planned',
+        const SizedBox(height:8),Text('${(total/100).toStringAsFixed(2)}% planned',
           style:Theme.of(context).textTheme.titleLarge),
         const SizedBox(height:12),LinearProgressIndicator(value:(total/10000).clamp(0.0,1.0).toDouble(),
           color:LG.gold,backgroundColor:LG.sageSoft,minHeight:8,borderRadius:BorderRadius.circular(8)),
         const SizedBox(height:8),const Text('Percentages are non-binding intentions, not a legal division of assets.',
           style:TextStyle(color:LG.muted,fontSize:11)),
       ])),const SizedBox(height:22),SectionTitle('Beneficiaries (${people.length})'),
-      if(people.isEmpty)const EmptySection(title:'No intended beneficiaries',detail:'Create a planning entry. Avoid sensitive identification numbers in this preview.')
+      if(people.isEmpty)const EmptySection(title:'No intended beneficiaries',detail:'Create a planning entry. Avoid storing sensitive identification numbers.')
       else ...people.map((p)=>Padding(padding:const EdgeInsets.only(bottom:9),
         child:SoftCard(onTap:()=>openWealthPage(context,BeneficiaryFormScreen(store:store,existing:p)),child:Row(children:[
           const CircleAvatar(backgroundColor:LG.sageSoft,child:Icon(Icons.person_outline,color:LG.sage)),
@@ -289,7 +293,7 @@ class BeneficiariesScreen extends StatelessWidget {
             Text(p.name,style:const TextStyle(fontWeight:FontWeight.w800)),
             Text(p.relationship,style:const TextStyle(color:LG.muted,fontSize:12)),
           ])),
-          Text('${(p.intendedShareBps/100).toStringAsFixed(0)}%',
+          Text('${(p.intendedShareBps/100).toStringAsFixed(2)}%',
             style:const TextStyle(color:LG.sage,fontWeight:FontWeight.w800)),
           const Icon(Icons.chevron_right,color:LG.muted),
         ])))),
@@ -321,8 +325,10 @@ class _BeneficiaryFormScreenState extends State<BeneficiaryFormScreen> {
   final key=GlobalKey<FormState>();
   late final name=TextEditingController(text:widget.existing?.name??'');
   late final relation=TextEditingController(text:widget.existing?.relationship??'');
-  late final share=TextEditingController(text:((widget.existing?.intendedShareBps??0)/100).toStringAsFixed(0));
+  late final share=TextEditingController(text:((widget.existing?.intendedShareBps??0)/100).toStringAsFixed(2));
   late final notes=TextEditingController(text:widget.existing?.notes??'');
+  bool saving = false;
+  late final recordId = widget.existing?.id ?? makeId();
   @override void dispose(){for(final c in [name,relation,share,notes]){c.dispose();}super.dispose();}
   @override Widget build(BuildContext context)=>Scaffold(appBar:AppBar(title:const BrandMark(height:28)),
     body:SafeArea(child:Form(key:key,child:ListView(padding:const EdgeInsets.all(24),children:[
@@ -332,22 +338,31 @@ class _BeneficiaryFormScreenState extends State<BeneficiaryFormScreen> {
       FormFieldBlock(title:'Relationship',child:TextFormField(controller:relation,validator:(v)=>v==null||v.trim().isEmpty?'Required':null)),
       FormFieldBlock(title:'Intended share (%)',help:'All planned beneficiary shares combined must not exceed 100%.',
         child:TextFormField(controller:share,keyboardType:const TextInputType.numberWithOptions(decimal:true),
-          validator:(v){final n=double.tryParse(v??'');return n==null||n<0||n>100?'Enter 0–100%':null;})),
+          validator:(v){final n=double.tryParse(v??'');if(n==null || !n.isFinite || n<0 || n>100) return 'Enter 0–100%';
+            final others = widget.store.state.beneficiaries.where((p) => p.id != recordId).fold<int>(0, (sum,p) => sum+p.intendedShareBps);
+            return others + (n*100).round() > 10000 ? 'Combined shares cannot exceed 100%' : null;})),
       FormFieldBlock(title:'Planning notes',child:TextFormField(controller:notes,maxLines:3)),
       const SizedBox(height:10),
-      ElevatedButton(onPressed:()async{
-        if(!key.currentState!.validate())return;
+      ElevatedButton(onPressed:saving?null:()async{
+        if(saving || !key.currentState!.validate())return;
+        setState(()=>saving=true);
         try{
-          await widget.store.upsertBeneficiary(BeneficiaryRecord(id:widget.existing?.id??makeId(),
+          await widget.store.upsertBeneficiary(BeneficiaryRecord(id:recordId,
             name:name.text.trim(),relationship:relation.text.trim(),
             intendedShareBps:(double.parse(share.text)*100).round(),notes:notes.text.trim()));
           if(context.mounted)Navigator.pop(context);
         }catch(e){if(context.mounted)ScaffoldMessenger.of(context).showSnackBar(SnackBar(content:Text('$e')));}
-      },child:const Text('Save planning note')),
+        finally {if(mounted)setState(()=>saving=false);}
+      },child:Text(saving?'Saving…':'Save planning note')),
       if(widget.existing!=null)...[const SizedBox(height:12),
-        TextButton(onPressed:()async{
-          await widget.store.deleteBeneficiary(widget.existing!.id);
-          if(context.mounted)Navigator.pop(context);
+        TextButton(onPressed:saving?null:()async{
+          final confirmed = await confirmActionSheet(context, title:'Remove beneficiary intention?', consequence:'This deletes the planning note, not any legal nomination or asset.', confirmLabel:'Remove');
+          if(!confirmed || !mounted || saving)return;
+          setState(()=>saving=true);
+          try {await widget.store.deleteBeneficiary(widget.existing!.id);
+            if(mounted)Navigator.pop(context);
+          } catch (_) {if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not remove planning note. Try again.')));}
+          finally {if(mounted)setState(()=>saving=false);}
         },child:const Text('Remove planning note',style:TextStyle(color:LG.negative)))],
       const SizedBox(height:14),const Text('Consult a qualified adviser for enforceable nominations or succession documents.',
         style:TextStyle(color:LG.muted,fontSize:12,height:1.5)),

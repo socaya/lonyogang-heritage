@@ -1053,6 +1053,7 @@ class _GoalFormState extends State<GoalForm> {
       text: widget.existing?.savedUgx.toString() ?? '0');
   late DateTime? targetDate = widget.existing?.targetDate;
   bool saving = false;
+  late final goalId = widget.existing?.id ?? makeId();
 
   @override
   void dispose() {
@@ -1063,7 +1064,7 @@ class _GoalFormState extends State<GoalForm> {
   }
 
   Future<void> _save() async {
-    if (!form.currentState!.validate()) return;
+    if (saving || !form.currentState!.validate()) return;
     final targetUgx = parseAmount(target.text)!;
     final savedUgx = parseAmount(saved.text) ?? 0;
     if (savedUgx > targetUgx) {
@@ -1074,7 +1075,7 @@ class _GoalFormState extends State<GoalForm> {
     setState(() => saving = true);
     try {
       await widget.store.upsertGoal(WealthGoal(
-          id: widget.existing?.id ?? makeId(),
+          id: goalId,
           name: name.text.trim(),
           targetUgx: targetUgx,
           savedUgx: savedUgx,
@@ -1138,14 +1139,11 @@ class _GoalFormState extends State<GoalForm> {
                     help: 'Leave blank for an open-ended goal.',
                     child: SoftCard(
                         onTap: () async {
-                          final v = await showDatePicker(
-                              context: context,
-                              initialDate: targetDate ??
-                                  DateTime.now().add(const Duration(days: 365)),
-                              firstDate: DateTime.now()
-                                  .subtract(const Duration(days: 30)),
-                              lastDate: DateTime(2100));
-                          if (v != null) setState(() => targetDate = v);
+                          final initial = targetDate ?? DateTime.now().add(const Duration(days: 365));
+                          final v = await showDatePicker(context: context, initialDate: initial,
+                              firstDate: DateTime(initial.year < 1900 ? initial.year : 1900),
+                              lastDate: DateTime(initial.year > 2100 ? initial.year+1 : 2101));
+                          if (mounted && v != null) setState(() => targetDate = v);
                         },
                         child: Row(children: [
                           const Icon(Icons.event_outlined,
@@ -1172,7 +1170,7 @@ class _GoalFormState extends State<GoalForm> {
           if (widget.existing != null) ...[
             const SizedBox(height: 10),
             TextButton(
-                onPressed: _delete,
+                onPressed: saving ? null : _delete,
                 child: const Text('Remove goal',
                     style: TextStyle(color: LG.negative))),
           ],
@@ -1286,6 +1284,7 @@ class _ContactFormState extends State<ContactForm> {
   late final instructions =
       TextEditingController(text: widget.existing?.instructions ?? '');
   bool saving = false;
+  late final contactId = widget.existing?.id ?? makeId();
 
   @override
   void dispose() {
@@ -1298,11 +1297,11 @@ class _ContactFormState extends State<ContactForm> {
   }
 
   Future<void> _save() async {
-    if (!form.currentState!.validate()) return;
+    if (saving || !form.currentState!.validate()) return;
     setState(() => saving = true);
     try {
       final contact = LegacyContact(
-        id: widget.existing?.id ?? makeId(),
+        id: contactId,
         name: name.text.trim(),
         relationship: relation.text.trim(),
         instructions: instructions.text.trim(),
@@ -1323,9 +1322,12 @@ class _ContactFormState extends State<ContactForm> {
   Future<void> _delete() async {
     final existing = widget.existing;
     if (existing == null) return;
-    await widget.store.removeContact(existing.id);
-    if (!mounted) return;
-    Navigator.of(context).pop();
+    final confirmed = await confirmActionSheet(context, title: 'Remove trusted contact?', consequence: 'This removes the private contact note only.', confirmLabel: 'Remove');
+    if (!confirmed || !mounted || saving) return;
+    setState(() => saving = true);
+    try { await widget.store.removeContact(existing.id); if(mounted) Navigator.of(context).pop(); }
+    catch (_) { if(mounted) snack(context, 'Could not remove contact. Try again.'); }
+    finally { if(mounted) setState(() => saving = false); }
   }
 
   @override

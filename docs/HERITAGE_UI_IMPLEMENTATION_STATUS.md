@@ -34,3 +34,9 @@ This is an incremental implementation, not a 100% completion or production readi
 - Rental income uses property/period filters, current ledger receipts and costs, exact totals and dated records; excludes reversed and future entries.
 - Cash flow excludes future entries; exact row amounts wrap. Historical net-worth range selection uses actual dated observations only. Asset performance refreshes current asset and includes a numeric valuation list.
 - Native build, screenshots and regression tests remain unexecuted; no verified coverage claim.
+
+## Batch 7 — heritage planning and document editing
+- Document search now includes notes and stored custom categories. Metadata edits preserve attachments, archive flag and archived/missing asset links. Stable retry IDs and guards prevent duplicate record creation.
+- Beneficiary basis-point precision preserved, combined share validated before saving, destructive actions confirmed.
+- Goal and schedule date pickers accept existing overdue dates, stable IDs protect retries, trusted contact and schedule deletion require confirmation. Scheduled postings described truthfully as reviewed/manual.
+- Native verification remains outstanding.
