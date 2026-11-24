@@ -32,7 +32,7 @@ class AppPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context)=>Scaffold(
-    backgroundColor:background,
+    backgroundColor:LG.surface(context,background),
     appBar:appBar,bottomNavigationBar:bottomBar,
     body:SafeArea(child:LayoutBuilder(builder:(context,c){
       final adaptive=padding==const EdgeInsets.fromLTRB(LG.hPad,20,LG.hPad,32)
@@ -79,7 +79,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                 tooltip: 'Back',
                 onPressed:
                     onBack ?? () => Navigator.of(context).maybePop(),
-                icon: const Icon(Icons.arrow_back_rounded, color: LG.navy),
+                icon: Icon(Icons.arrow_back_rounded, color: LG.adaptive(context,LG.navy)),
               ),
             ),
             if (showBrand)
@@ -88,13 +88,13 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: LG.sageSoft,
+                  color: LG.adaptive(context,LG.sageSoft),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${step!.toString().padLeft(2, '0')} / ${totalSteps!.toString().padLeft(2, '0')}',
-                  style: const TextStyle(
-                      color: LG.sage,
+                  style: TextStyle(
+                      color: LG.adaptive(context,LG.sage),
                       fontWeight: FontWeight.w700,
                       fontSize: 12,
                       letterSpacing: 0.5),
@@ -129,8 +129,8 @@ class StepProgress extends StatelessWidget {
           if (eyebrow != null) ...[
             Text(
               eyebrow!.toUpperCase(),
-              style: const TextStyle(
-                color: LG.sage,
+              style: TextStyle(
+                color: LG.adaptive(context,LG.sage),
                 fontSize: 11,
                 fontWeight: FontWeight.w700,
                 letterSpacing: 1.3,
@@ -145,7 +145,7 @@ class StepProgress extends StatelessWidget {
                   child: Container(
                     height: 3,
                     decoration: BoxDecoration(
-                      color: i < currentStep ? LG.gold : LG.line,
+                      color: LG.adaptive(context,i < currentStep ? LG.gold : LG.line),
                       borderRadius: BorderRadius.circular(2),
                     ),
                   ),
@@ -202,8 +202,8 @@ class PrimaryCTA extends StatelessWidget {
                       ),
                       if (showArrow) ...[
                         const SizedBox(width: 10),
-                        const Icon(Icons.arrow_forward_rounded,
-                            size: 18, color: LG.gold),
+                        Icon(Icons.arrow_forward_rounded,
+                            size: 18, color: LG.adaptive(context,LG.gold)),
                       ],
                     ],
                   ),
@@ -229,13 +229,13 @@ class SecurityNotice extends StatelessWidget {
   Widget build(BuildContext context) => Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: LG.sageSoft,
+          color: LG.adaptive(context,LG.sageSoft),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(icon, color: LG.sage, size: 22),
+            Icon(icon, color: LG.adaptive(context,LG.sage), size: 22),
             const SizedBox(width: 12),
             Expanded(
                 child: Column(
@@ -246,8 +246,8 @@ class SecurityNotice extends StatelessWidget {
                           fontSize: 13, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Text(message,
-                      style: const TextStyle(
-                          fontSize: 12, color: LG.muted, height: 1.45)),
+                      style: TextStyle(
+                          fontSize: 12, color: LG.adaptive(context,LG.muted), height: 1.45)),
                 ])),
           ],
         ),
@@ -274,10 +274,10 @@ class StatusChip extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
+      decoration: BoxDecoration(color: LG.surface(context,bg), borderRadius: BorderRadius.circular(8)),
       child: Text(label,
           style: TextStyle(
-              color: fg, fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.2)),
+              color: LG.adaptive(context,fg), fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.2)),
     );
   }
 }
@@ -310,8 +310,8 @@ class MoneyField extends StatelessWidget {
         decoration: InputDecoration(
           prefixText: 'UGX  ',
           hintText: hint ?? '0',
-          prefixStyle: const TextStyle(
-              color: LG.muted, fontWeight: FontWeight.w700, fontSize: 14),
+          prefixStyle: TextStyle(
+              color: LG.adaptive(context,LG.muted), fontWeight: FontWeight.w700, fontSize: 14),
         ),
         validator: validator ??
             (v) {
@@ -357,11 +357,11 @@ class DateField extends StatelessWidget {
           if (picked != null) onChanged(picked);
         },
         child: Row(children: [
-          Icon(icon, color: LG.sage, size: 18),
+          Icon(icon, color: LG.adaptive(context,LG.sage), size: 18),
           const SizedBox(width: 12),
           Text(LG.date(value), style: const TextStyle(fontWeight: FontWeight.w600)),
           const Spacer(),
-          const Icon(Icons.expand_more, color: LG.muted),
+          const Icon(Icons.expand_more, color: LG.adaptive(context,LG.muted)),
         ]),
       );
 }
@@ -402,7 +402,7 @@ class _PhoneFieldState extends State<PhoneField> {
           height: 54,
           padding: const EdgeInsets.symmetric(horizontal: 12),
           decoration: BoxDecoration(
-            border: Border.all(color: LG.line),
+            border: Border.all(color: LG.adaptive(context,LG.line)),
             borderRadius: BorderRadius.circular(12),
           ),
           child: DropdownButtonHideUnderline(
@@ -447,7 +447,7 @@ Future<bool> confirmActionSheet(BuildContext context, {
 }) async {
   final result = await showModalBottomSheet<bool>(
     context: context,
-    backgroundColor: LG.canvas,
+    backgroundColor: LG.surface(context,LG.canvas),
     showDragHandle: true,
     isScrollControlled: true,
     builder: (ctx) => SafeArea(
@@ -458,7 +458,7 @@ Future<bool> confirmActionSheet(BuildContext context, {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              Icon(icon, color: destructive ? LG.negative : LG.sage),
+              Icon(icon, color: LG.adaptive(ctx,destructive ? LG.negative : LG.sage)),
               const SizedBox(width: 10),
               Expanded(
                   child: Text(title,
@@ -466,7 +466,7 @@ Future<bool> confirmActionSheet(BuildContext context, {
             ]),
             const SizedBox(height: 10),
             Text(consequence,
-                style: const TextStyle(color: LG.muted, height: 1.5)),
+                style: const TextStyle(color: LG.adaptive(context,LG.muted), height: 1.5)),
             const SizedBox(height: 18),
             PrimaryCTA(
               label: confirmLabel,
@@ -477,7 +477,7 @@ Future<bool> confirmActionSheet(BuildContext context, {
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: Text(cancelLabel,
-                    style: const TextStyle(color: LG.muted))),
+                    style: const TextStyle(color: LG.adaptive(context,LG.muted)))),
           ],
         ),
       ),
@@ -502,7 +502,7 @@ class LoadingState extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2)),
             if (message != null) ...[
               const SizedBox(height: 16),
-              Text(message!, style: const TextStyle(color: LG.muted)),
+              Text(message!, style: const TextStyle(color: LG.adaptive(context,LG.muted))),
             ],
           ],
         ),
@@ -525,14 +525,14 @@ class ErrorState extends StatelessWidget {
   Widget build(BuildContext context) => SoftCard(
         color: const Color(0xFFF8EAE7),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-          const Row(children: [
-            Icon(Icons.error_outline, color: LG.negative),
+          Row(children: [
+            Icon(Icons.error_outline, color: LG.adaptive(context,LG.negative)),
             SizedBox(width: 10),
             Expanded(child:Text('Something went wrong',
                 style: TextStyle(fontWeight: FontWeight.w700))),
           ]),
           const SizedBox(height: 8),
-          Text(message, style: const TextStyle(color: LG.muted, height: 1.5)),
+          Text(message, style: const TextStyle(color: LG.adaptive(context,LG.muted), height: 1.5)),
           if (onRetry != null) ...[
             const SizedBox(height: 10),
             OutlinedButton.icon(
@@ -567,13 +567,13 @@ class AppEmptyState extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.symmetric(vertical: 24),
           child: Column(children: [
-            Icon(icon, size: 34, color: LG.sage),
+            Icon(icon, size: 34, color: LG.adaptive(context,LG.sage)),
             const SizedBox(height: 12),
             Text(title, style: Theme.of(context).textTheme.titleMedium),
             const SizedBox(height: 6),
             Text(detail,
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: LG.muted, height: 1.45)),
+                style: TextStyle(color: LG.adaptive(context,LG.muted), height: 1.45)),
             if (onAction != null && actionLabel != null) ...[
               const SizedBox(height: 16),
               OutlinedButton.icon(

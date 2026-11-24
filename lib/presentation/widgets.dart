@@ -21,12 +21,12 @@ class BrandMark extends StatelessWidget {
         image: true,
         child: ConstrainedBox(
           constraints: BoxConstraints(maxWidth: height * 4),
-          child: Image.asset(
+          child: DecoratedBox(decoration: BoxDecoration(color:LG.isDark(context)?LG.ivory:Colors.transparent,borderRadius:BorderRadius.circular(4)),child: Image.asset(
             'assets/brand/theme1-primary.png',
             height: height,
             fit: BoxFit.contain,
             excludeFromSemantics: true,
-          ),
+          )),
         ),
       );
 }
@@ -41,7 +41,7 @@ class PageHeading extends StatelessWidget {
     child:LayoutBuilder(builder:(context,c){
       final heading=Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Semantics(header:true,child:Text(title,style:Theme.of(context).textTheme.headlineMedium)),
-        if(subtitle!=null)...[const SizedBox(height:8),Text(subtitle!,style:Theme.of(context).textTheme.bodyMedium?.copyWith(color:LG.muted))],
+        if(subtitle!=null)...[const SizedBox(height:8),Text(subtitle!,style:Theme.of(context).textTheme.bodyMedium?.copyWith(color:LG.adaptive(context,LG.muted)))],
       ]);
       if(trailing==null)return heading;
       if(stackedLayout(context,c.maxWidth))return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[heading,const SizedBox(height:12),trailing!]);
@@ -53,7 +53,7 @@ class PageHeading extends StatelessWidget {
 class SoftCard extends StatelessWidget {
   final Widget child;final EdgeInsets padding;final Color color;final VoidCallback? onTap;
   const SoftCard({super.key,required this.child,this.padding=const EdgeInsets.all(18),this.color=LG.white,this.onTap});
-  @override Widget build(BuildContext context)=>Material(color:color,borderRadius:BorderRadius.circular(LG.r),
+  @override Widget build(BuildContext context)=>Material(color:LG.surface(context,color),borderRadius:BorderRadius.circular(LG.r),
     child:InkWell(onTap:onTap,borderRadius:BorderRadius.circular(LG.r),
       child:Padding(padding:padding,child:child)));
 }
@@ -71,7 +71,7 @@ class SectionTitle extends StatelessWidget {
               width: 4,
               height: 20,
               decoration: BoxDecoration(
-                  color: LG.gold, borderRadius: BorderRadius.circular(2)),
+                  color: LG.adaptive(context,LG.gold), borderRadius: BorderRadius.circular(2)),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -90,8 +90,8 @@ class InfoLabel extends StatelessWidget {
   @override Widget build(BuildContext context)=>Padding(
     padding:const EdgeInsets.symmetric(vertical:10),
     child:LayoutBuilder(builder:(context,c){
-      final name=Text(label,style:const TextStyle(color:LG.muted,fontSize:14,height:1.3));
-      final detail=Text(value,style:TextStyle(color:valueColor??LG.navy,fontWeight:FontWeight.w700,fontSize:14),textAlign:stackedLayout(context,c.maxWidth)?TextAlign.start:TextAlign.end);
+      final name=Text(label,style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:14,height:1.3));
+      final detail=Text(value,style:TextStyle(color:LG.adaptive(context,valueColor??LG.navy),fontWeight:FontWeight.w700,fontSize:14),textAlign:stackedLayout(context,c.maxWidth)?TextAlign.start:TextAlign.end);
       if(stackedLayout(context,c.maxWidth))return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[name,const SizedBox(height:4),detail]);
       return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:name),const SizedBox(width:12),Expanded(child:detail)]);
     }),
@@ -113,8 +113,8 @@ class LGFilterChip extends StatelessWidget {
       child:AnimatedContainer(duration:MediaQuery.disableAnimationsOf(context)?Duration.zero:const Duration(milliseconds:160),
         constraints:const BoxConstraints(minHeight:48,minWidth:48),
         padding:const EdgeInsets.symmetric(horizontal:12,vertical:12),
-        decoration:BoxDecoration(color:selected?LG.goldSoft:LG.white,borderRadius:BorderRadius.circular(8),border:Border.all(color:selected?LG.gold:LG.line,width:1.2)),
-        child:Text(label,style:const TextStyle(color:LG.navy,fontSize:13,fontWeight:FontWeight.w600)),
+        decoration:BoxDecoration(color:LG.adaptive(context,selected?LG.goldSoft:LG.white),borderRadius:BorderRadius.circular(8),border:Border.all(color:LG.adaptive(context,selected?LG.gold:LG.line),width:1.2)),
+        child:Text(label,style:TextStyle(color:LG.adaptive(context,LG.navy),fontSize:13,fontWeight:FontWeight.w600)),
       ),
     )),
   );
@@ -124,8 +124,8 @@ class Pill extends StatelessWidget {
   final String label;final Color color;
   const Pill(this.label,{super.key,this.color=LG.sageSoft});
   @override Widget build(BuildContext context)=>Container(padding:const EdgeInsets.symmetric(horizontal:11,vertical:6),
-    decoration:BoxDecoration(color:color,borderRadius:BorderRadius.circular(22)),child:Text(label,
-      style:const TextStyle(color:LG.sage,fontWeight:FontWeight.w700,fontSize:11)));
+    decoration:BoxDecoration(color:LG.surface(context,color),borderRadius:BorderRadius.circular(22)),child:Text(label,
+      style:TextStyle(color:LG.adaptive(context,LG.sage),fontWeight:FontWeight.w700,fontSize:11)));
 }
 
 IconData assetIcon(AssetKind kind)=>switch(kind){
@@ -185,10 +185,10 @@ class AssetTile extends StatelessWidget {
                 width: 46,
                 height: 46,
                 decoration: BoxDecoration(
-                    color: LG.sageSoft,
+                    color: LG.adaptive(context,LG.sageSoft),
                     borderRadius: BorderRadius.circular(13)),
                 child: Icon(assetIcon(asset.kind),
-                    color: LG.sage, size: 23)),
+                    color: LG.adaptive(context,LG.sage), size: 23)),
             const SizedBox(width: 13),
             Expanded(
                 child: Column(
@@ -224,22 +224,22 @@ class AssetTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style:
-                          const TextStyle(fontSize: 12.5, color: LG.muted)),
+                          TextStyle(fontSize: 12.5, color: LG.adaptive(context,LG.muted))),
                   if (_hasInterest) ...[
                     const SizedBox(height: 7),
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
-                          color: LG.goldSoft,
+                          color: LG.adaptive(context,LG.goldSoft),
                           borderRadius: BorderRadius.circular(8)),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                        const Icon(Icons.percent_rounded,
-                            size: 10.5, color: LG.gold),
+                        Icon(Icons.percent_rounded,
+                            size: 10.5, color: LG.adaptive(context,LG.gold)),
                         const SizedBox(width: 4),
                         Text(_interestLabel,
-                            style: const TextStyle(
-                                color: LG.navy,
+                            style: TextStyle(
+                                color: LG.adaptive(context,LG.navy),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700)),
                       ]),
@@ -255,11 +255,11 @@ class AssetTile extends StatelessWidget {
                       letterSpacing: -.2)),
               if (asset.ownershipBps < 10000)
                 Text('${(asset.ownershipBps / 100).toStringAsFixed(0)}% owned',
-                    style: const TextStyle(fontSize: 10.5, color: LG.sage)),
+                    style: TextStyle(fontSize: 10.5, color: LG.adaptive(context,LG.sage))),
             ]),
             const SizedBox(width: 4),
-            const Icon(Icons.chevron_right_rounded,
-                size: 20, color: LG.muted),
+            Icon(Icons.chevron_right_rounded,
+                size: 20, color: LG.adaptive(context,LG.muted)),
           ]),
         ),
       );
@@ -270,7 +270,7 @@ class WealthBreakdown extends StatelessWidget {
   const WealthBreakdown({super.key,required this.values});
   @override
   Widget build(BuildContext context) {
-    final colors = [LG.gold, LG.sage, LG.navy, const Color(0xFF487A94)];
+    final colors = [LG.adaptive(context,LG.gold), LG.adaptive(context,LG.sage), LG.adaptive(context,LG.navy), const Color(0xFF487A94)];
     final total = values.values.fold<int>(0, (a, b) => a + b);
     final entries = values.entries.toList();
     return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -288,7 +288,7 @@ class WealthBreakdown extends StatelessWidget {
           ),
         )
       else
-        const Text('Allocation chart unavailable', style: TextStyle(color: LG.muted)),
+        Text('Allocation chart unavailable', style: TextStyle(color: LG.adaptive(context,LG.muted))),
       const SizedBox(height: 16),
       for (var i = 0; i < entries.length; i++)
         Padding(
@@ -296,11 +296,11 @@ class WealthBreakdown extends StatelessWidget {
           child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Container(width: 9, height: 9, margin: const EdgeInsets.only(top: 5), color: colors[i % colors.length]),
             const SizedBox(width: 9),
-            Expanded(child: Text(entries[i].key, style: const TextStyle(color: LG.muted, fontSize: 13))),
+            Expanded(child: Text(entries[i].key, style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13))),
             Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(LG.money(entries[i].value), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
               if (total > 0 && entries.every((e) => e.value >= 0))
-                Text('${(entries[i].value / total * 100).toStringAsFixed(1)}%', style: const TextStyle(color: LG.muted, fontSize: 12)),
+                Text('${(entries[i].value / total * 100).toStringAsFixed(1)}%', style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12)),
             ])),
           ]),
         ),
@@ -312,9 +312,9 @@ class EmptySection extends StatelessWidget {
   final String title;final String detail;final IconData icon;final VoidCallback? onAdd;
   const EmptySection({super.key,required this.title,required this.detail,this.icon=Icons.layers_outlined,this.onAdd});
   @override Widget build(BuildContext context)=>SoftCard(child:Padding(padding:const EdgeInsets.symmetric(vertical:20),child:
-    Column(children:[Icon(icon,size:34,color:LG.sage),const SizedBox(height:12),Text(title,
+    Column(children:[Icon(icon,size:34,color:LG.adaptive(context,LG.sage)),const SizedBox(height:12),Text(title,
       style:Theme.of(context).textTheme.titleMedium),const SizedBox(height:6),Text(detail,
-      textAlign:TextAlign.center,style:const TextStyle(color:LG.muted,height:1.4)),
+      textAlign:TextAlign.center,style:TextStyle(color:LG.adaptive(context,LG.muted),height:1.4)),
       if(onAdd!=null)...[const SizedBox(height:16),TextButton.icon(onPressed:onAdd,icon:const Icon(Icons.add),label:const Text('Add entry'))]
     ])));
 }
@@ -342,16 +342,16 @@ class FormFieldBlock extends StatelessWidget {
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Flexible(child:Text(title,
-                    style: const TextStyle(
+                    style: TextStyle(
                         fontWeight: FontWeight.w600,
                         fontSize: 15,
-                        color: LG.navy,
+                        color: LG.adaptive(context,LG.navy),
                         letterSpacing: -.1))),
                 if (required) ...[
                   const SizedBox(width: 6),
-                  const Text('*',
+                  Text('*',
                       style: TextStyle(
-                          color: LG.gold,
+                          color: LG.adaptive(context,LG.gold),
                           fontSize: 15,
                           fontWeight: FontWeight.w700)),
                 ],
@@ -362,8 +362,8 @@ class FormFieldBlock extends StatelessWidget {
             if (help != null) ...[
               const SizedBox(height: 8),
               Text(help!,
-                  style: const TextStyle(
-                      fontSize: 13, color: LG.muted, height: 1.4)),
+                  style: TextStyle(
+                      fontSize: 13, color: LG.adaptive(context,LG.muted), height: 1.4)),
             ],
           ],
         ),
@@ -372,10 +372,10 @@ class FormFieldBlock extends StatelessWidget {
 
 class PrivacyBanner extends StatelessWidget {
   const PrivacyBanner({super.key});
-  @override Widget build(BuildContext context)=>const SoftCard(color:LG.sageSoft,child:Row(children:[
-    Icon(Icons.shield_outlined,color:LG.sage,size:27),SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+  @override Widget build(BuildContext context)=>SoftCard(color:LG.adaptive(context,LG.sageSoft),child:Row(children:[
+    Icon(Icons.shield_outlined,color:LG.adaptive(context,LG.sage),size:27),SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
       Text('Local alpha mode',style:TextStyle(fontWeight:FontWeight.w700,fontSize:13)),SizedBox(height:3),
       Text('Optional AES-GCM encryption on this device. No cloud sync. Keep an unencrypted JSON export as your backup.',
-        style:TextStyle(fontSize:11,height:1.45,color:LG.muted))
+        style:TextStyle(fontSize:11,height:1.45,color:LG.adaptive(context,LG.muted)))
     ]))]));
 }
