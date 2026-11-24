@@ -48,6 +48,8 @@ class ExpensesScreen extends StatefulWidget {
 
 class _ExpensesScreenState extends State<ExpensesScreen> {
   String? _filter;
+  String _period = 'All dates';
+  String _query = '';
 
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
@@ -58,14 +60,27 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
           final monthStart = DateTime(now.year, now.month, 1);
           final all = [...widget.store.state.expenses.where((e) => !e.archived)]
             ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
-          final filtered = _filter == null
-              ? all
-              : all.where((e) => e.category == _filter).toList();
+          final tomorrow = DateTime(now.year, now.month, now.day + 1);
+          final nextMonth = DateTime(now.year, now.month + 1);
+          final periodRecords = all.where((e) {
+            final date = e.occurredAt.toLocal();
+            if (_period == 'Today') return !date.isBefore(today) && date.isBefore(tomorrow);
+            if (_period == 'This month') return !date.isBefore(monthStart) && date.isBefore(nextMonth);
+            return true;
+          }).toList();
+          final filtered = periodRecords.where((e) =>
+            (_filter == null || e.category == _filter) &&
+            '${e.description} ${e.merchant} ${e.category}'.toLowerCase().contains(_query.trim().toLowerCase())).toList();
+          final categoryTotals = <String, int>{};
+          for (final e in periodRecords) {
+            final category = e.category.isEmpty ? 'Uncategorized' : e.category;
+            categoryTotals.update(category, (v) => v + e.amountUgx, ifAbsent: () => e.amountUgx);
+          }
           final todaysTotal = all
-              .where((e) => !e.occurredAt.isBefore(today))
+              .where((e) => !e.occurredAt.toLocal().isBefore(today) && e.occurredAt.toLocal().isBefore(tomorrow))
               .fold<int>(0, (acc, e) => acc + e.amountUgx);
           final monthsTotal = all
-              .where((e) => !e.occurredAt.isBefore(monthStart))
+              .where((e) => !e.occurredAt.toLocal().isBefore(monthStart) && e.occurredAt.toLocal().isBefore(nextMonth))
               .fold<int>(0, (acc, e) => acc + e.amountUgx);
           final categories = all.map((e) => e.category).toSet().toList()
             ..sort();
@@ -74,7 +89,7 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
             floatingActionButton: FloatingActionButton.extended(
               onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
                   builder: (_) => ExpenseForm(store: widget.store))),
-              backgroundColor: LG.gold,
+              backgroundColor: LG.navy,
               foregroundColor: LG.white,
               icon: const Icon(Icons.add),
               label: const Text('New expense'),
@@ -104,9 +119,24 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                             iconColor: LG.sage)),
                   ]),
                   const SizedBox(height: 22),
+                  DropdownButtonFormField<String>(
+                    initialValue: _period,
+                    decoration: const InputDecoration(labelText: 'Period'),
+                    items: const ['All dates', 'Today', 'This month'].map((p) => DropdownMenuItem(value: p, child: Text(p))).toList(),
+                    onChanged: (p) => setState(() => _period = p ?? 'All dates'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(onChanged: (q) => setState(() => _query = q),
+                    decoration: const InputDecoration(labelText: 'Search expenses', prefixIcon: Icon(Icons.search))),
+                  const SizedBox(height: 16),
+                  if (categoryTotals.isNotEmpty) ...[
+                    const SectionTitle('Spending by category'),
+                    SoftCard(child: WealthBreakdown(values: categoryTotals)),
+                    const SizedBox(height: 16),
+                  ],
                   if (categories.isNotEmpty)
                     SizedBox(
-                      height: 42,
+                      height: 48,
                       child: ListView(
                         scrollDirection: Axis.horizontal,
                         children: [
@@ -128,10 +158,9 @@ class _ExpensesScreenState extends State<ExpensesScreen> {
                     ),
                   const SizedBox(height: 14),
                   if (filtered.isEmpty)
-                    const EmptySection(
-                      title: 'No expenses recorded yet',
-                      detail:
-                          'Tap "New expense" to log a purchase and optionally scan the receipt.',
+                    EmptySection(
+                      title: all.isEmpty ? 'No expenses recorded yet' : 'No matching expenses',
+                      detail: all.isEmpty ? 'Tap New expense to log a purchase and optionally scan the receipt.' : 'Change the period, category or search.',
                       icon: Icons.receipt_long_outlined,
                     )
                   else
@@ -178,7 +207,7 @@ class _SummaryTile extends StatelessWidget {
               child: Text(value,
                   style: const TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -.3))),
         ]),
       );
@@ -215,7 +244,7 @@ class _ExpenseTile extends StatelessWidget {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style:
-                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w800)),
+                  const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
           const SizedBox(height: 4),
           Text(subtitle,
               maxLines: 1,
@@ -232,7 +261,7 @@ class _ExpenseTile extends StatelessWidget {
                   style: const TextStyle(
                       color: LG.sage,
                       fontSize: 11,
-                      fontWeight: FontWeight.w800)),
+                      fontWeight: FontWeight.w700)),
             ),
           ],
         ])),
@@ -241,7 +270,7 @@ class _ExpenseTile extends StatelessWidget {
           Text('- ${LG.money(expense.amountUgx, compact: true)}',
               style: const TextStyle(
                   color: LG.negative,
-                  fontWeight: FontWeight.w900,
+                  fontWeight: FontWeight.w700,
                   fontSize: 14.5)),
           if (expense.receipt != null) ...[
             const SizedBox(height: 4),

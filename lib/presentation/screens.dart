@@ -969,35 +969,102 @@ class ReturnsList extends StatelessWidget {
   }
 }
 
-class TransactionsScreen extends StatelessWidget {
+class TransactionsScreen extends StatefulWidget {
   final PortfolioStore store;
-  const TransactionsScreen({super.key,required this.store});
-  @override Widget build(BuildContext context) {
-    final events=[...store.state.events]..sort((a,b)=>b.occurredAt.compareTo(a.occurredAt));
-    return ScreenPage(title:'Transactions',subtitle:'A record of money movements and income.',children:[
-      if(events.isEmpty)const EmptySection(title:'No transactions yet',detail:'Add contributions, income, rental receipts or expenses.')
-      else ...events.map((e){
-        final reversed=eventIsReversed(e,events);
-        final label='${e.description}. ${e.kind.name}. ${LG.money(e.amountUgx)}. ${LG.date(e.occurredAt)}.'
-          '${reversed?' Reversed.':''}';
-        return Padding(padding:const EdgeInsets.only(bottom:8),child:Semantics(
-          container:true,button:true,label:label,
-          child:SoftCard(onTap:()=>push(context,TransactionDetailScreen(store:store,event:e)),
-            child:Row(children:[
-            Icon(e.kind==EventKind.reversal?Icons.undo:Icons.receipt_long_outlined,color:LG.sage),
-            const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-              Text(e.description,style:const TextStyle(fontWeight:FontWeight.w700)),const SizedBox(height:4),
-              Text('${e.kind.name} · ${LG.date(e.occurredAt)}',style:const TextStyle(fontSize:11,color:LG.muted)),
-              if(reversed)const Text('Reversed',style:TextStyle(color:LG.negative,fontSize:11)),
-            ])),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
-              Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w700)),
-              const SizedBox(height:4),
-              const Icon(Icons.chevron_right,color:LG.muted,size:18),
-            ])]))));}),
-      const SizedBox(height:18),ElevatedButton.icon(onPressed:()=>push(context,EventForm(store:store)),
-        icon:const Icon(Icons.add),label:const Text('Record transaction')),
-    ]);
-  }
+  const TransactionsScreen({super.key, required this.store});
+
+  @override
+  State<TransactionsScreen> createState() => _TransactionsScreenState();
+}
+
+class _TransactionsScreenState extends State<TransactionsScreen> {
+  String query = '';
+  EventKind? kind;
+  DateTimeRange? period;
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+    animation: widget.store,
+    builder: (context, _) {
+      final all = [...widget.store.state.events]
+        ..sort((a, b) => b.occurredAt.compareTo(a.occurredAt));
+      final needle = query.trim().toLowerCase();
+      final events = all.where((e) {
+        final date = DateUtils.dateOnly(e.occurredAt.toLocal());
+        return (kind == null || e.kind == kind) &&
+          (needle.isEmpty || e.description.toLowerCase().contains(needle)) &&
+          (period == null || (!date.isBefore(period!.start) && !date.isAfter(period!.end)));
+      }).toList();
+      return ScreenPage(title: 'Transactions',
+        subtitle: 'Recorded money movements. Reversals remain in the ledger.',
+        children: [
+          ElevatedButton.icon(
+            onPressed: () => push(context, EventForm(store: widget.store)),
+            icon: const Icon(Icons.add),
+            label: const Text('Record transaction'),
+          ),
+          const SizedBox(height: 20),
+          TextField(
+            key: const ValueKey('transaction-search'),
+            onChanged: (value) => setState(() => query = value),
+            decoration: const InputDecoration(labelText: 'Search transactions', prefixIcon: Icon(Icons.search)),
+          ),
+          const SizedBox(height: 12),
+          DropdownButtonFormField<EventKind>(
+            initialValue: kind,
+            isExpanded: true,
+            decoration: const InputDecoration(labelText: 'Transaction type'),
+            items: [const DropdownMenuItem<EventKind>(value: null, child: Text('All types')),
+              ...EventKind.values.map((e) => DropdownMenuItem(value: e, child: Text(e.name)))],
+            onChanged: (value) => setState(() => kind = value),
+          ),
+          const SizedBox(height: 12),
+          OutlinedButton.icon(
+            icon: const Icon(Icons.date_range_outlined),
+            label: Text(period == null ? 'All dates · Choose period' : '${LG.date(period!.start)} – ${LG.date(period!.end)}'),
+            onPressed: () async {
+              final now = DateTime.now();
+              final chosen = await showDateRangePicker(context: context,
+                firstDate: DateTime(1900), lastDate: DateTime(now.year + 10),
+                initialDateRange: period);
+              if (mounted && chosen != null) setState(() => period = chosen);
+            },
+          ),
+          if (period != null)
+            TextButton(onPressed: () => setState(() => period = null), child: const Text('Clear period')),
+          const SizedBox(height: 16),
+          SectionTitle('Records (${events.length})'),
+          if (events.isEmpty)
+            EmptySection(title: all.isEmpty ? 'No transactions yet' : 'No matching transactions',
+              detail: all.isEmpty ? 'Record a contribution, withdrawal or income.' : 'Change the search, type or date range.')
+          else
+            for (var i = 0; i < events.length; i++) ...[
+              if (i == 0 || !DateUtils.isSameDay(events[i-1].occurredAt.toLocal(), events[i].occurredAt.toLocal()))
+                Padding(padding: const EdgeInsets.symmetric(vertical: 12),
+                  child: Text(LG.date(events[i].occurredAt.toLocal()), style: Theme.of(context).textTheme.titleSmall)),
+              _transactionRow(context, events[i], eventIsReversed(events[i], all)),
+            ],
+        ]);
+    });
+
+  Widget _transactionRow(BuildContext context, LedgerEvent e, bool reversed) =>
+    Padding(padding: const EdgeInsets.only(bottom: 6), child: SoftCard(
+      padding: const EdgeInsets.all(14),
+      onTap: () => push(context, TransactionDetailScreen(store: widget.store, event: e)),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(e.kind == EventKind.reversal ? Icons.undo : Icons.receipt_long_outlined, color: LG.sageDark),
+        const SizedBox(width: 12),
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(e.description, style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 4),
+          Text(e.kind.name, style: const TextStyle(color: LG.muted, fontSize: 13)),
+          if (reversed) const Text('Reversed', style: TextStyle(color: LG.negative, fontSize: 13)),
+        ])),
+        const SizedBox(width: 8),
+        Flexible(child: Text(LG.money(e.amountUgx), textAlign: TextAlign.end,
+          style: const TextStyle(fontWeight: FontWeight.w700))),
+      ]),
+    ));
 }
 
 class MoreScreen extends StatelessWidget {

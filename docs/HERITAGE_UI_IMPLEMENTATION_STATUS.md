@@ -20,3 +20,9 @@ This is an incremental implementation, not a 100% completion or production readi
 - Allocation chart omits zero segments, avoids misleading charts for nonpositive totals, and presents exact values and percentages.
 - Updated navigation regression test for four tabs, contextual Add and search.
 - Tests not executed: Flutter SDK unavailable. Authentication, native dark mode and remaining screen-specific work remain open.
+
+## Batch 4 — transaction and expense browsing
+- Live transaction search, type and inclusive date range filters, date grouping and exact amounts; reversal status uses the full ledger.
+- Expense period and search filters, real category totals, accurate local-day and month bounds (future records excluded from daily/monthly summaries).
+- Existing recording, editing, attachment and reversal flows retained.
+- Native tests remain unexecuted; no Verified status asserted.
