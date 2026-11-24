@@ -441,12 +441,12 @@ class _AssetFormState extends State<AssetForm> {
                     if (d != null) setState(() => date = d);
                   },
                   child: Row(children: [
-                    const Icon(Icons.calendar_today_outlined,
-                        color: LG.sage, size: 18),
+                    Icon(Icons.calendar_today_outlined,
+                        color: LG.adaptive(context,LG.sage), size: 18),
                     const SizedBox(width: 12),
                     Text(LG.date(date)),
                     const Spacer(),
-                    const Icon(Icons.chevron_right, color: LG.muted),
+                    Icon(Icons.chevron_right, color: LG.adaptive(context,LG.muted)),
                   ]),
                 ),
               ),
@@ -784,7 +784,7 @@ class _LiabilityFormState extends State<LiabilityForm> {
               const SizedBox(height: 16),
               if (saveError != null)
                 Padding(padding: const EdgeInsets.only(bottom: 12),
-                  child: Text(saveError!, style: const TextStyle(color: LG.negative))),
+                  child: Text(saveError!, style: TextStyle(color: LG.adaptive(context,LG.negative)))),
               PrimaryCTA(
                 label: 'Save liability',
                 loading: saving,
@@ -794,8 +794,8 @@ class _LiabilityFormState extends State<LiabilityForm> {
                 TextButton(
                   onPressed: saving ? null : () => confirmArchive(context,
                       () => widget.store.archiveLiability(widget.existing!)),
-                  child: const Text('Archive liability',
-                      style: TextStyle(color: LG.negative)),
+                  child: Text('Archive liability',
+                      style: TextStyle(color: LG.adaptive(context,LG.negative))),
                 ),
             ],
           ),
@@ -923,7 +923,7 @@ class _EventFormState extends State<EventForm>{
                 if (picked != null) setState(() => day = picked);
               },
               child: Row(children: [
-                const Icon(Icons.calendar_today_outlined, color: LG.sage),
+                Icon(Icons.calendar_today_outlined, color: LG.adaptive(context,LG.sage)),
                 const SizedBox(width: 12),
                 Text(LG.date(day))
               ]))),
@@ -931,12 +931,12 @@ class _EventFormState extends State<EventForm>{
           title: 'Notes',
           child: TextFormField(controller: notes, maxLines: 3)),
       const SizedBox(height: 10),
-      const SoftCard(
-          color: LG.sageSoft,
+      SoftCard(
+          color: LG.adaptive(context,LG.sageSoft),
           child: Text(
               'An activity entry does not automatically change asset valuations. Update the asset value separately after reconciling statements.',
               style:
-                  TextStyle(color: LG.muted, fontSize: 13, height: 1.5))),
+                  TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13, height: 1.5))),
       const SizedBox(height: 22),
       ElevatedButton(
           onPressed: () async {
@@ -1008,20 +1008,20 @@ class GoalsScreen extends StatelessWidget {
                                             : StatusTone.info),
                                     const SizedBox(width: 6),
                                   ],
-                                  const Icon(Icons.chevron_right, color: LG.muted),
+                                  Icon(Icons.chevron_right, color: LG.adaptive(context,LG.muted)),
                                 ]),
                                 const SizedBox(height: 10),
                                 LinearProgressIndicator(
                                     value: pct.toDouble(),
                                     minHeight: 8,
-                                    color: LG.sage,
-                                    backgroundColor: LG.sageSoft,
+                                    color: LG.adaptive(context,LG.sage),
+                                    backgroundColor: LG.adaptive(context,LG.sageSoft),
                                     borderRadius: BorderRadius.circular(7)),
                                 const SizedBox(height: 9),
                                 Text(
                                     '${LG.money(g.savedUgx)} of ${LG.money(g.targetUgx)}',
-                                    style: const TextStyle(
-                                        fontSize: 12, color: LG.muted)),
+                                    style: TextStyle(
+                                        fontSize: 12, color: LG.adaptive(context,LG.muted))),
                               ]),
                         ),
                       ));
@@ -1147,8 +1147,8 @@ class _GoalFormState extends State<GoalForm> {
                           if (mounted && v != null) setState(() => targetDate = v);
                         },
                         child: Row(children: [
-                          const Icon(Icons.event_outlined,
-                              color: LG.sage, size: 18),
+                          Icon(Icons.event_outlined,
+                              color: LG.adaptive(context,LG.sage), size: 18),
                           const SizedBox(width: 10),
                           Expanded(
                               child: Text(
@@ -1160,8 +1160,8 @@ class _GoalFormState extends State<GoalForm> {
                             IconButton(
                                 tooltip: 'Clear target date',
                                 onPressed: () => setState(() => targetDate = null),
-                                icon: const Icon(Icons.close,
-                                    color: LG.muted, size: 18))
+                                icon: Icon(Icons.close,
+                                    color: LG.adaptive(context,LG.muted), size: 18))
                         ]))),
               ])),
           PrimaryCTA(
@@ -1172,8 +1172,8 @@ class _GoalFormState extends State<GoalForm> {
             const SizedBox(height: 10),
             TextButton(
                 onPressed: saving ? null : _delete,
-                child: const Text('Remove goal',
-                    style: TextStyle(color: LG.negative))),
+                child: Text('Remove goal',
+                    style: TextStyle(color: LG.adaptive(context,LG.negative)))),
           ],
         ],
       );
@@ -1191,16 +1191,16 @@ class LegacyScreen extends StatelessWidget {
           title: 'Heritage & legacy',
           subtitle: 'Organise trusted contacts and estate-planning notes.',
           children: [
-            const SoftCard(
-                color: LG.sageSoft,
+            SoftCard(
+                color: LG.adaptive(context,LG.sageSoft),
                 child: Row(children: [
-                  Icon(Icons.shield_outlined, color: LG.sage),
+                  Icon(Icons.shield_outlined, color: LG.adaptive(context,LG.sage)),
                   SizedBox(width: 12),
                   Expanded(
                       child: Text(
                           'Contacts are private notes, not legally binding nominations or instructions.',
                           style: TextStyle(
-                              fontSize: 12, color: LG.muted, height: 1.5)))
+                              fontSize: 12, color: LG.adaptive(context,LG.muted), height: 1.5)))
                 ])),
             const SizedBox(height: 18),
             const SectionTitle('Trusted contacts'),
@@ -1216,10 +1216,10 @@ class LegacyScreen extends StatelessWidget {
                       onTap: () => push(
                           context, ContactForm(store: store, existing: c)),
                       child: Row(children: [
-                        const CircleAvatar(
-                            backgroundColor: LG.sageSoft,
+                        CircleAvatar(
+                            backgroundColor: LG.adaptive(context,LG.sageSoft),
                             child:
-                                Icon(Icons.person_outline, color: LG.sage)),
+                                Icon(Icons.person_outline, color: LG.adaptive(context,LG.sage))),
                         const SizedBox(width: 12),
                         Expanded(
                             child: Column(
@@ -1230,24 +1230,24 @@ class LegacyScreen extends StatelessWidget {
                                   style: const TextStyle(
                                       fontWeight: FontWeight.w800)),
                               Text(c.relationship,
-                                  style: const TextStyle(
-                                      color: LG.muted, fontSize: 12)),
+                                  style: TextStyle(
+                                      color: LG.adaptive(context,LG.muted), fontSize: 12)),
                               if (c.email.isNotEmpty)
                                 Text(c.email,
-                                    style: const TextStyle(
-                                        color: LG.muted, fontSize: 11)),
+                                    style: TextStyle(
+                                        color: LG.adaptive(context,LG.muted), fontSize: 11)),
                               if (c.phone.isNotEmpty)
                                 Text(c.phone,
-                                    style: const TextStyle(
-                                        color: LG.muted, fontSize: 11)),
+                                    style: TextStyle(
+                                        color: LG.adaptive(context,LG.muted), fontSize: 11)),
                               if (c.instructions.isNotEmpty)
                                 Text(c.instructions,
                                     maxLines: 2,
                                     overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                        color: LG.muted, fontSize: 11)),
+                                    style: TextStyle(
+                                        color: LG.adaptive(context,LG.muted), fontSize: 11)),
                             ])),
-                        const Icon(Icons.chevron_right, color: LG.muted),
+                        Icon(Icons.chevron_right, color: LG.adaptive(context,LG.muted)),
                       ]),
                     ),
                   )),
@@ -1389,8 +1389,8 @@ class _ContactFormState extends State<ContactForm> {
             const SizedBox(height: 10),
             TextButton(
                 onPressed: saving ? null : _delete,
-                child: const Text('Remove contact',
-                    style: TextStyle(color: LG.negative))),
+                child: Text('Remove contact',
+                    style: TextStyle(color: LG.adaptive(context,LG.negative)))),
           ],
         ],
       );
@@ -1404,13 +1404,13 @@ class RemindersScreen extends StatelessWidget {
     if(store.state.reminders.isEmpty)const EmptySection(title:'No reminders',detail:'Record a maturity, rent, renewal or contribution date.')
     else ...([...store.state.reminders]..sort((a,b)=>a.dueAt.compareTo(b.dueAt))).map((r)=>Padding(
       padding:const EdgeInsets.only(bottom:8),child:SoftCard(child:CheckboxListTile(
-        contentPadding:EdgeInsets.zero,value:r.completed,activeColor:LG.sage,
+        contentPadding:EdgeInsets.zero,value:r.completed,activeColor:LG.adaptive(context,LG.sage),
         onChanged:(_)=>store.toggleReminder(r.id),title:Text(r.title,style:TextStyle(
           decoration:r.completed?TextDecoration.lineThrough:null,fontWeight:FontWeight.w700,fontSize:14)),
         subtitle:Text(LG.date(r.dueAt)),secondary:IconButton(tooltip:'Edit reminder',icon:const Icon(Icons.edit_outlined),onPressed:()=>push(context,ReminderForm(store:store,existing:r))),controlAffinity:ListTileControlAffinity.leading)))),
     const SizedBox(height:16),ElevatedButton.icon(onPressed:()=>push(context,ReminderForm(store:store)),icon:const Icon(Icons.add_alert_outlined),label:const Text('Add reminder')),
-    const SizedBox(height:12),const Text('Reminders appear in-app. Device notifications depend on platform support and permissions.',
-      style:TextStyle(color:LG.muted,fontSize:11)),
+    const SizedBox(height:12),Text('Reminders appear in-app. Device notifications depend on platform support and permissions.',
+      style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:11)),
   ]));
 }
 class ReminderForm extends StatefulWidget {
@@ -1451,7 +1451,7 @@ class _ReminderFormState extends State<ReminderForm> {
       try {await widget.store.removeReminder(id);if(mounted)Navigator.of(context).pop();}
       catch(_){if(mounted)snack(context,'Could not remove reminder. Try again.');}
       finally{if(mounted)setState(()=>busy=false);}
-    },child:const Text('Remove reminder',style:TextStyle(color:LG.negative))),
+    },child:Text('Remove reminder',style:TextStyle(color:LG.adaptive(context,LG.negative)))),
   ]);
 }
 
@@ -1462,15 +1462,15 @@ class SettingsScreen extends StatelessWidget {
     const SectionTitle('Appearance'),
     const AppearanceSettingsTile(),
     const SizedBox(height:20),const SectionTitle('Local data management'),
-    SoftCard(child:Column(children:[ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.upload_file_outlined,color:LG.sage),
+    SoftCard(child:Column(children:[ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.upload_file_outlined,color:LG.adaptive(context,LG.sage)),
       title:const Text('Export portfolio JSON'),subtitle:const Text('Copies unencrypted JSON to clipboard'),
-      trailing:const Icon(Icons.chevron_right,color:LG.muted),onTap:()=>_export(context,store)),
-      const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.download_outlined,color:LG.sage),
+      trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),onTap:()=>_export(context,store)),
+      const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.download_outlined,color:LG.adaptive(context,LG.sage)),
       title:const Text('Import portfolio JSON'),subtitle:const Text('Replaces current local portfolio after confirmation'),
-      trailing:const Icon(Icons.chevron_right,color:LG.muted),onTap:()=>_import(context,store)),
-      const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.science_outlined,color:LG.sage),
+      trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),onTap:()=>_import(context,store)),
+      const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.science_outlined,color:LG.adaptive(context,LG.sage)),
       title:const Text('Load demo portfolio'),subtitle:const Text('Replaces local records with sample SRS data'),
-      trailing:const Icon(Icons.chevron_right,color:LG.muted),onTap:()async{
+      trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),onTap:()async{
         final yes=await showDialog<bool>(context:context,builder:(c)=>AlertDialog(title:const Text('Replace portfolio?'),
           content:const Text('This overwrites your local entries with demonstration data.'),actions:[
             TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('Cancel')),
@@ -1480,15 +1480,15 @@ class SettingsScreen extends StatelessWidget {
     ])),const SizedBox(height:22),const SectionTitle('Device state'),
     SoftCard(child:Column(children:[
       ListTile(contentPadding:EdgeInsets.zero,
-        leading:const Icon(Icons.storage_outlined,color:LG.sage),
+        leading:Icon(Icons.storage_outlined,color:LG.adaptive(context,LG.sage)),
         title:const Text('Data & sync status'),
         subtitle:const Text('Counts, last-saved time, encryption and remote status'),
-        trailing:const Icon(Icons.chevron_right,color:LG.muted),
+        trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
         onTap:()=>push(context,DataSyncStatusScreen(store:store))),
       const Divider(),
       ListTile(contentPadding:EdgeInsets.zero,
-        leading:const Icon(Icons.restart_alt,color:LG.negative),
-        title:const Text('Reset portfolio',style:TextStyle(color:LG.negative,fontWeight:FontWeight.w800)),
+        leading:Icon(Icons.restart_alt,color:LG.adaptive(context,LG.negative)),
+        title:Text('Reset portfolio',style:TextStyle(color:LG.adaptive(context,LG.negative),fontWeight:FontWeight.w800)),
         subtitle:const Text('Remove every local record, attachment and passphrase'),
         onTap:()=>runLocalReset(context,store)),
     ])),
@@ -1503,10 +1503,10 @@ class SettingsScreen extends StatelessWidget {
         const SectionTitle('Online integrations'),
         SoftCard(child:ListTile(
           contentPadding:EdgeInsets.zero,
-          leading:const Icon(Icons.account_balance_outlined,color:LG.sage),
+          leading:Icon(Icons.account_balance_outlined,color:LG.adaptive(context,LG.sage)),
           title:const Text('Bank aggregation providers'),
           subtitle:const Text('What the server can link against today'),
-          trailing:const Icon(Icons.chevron_right,color:LG.muted),
+          trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
           onTap:()=>push(context,BankProvidersScreen(sync:remote)),
         )),
       ]);
@@ -1534,7 +1534,7 @@ Future<void> _import(BuildContext context,PortfolioStore store)async{
   final controller=TextEditingController();
   final yes=await showDialog<bool>(context:context,builder:(c)=>AlertDialog(title:const Text('Import portfolio JSON'),
     content:SingleChildScrollView(child:Column(mainAxisSize:MainAxisSize.min,children:[
-      const Text('This overwrites your current local portfolio. Save an export first.',style:TextStyle(fontSize:12,color:LG.muted)),
+      Text('This overwrites your current local portfolio. Save an export first.',style:TextStyle(fontSize:12,color:LG.adaptive(context,LG.muted))),
       const SizedBox(height:12),TextField(controller:controller,maxLines:6,decoration:const InputDecoration(hintText:'Paste exported JSON here')),
     ])),actions:[TextButton(onPressed:()=>Navigator.pop(c,false),child:const Text('Cancel')),
       TextButton(onPressed:()=>Navigator.pop(c,true),child:const Text('Replace data'))]));

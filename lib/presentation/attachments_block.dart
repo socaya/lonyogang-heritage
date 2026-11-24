@@ -52,16 +52,16 @@ class _AttachmentsBlockState extends State<AttachmentsBlock> {
       children: [
         SectionTitle(widget.title),
         if (list.isEmpty)
-          const SoftCard(
+          SoftCard(
             padding: EdgeInsets.all(14),
-            color: LG.sageSoft,
+            color: LG.adaptive(context,LG.sageSoft),
             child: Row(children: [
-              Icon(Icons.description_outlined, color: LG.sage),
+              Icon(Icons.description_outlined, color: LG.adaptive(context,LG.sage)),
               SizedBox(width: 10),
               Expanded(
                 child: Text(
                     'No files yet. Scan a receipt, pick from the gallery, or attach a statement PDF.',
-                    style: TextStyle(color: LG.muted, fontSize: 13)),
+                    style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13)),
               ),
             ]),
           ),
@@ -76,7 +76,7 @@ class _AttachmentsBlockState extends State<AttachmentsBlock> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                        color: LG.goldSoft,
+                        color: LG.adaptive(context,LG.goldSoft),
                         borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.attachment_rounded,
                         color: LG.gold, size: 18)),
@@ -94,15 +94,15 @@ class _AttachmentsBlockState extends State<AttachmentsBlock> {
                         const SizedBox(height: 2),
                         Text(
                             '${_sizeHuman(list[i].sizeBytes)} · ${list[i].mimeType}',
-                            style: const TextStyle(
-                                color: LG.muted, fontSize: 11.5)),
+                            style: TextStyle(
+                                color: LG.adaptive(context,LG.muted), fontSize: 11.5)),
                       ]),
                 ),
                 IconButton(
                   tooltip: 'Preview',
                   onPressed:
                       _busy ? null : () => _preview(list[i]),
-                  icon: const Icon(Icons.open_in_new, color: LG.sage),
+                  icon: Icon(Icons.open_in_new, color: LG.adaptive(context,LG.sage)),
                 ),
                 IconButton(
                   tooltip: 'Remove',
@@ -117,7 +117,7 @@ class _AttachmentsBlockState extends State<AttachmentsBlock> {
                           }
                         },
                   icon:
-                      const Icon(Icons.delete_outline, color: LG.muted),
+                      Icon(Icons.delete_outline, color: LG.adaptive(context,LG.muted)),
                 ),
               ]),
             ),
@@ -151,19 +151,19 @@ class _AttachmentsBlockState extends State<AttachmentsBlock> {
         ]),
         const SizedBox(height: 6),
         Text(widget.helpText,
-            style: const TextStyle(
-                color: LG.muted, fontSize: 12, height: 1.45)),
+            style: TextStyle(
+                color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.45)),
         if (_error != null) ...[
           const SizedBox(height: 6),
           Text(_error!,
-              style: const TextStyle(color: LG.negative, fontSize: 12)),
+              style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12)),
         ],
         if (_busy) ...[
           const SizedBox(height: 6),
-          const LinearProgressIndicator(
+          LinearProgressIndicator(
               minHeight: 3,
-              color: LG.sage,
-              backgroundColor: LG.sageSoft),
+              color: LG.adaptive(context,LG.sage),
+              backgroundColor: LG.adaptive(context,LG.sageSoft)),
         ],
       ],
     );

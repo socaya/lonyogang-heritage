@@ -51,9 +51,9 @@ class _BankProvidersScreenState extends State<BankProvidersScreen> {
           Text('Bank aggregation',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'What the backend can link against today. Linking requires the backend to hold valid OAuth credentials for the provider — if a provider is listed but your deployment has not been issued those credentials, the link flow will reject it.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 20),
           if (_loading)
@@ -72,7 +72,7 @@ class _BankProvidersScreenState extends State<BankProvidersScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: SoftCard(
                     child: Row(children: [
-                      const Icon(Icons.account_balance, color: LG.sage),
+                      Icon(Icons.account_balance, color: LG.adaptive(context,LG.sage)),
                       const SizedBox(width: 12),
                       Expanded(
                         child: Column(
@@ -82,10 +82,10 @@ class _BankProvidersScreenState extends State<BankProvidersScreen> {
                                 style: const TextStyle(
                                     fontWeight: FontWeight.w700)),
                             const SizedBox(height: 4),
-                            const Text(
+                            Text(
                                 'Links go through the server; raw credentials never touch this device.',
                                 style: TextStyle(
-                                    color: LG.muted, fontSize: 12)),
+                                    color: LG.adaptive(context,LG.muted), fontSize: 12)),
                           ],
                         ),
                       ),
@@ -93,9 +93,9 @@ class _BankProvidersScreenState extends State<BankProvidersScreen> {
                   ),
                 )),
           const SizedBox(height: 18),
-          const Text(
+          Text(
             'The actual linking flow is not wired into this screen yet — it needs a per-provider OAuth consent step that varies by partner and deployment. This surface stays honest about what the server advertises until that path lands.',
-            style: TextStyle(color: LG.muted, fontSize: 12, height: 1.55),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.55),
           ),
         ],
       );

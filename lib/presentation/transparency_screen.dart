@@ -80,9 +80,9 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
           Text('Audit transparency',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Every action we take on your behalf writes a Merkle-chained audit entry. If the chain still verifies, the server has not silently rewritten its history.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 20),
           if (_loading)
@@ -97,7 +97,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   (_chain?.verified ?? false)
                       ? Icons.verified_rounded
                       : Icons.gpp_bad_outlined,
-                  color: (_chain?.verified ?? false) ? LG.sage : LG.negative,
+                  color: LG.adaptive(context,(_chain?.verified ?? false) ? LG.sage : LG.negative),
                   size: 32,
                 ),
                 const SizedBox(width: 14),
@@ -118,7 +118,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                         '${_chain?.tipHashBase64 == null ? '' : ' · tip ${_shortHash(_chain!.tipHashBase64!)}'}'
                         '${_chain?.brokenAt == null ? '' : ' · broken at ${_chain!.brokenAt}'}',
                         style:
-                            const TextStyle(color: LG.muted, fontSize: 12),
+                            TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12),
                       ),
                     ],
                   ),
@@ -135,10 +135,10 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
               ),
             ]),
             if (_anchors.isEmpty)
-              const SoftCard(
+              SoftCard(
                 child: Text(
                     'No anchors yet. Press "Anchor now" to freeze the current chain tip or wait for the scheduled job.',
-                    style: TextStyle(color: LG.muted, fontSize: 12)),
+                    style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12)),
               )
             else
               ..._anchors.map((a) => Padding(
@@ -152,7 +152,7 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                                   a.verified
                                       ? Icons.push_pin
                                       : Icons.priority_high,
-                                  color: a.verified ? LG.sage : LG.negative,
+                                  color: LG.adaptive(context,a.verified ? LG.sage : LG.negative),
                                   size: 18),
                               const SizedBox(width: 8),
                               Expanded(
@@ -170,8 +170,8 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                               '${a.source == null ? '' : ' · source ${a.source}'}'
                               '${a.proofBase64 == null ? '' : ' · proof attached'}'
                               '${a.brokenAt == null ? '' : ' · broken at ${a.brokenAt}'}',
-                              style: const TextStyle(
-                                  color: LG.muted, fontSize: 11),
+                              style: TextStyle(
+                                  color: LG.adaptive(context,LG.muted), fontSize: 11),
                             ),
                           ]),
                     ),
@@ -199,21 +199,21 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                             Text(
                               '${LG.date(e.createdAt)}'
                               '${e.resource == null ? '' : ' · ${e.resource}'}',
-                              style: const TextStyle(
-                                  color: LG.muted, fontSize: 12),
+                              style: TextStyle(
+                                  color: LG.adaptive(context,LG.muted), fontSize: 12),
                             ),
                             if (e.context != null) ...[
                               const SizedBox(height: 4),
                               Text('${e.context}',
-                                  style: const TextStyle(
-                                      color: LG.muted, fontSize: 11)),
+                                  style: TextStyle(
+                                      color: LG.adaptive(context,LG.muted), fontSize: 11)),
                             ],
                             const SizedBox(height: 4),
                             Text(
                                 'hash ${_shortHash(e.hashBase64)}'
                                 '${e.prevHashBase64 == null ? ' · root' : ' · prev ${_shortHash(e.prevHashBase64!)}'}',
-                                style: const TextStyle(
-                                    color: LG.muted,
+                                style: TextStyle(
+                                    color: LG.adaptive(context,LG.muted),
                                     fontSize: 11,
                                     fontFamily: 'monospace')),
                           ]),
@@ -221,9 +221,9 @@ class _TransparencyScreenState extends State<TransparencyScreen> {
                   )),
           ],
           const SizedBox(height: 18),
-          const Text(
+          Text(
             'Entries that touch personally identifying data are kept under Uganda DPPA 2019 s. 7(1). Deleting your account erases the account linkage but keeps the audit row.',
-            style: TextStyle(color: LG.muted, fontSize: 12, height: 1.55),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.55),
           ),
         ],
       );
