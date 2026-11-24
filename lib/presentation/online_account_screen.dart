@@ -111,19 +111,19 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
           Text(_stage == _Stage.form ? 'Create online account' : 'Verify your identity',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Create a server-backed account so your encrypted portfolio can sync between devices.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
           if (_stage == _Stage.form) ..._formStage(context),
           if (_stage == _Stage.verify) ..._verifyStage(context),
           if (_stage == _Stage.done)
-            const Center(
+            Center(
               child: Padding(
                 padding: EdgeInsets.symmetric(vertical: 40),
                 child: Column(children: [
-                  Icon(Icons.check_circle, color: LG.sage, size: 48),
+                  Icon(Icons.check_circle, color: LG.adaptive(context,LG.sage), size: 48),
                   SizedBox(height: 12),
                   Text('Signed in. Your device is syncing.',
                       style: TextStyle(fontWeight: FontWeight.w700)),
@@ -132,7 +132,7 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
             ),
           if (_error != null) ...[
             const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: LG.negative, fontSize: 12)),
+            Text(_error!, style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12)),
           ],
           const SizedBox(height: 18),
           const SecurityNotice(
@@ -237,7 +237,7 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
         ),
         TextButton(
           onPressed: _busy ? null : () => setState(() => _stage = _Stage.form),
-          child: const Text('Back', style: TextStyle(color: LG.muted)),
+          child: Text('Back', style: TextStyle(color: LG.adaptive(context,LG.muted))),
         ),
       ];
 
@@ -300,7 +300,7 @@ class _ResendButton extends StatelessWidget {
           blocked
               ? 'Resend $channel in $cooldown s'
               : 'Resend $channel code',
-          style: const TextStyle(color: LG.muted),
+          style: TextStyle(color: LG.adaptive(context,LG.muted)),
         ),
       ),
     );

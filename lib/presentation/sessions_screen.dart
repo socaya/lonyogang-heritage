@@ -104,9 +104,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
           Text('Active sessions',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Every device that has signed into this account. Revoke any you do not recognise — the device holding that session will be signed out on its next request.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 20),
           if (!_loading && _error == null && _sessions.any((s) => s.isActive && s.id != _currentSessionId)) ...[
@@ -135,7 +135,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
                     child: Row(children: [
                       Icon(
                         s.isActive ? Icons.check_circle : Icons.history_toggle_off,
-                        color: s.isActive ? LG.sage : LG.muted,
+                        color: LG.adaptive(context,s.isActive ? LG.sage : LG.muted),
                       ),
                       const SizedBox(width: 12),
                       Expanded(
@@ -150,29 +150,29 @@ class _SessionsScreenState extends State<SessionsScreen> {
                               'Opened ${LG.date(s.createdAt)}'
                               '${s.revokedAt != null ? ' · Revoked ${LG.date(s.revokedAt!)}' : ''}'
                               '${s.refreshedAt != null && s.revokedAt == null ? ' · Refreshed ${LG.date(s.refreshedAt!)}' : ''}',
-                              style: const TextStyle(
-                                  color: LG.muted, fontSize: 12),
+                              style: TextStyle(
+                                  color: LG.adaptive(context,LG.muted), fontSize: 12),
                             ),
                             Text(s.id == _currentSessionId ? 'Current session' : s.revokedAt != null ? 'Revoked' : s.isActive ? 'Active' : 'Expired', style: const TextStyle(fontWeight: FontWeight.w600)),
                             Text('Device ${_shorten(s.deviceId)}',
-                                style: const TextStyle(
-                                    color: LG.muted, fontSize: 11)),
+                                style: TextStyle(
+                                    color: LG.adaptive(context,LG.muted), fontSize: 11)),
                           ],
                         ),
                       ),
                       if (s.isActive && _currentSessionId != null && s.id != _currentSessionId)
                         IconButton(
                           tooltip: 'Revoke session',
-                          icon: const Icon(Icons.logout, color: LG.muted),
+                          icon: Icon(Icons.logout, color: LG.adaptive(context,LG.muted)),
                           onPressed: _working ? null : () => _revoke(s),
                         ),
                     ]),
                   ),
                 )),
           const SizedBox(height: 18),
-          const Text(
+          Text(
             'Revocation keeps a historical row for audit. If a device is lost, revoke its session and change your password if you suspect exposure.',
-            style: TextStyle(color: LG.muted, fontSize: 12, height: 1.55),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.55),
           ),
         ],
       );

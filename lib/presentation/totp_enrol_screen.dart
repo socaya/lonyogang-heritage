@@ -87,9 +87,9 @@ class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
           Text('Enrol a TOTP second factor',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Set up a time-based one-time passcode (TOTP) so the next sign-in needs both your password and a six-digit code from your authenticator app.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 22),
           if (_secret == null)
@@ -102,9 +102,9 @@ class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
           else ...[
             SoftCard(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('BASE32 SEED',
+                Text('BASE32 SEED',
                     style: TextStyle(
-                        color: LG.sage,
+                        color: LG.adaptive(context,LG.sage),
                         fontSize: 11,
                         letterSpacing: 1.2,
                         fontWeight: FontWeight.w800)),
@@ -124,15 +124,15 @@ class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
             const SizedBox(height: 12),
             SoftCard(
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('OTPAUTH URL',
+                Text('OTPAUTH URL',
                     style: TextStyle(
-                        color: LG.sage,
+                        color: LG.adaptive(context,LG.sage),
                         fontSize: 11,
                         letterSpacing: 1.2,
                         fontWeight: FontWeight.w800)),
                 const SizedBox(height: 8),
                 SelectableText(_otpauthUrl!,
-                    style: const TextStyle(fontSize: 12, color: LG.muted)),
+                    style: TextStyle(fontSize: 12, color: LG.adaptive(context,LG.muted))),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
                     onPressed: () => _copy('otpauth URL', _otpauthUrl!),
@@ -150,7 +150,7 @@ class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
             const SizedBox(height: 14),
             TextButton(
                 onPressed: () => Navigator.of(context).pop(),
-                child: const Text('Done', style: TextStyle(color: LG.muted))),
+                child: Text('Done', style: TextStyle(color: LG.adaptive(context,LG.muted)))),
           ],
           const SizedBox(height: 22),
           const Divider(),
@@ -158,9 +158,9 @@ class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
           Text('Remove TOTP',
               style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'If you still hold the authenticator app, you can take the second factor off. The server demands a current code so a stolen session cannot do this.',
-            style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.5),
           ),
           const SizedBox(height: 10),
           OutlinedButton.icon(
@@ -170,7 +170,7 @@ class _TotpEnrolScreenState extends State<TotpEnrolScreen> {
           ),
           if (_error != null) ...[
             const SizedBox(height: 14),
-            Text(_error!, style: const TextStyle(color: LG.negative, fontSize: 12)),
+            Text(_error!, style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12)),
           ],
         ],
       );

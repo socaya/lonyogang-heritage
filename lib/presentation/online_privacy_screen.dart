@@ -266,9 +266,9 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
           Text('Online privacy',
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
-          const Text(
+          Text(
             'Exercise your Uganda DPPA 2019 data-subject rights. All calls go through your authenticated session; the server keeps a Merkle-chained audit entry for every action.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
+            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 22),
           if (_loading)
@@ -331,7 +331,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
               const SizedBox(height: 10),
               SoftCard(
                 child: Row(children: [
-                  const Icon(Icons.campaign_outlined, color: LG.sage),
+                  Icon(Icons.campaign_outlined, color: LG.adaptive(context,LG.sage)),
                   const SizedBox(width: 12),
                   const Expanded(
                     child: Text(
@@ -399,9 +399,9 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
           }),
           OutlinedButton.icon(
             onPressed: _profile == null || _working ? null : _erase,
-            icon: const Icon(Icons.delete_forever, color: LG.negative),
-            label: const Text('Erase online account',
-                style: TextStyle(color: LG.negative)),
+            icon: Icon(Icons.delete_forever, color: LG.adaptive(context,LG.negative)),
+            label: Text('Erase online account',
+                style: TextStyle(color: LG.adaptive(context,LG.negative))),
           ),
           const SizedBox(height: 18),
           const SecurityNotice(
