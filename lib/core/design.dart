@@ -139,6 +139,68 @@ class LG {
               borderRadius: BorderRadius.circular(12))),
     );
   }
+  static bool isDark(BuildContext context)=>Theme.of(context).brightness==Brightness.dark;
+  static const darkCanvas=Color(0xFF142F40);
+  static const darkSurface=Color(0xFF1B394A);
+  static const darkInk=Color(0xFFF6F3EC);
+  static const darkMuted=Color(0xFFB9C8CB);
+  static const darkLine=Color(0xFF395464);
+  static const darkGold=Color(0xFFE5C27F);
+  static const darkSage=Color(0xFFABC9B4);
+  static const darkSageSoft=Color(0xFF24463E);
+  static const darkNegative=Color(0xFFF1A29B);
+
+  /// Map semantic light roles; explicitly branded hero colors stay fixed.
+  static Color adaptive(BuildContext context,Color color) {
+    if(!isDark(context))return color;
+    if(color==canvas)return darkCanvas;
+    if(color==white)return darkSurface;
+    if(color==muted)return darkMuted;
+    if(color==line)return darkLine;
+    if(color==sageSoft)return darkSageSoft;
+    if(color==goldSoft)return const Color(0xFF51432C);
+    if(color==sage||color==sageDark)return darkSage;
+    if(color==negative)return darkNegative;
+    if(color==gold)return darkGold;
+    if(color==navy)return darkInk;
+    if(color==const Color(0xFFF8EAE7))return const Color(0xFF533438);
+    if(color==const Color(0xFFFBF3DD))return const Color(0xFF51432C);
+    if(color==const Color(0xFF8C6A1D))return darkGold;
+    return color;
+  }
+  static Color surface(BuildContext context,Color color)=>
+      color==navy||color==navyDark ? color : adaptive(context,color);
+  static ThemeData get darkTheme {
+    final light=theme;
+    final base=ThemeData(useMaterial3:true,brightness:Brightness.dark);
+    final scheme=ColorScheme.fromSeed(seedColor:navy,brightness:Brightness.dark,
+      primary:darkGold,onPrimary:navy,secondary:darkSage,onSecondary:navyDark,
+      surface:darkSurface,onSurface:darkInk,onSurfaceVariant:darkMuted,
+      outline:darkLine,outlineVariant:darkLine,error:darkNegative);
+    return base.copyWith(
+      colorScheme:scheme,scaffoldBackgroundColor:darkCanvas,
+      textTheme:light.textTheme.apply(bodyColor:darkInk,displayColor:darkInk).copyWith(
+        bodySmall:light.textTheme.bodySmall?.copyWith(color:darkMuted)),
+      appBarTheme:light.appBarTheme.copyWith(backgroundColor:darkCanvas,foregroundColor:darkInk,titleTextStyle:light.appBarTheme.titleTextStyle?.copyWith(color:darkInk)),
+      cardTheme:light.cardTheme.copyWith(color:darkSurface),
+      inputDecorationTheme:light.inputDecorationTheme.copyWith(fillColor:darkSurface,
+        hintStyle:const TextStyle(color:darkMuted,fontSize:15),
+        labelStyle:const TextStyle(color:darkMuted,fontSize:15),
+        floatingLabelStyle:const TextStyle(color:darkGold,fontSize:13),
+        enabledBorder:OutlineInputBorder(borderSide:const BorderSide(color:darkLine),borderRadius:BorderRadius.circular(8)),
+        focusedBorder:OutlineInputBorder(borderSide:const BorderSide(color:darkGold,width:1.6),borderRadius:BorderRadius.circular(8)),
+        errorBorder:OutlineInputBorder(borderSide:const BorderSide(color:darkNegative),borderRadius:BorderRadius.circular(8)),
+        focusedErrorBorder:OutlineInputBorder(borderSide:const BorderSide(color:darkNegative,width:1.6),borderRadius:BorderRadius.circular(8))),
+      elevatedButtonTheme:ElevatedButtonThemeData(style:ElevatedButton.styleFrom(backgroundColor:darkGold,foregroundColor:navy,minimumSize:const Size.fromHeight(52),elevation:0,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(8)))),
+      outlinedButtonTheme:OutlinedButtonThemeData(style:OutlinedButton.styleFrom(foregroundColor:darkInk,side:const BorderSide(color:darkLine),minimumSize:const Size.fromHeight(52),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(8)))),
+      textButtonTheme:TextButtonThemeData(style:TextButton.styleFrom(foregroundColor:darkGold)),
+      navigationBarTheme:light.navigationBarTheme.copyWith(backgroundColor:navyDark),
+      dividerTheme:const DividerThemeData(color:darkLine,space:1,thickness:1),
+      snackBarTheme:light.snackBarTheme,
+      bottomSheetTheme:const BottomSheetThemeData(backgroundColor:darkSurface),
+    );
+  }
+
   static String money(int amount,{bool compact=false}) {
     if(compact && amount.abs()>=1000000000) return 'UGX ${(amount/1000000000).toStringAsFixed(2)}B';
     if(compact && amount.abs()>=1000000)return 'UGX ${(amount/1000000).toStringAsFixed(1)}M';

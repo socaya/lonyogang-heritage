@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import 'core/design.dart';
+import 'core/appearance.dart';
 import 'data/attachment_syncer.dart';
 import 'data/credentials_store.dart';
 import 'data/notifications.dart';
@@ -90,6 +91,7 @@ class LonyoGangApp extends StatefulWidget {
 
 class _LonyoGangAppState extends State<LonyoGangApp>
     with WidgetsBindingObserver {
+  final _appearance=AppearanceController();
   bool _schedulerReady = false;
   Timer? _syncTimer;
   Timer? _syncDebounce;
@@ -97,14 +99,20 @@ class _LonyoGangAppState extends State<LonyoGangApp>
   @override
   void initState() {
     super.initState();
+    _appearance.addListener(_appearanceChanged);
+    unawaited(_appearance.load().catchError((Object _){}));
     WidgetsBinding.instance.addObserver(this);
     widget.store.addListener(_syncScheduler);
     widget.store.addListener(_scheduleRemoteSync);
     _startSyncTimer();
   }
 
+  void _appearanceChanged(){if(mounted)setState((){});}
+
   @override
   void dispose() {
+    _appearance.removeListener(_appearanceChanged);
+    _appearance.dispose();
     WidgetsBinding.instance.removeObserver(this);
     widget.store.removeListener(_syncScheduler);
     widget.store.removeListener(_scheduleRemoteSync);
@@ -195,7 +203,7 @@ class _LonyoGangAppState extends State<LonyoGangApp>
   Widget build(BuildContext context) {
     final syncService = widget.sync;
     final remote = syncService is RemoteSyncService ? syncService : null;
-    return OnlineScope(
+    return AppearanceScope(controller:_appearance,child:OnlineScope(
       sync: remote,
       credentials: widget.credentials ?? CredentialsStore(),
       onSignInSuccess: remote == null
@@ -248,6 +256,8 @@ class _LonyoGangAppState extends State<LonyoGangApp>
         title: 'LonyoGang Heritage',
         debugShowCheckedModeBanner: false,
         theme: LG.theme,
+        darkTheme: LG.darkTheme,
+        themeMode: _appearance.mode,
         onGenerateRoute: (settings) => MaterialPageRoute<void>(
             builder: (_) => NotFoundScreen(attemptedTarget: settings.name)),
         home: widget.store.isLoaded
@@ -264,6 +274,6 @@ class _LonyoGangAppState extends State<LonyoGangApp>
                 },
               ),
       ),
-    );
+    ));
   }
 }
