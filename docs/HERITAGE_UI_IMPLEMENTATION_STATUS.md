@@ -45,3 +45,9 @@ This is an incremental implementation, not a 100% completion or production readi
 - Persisted scheduled-contribution preference; inbox and native scheduling use it. Dismissals suppress corresponding native alerts; short lead-time reminders schedule at due date. Added restore-dismissed action and alert detail dismissal.
 - Full reminder add/edit/remove form with stable IDs, validation, failure handling and reactive list. Existing reminder completion preserved. Regression tests added but not run.
 - Overall functional coverage percentage remains unmeasured; 0% independently verified in this environment. Do not count source mapping as implementation.
+
+## Batch 9 — account and security interfaces
+- Data & sync uses actual scoped service even when constructor argument omitted; no false offline success or misleading cloud copy. Sync and hydration guarded against duplicate operations and unmounted state updates; hydration requires unlocked content key.
+- Device sessions identify current session from access-token sid for UI purposes, distinguish expired/revoked/active and prevent accidental self-revocation in client. Server remains authorization authority.
+- Privacy actions expose errors, prevent updates after navigation, reset remote status after account erasure and truthfully label clipboard export.
+- Native verification and mandatory two-stage authentication remain outstanding. Overall functional coverage denominator not yet audited; verified coverage 0% in this environment.

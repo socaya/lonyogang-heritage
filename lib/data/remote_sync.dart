@@ -718,9 +718,28 @@ class RemoteSyncService implements SyncService {
   /// Revokes a single session by id. The caller must not revoke the
   /// session id currently backing [creds.accessToken] — the UI enforces
   /// that by comparing against the active session.
+  /// Session identifier from the local access token, for display and
+  /// preventing accidental self-revocation only. Server authorizes requests.
+  Future<String?> currentSessionId() async {
+    final creds = await credentialsLoader();
+    if (creds == null) return null;
+    return _sessionId(creds.accessToken);
+  }
+
+  static String? _sessionId(String token) {
+    try {
+      final parts = token.split('.');
+      if (parts.length != 3) return null;
+      final payload = jsonDecode(utf8.decode(base64Url.decode(base64Url.normalize(parts[1]))));
+      return payload is Map && payload['sid'] is String ? payload['sid'] as String : null;
+    } catch (_) { return null; }
+  }
+
   Future<void> revokeSession(String sessionId) async {
     final creds = await credentialsLoader();
     if (creds == null) throw StateError('Not signed in');
+    final current = _sessionId(creds.accessToken);
+    if (current == null || sessionId == current) throw StateError('Cannot revoke the current session from this screen');
     final uri = _baseUri.resolve('/identity/sessions/$sessionId');
     final request = await _http.openUrl('DELETE', uri);
     request.headers.set('authorization', 'Bearer ${creds.accessToken}');

@@ -58,7 +58,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
 
   Future<RemoteSyncCredentials?> _creds() async {
     final creds = await widget.credentials.load();
-    if (creds == null) setState(() => _error = 'Not signed in');
+    if (creds == null && mounted) setState(() => _error = 'Not signed in');
     return creds;
   }
 
@@ -78,9 +78,9 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
       if (res.statusCode != 200) {
         throw HttpException('HTTP ${res.statusCode}: $body', uri: uri);
       }
-      setState(() => _profile = jsonDecode(body) as Map<String, dynamic>);
+      if (mounted) setState(() => _profile = jsonDecode(body) as Map<String, dynamic>);
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -108,7 +108,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
           content: Text(
               'DSAR export copied to clipboard. Save it somewhere safe before wiping the device.')));
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -116,7 +116,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
 
   Future<void> _erase() async {
     final password = await _promptPassword();
-    if (password == null || password.isEmpty) return;
+    if (password == null || password.isEmpty || !mounted || _working) return;
     final confirmed = await confirmActionSheet(
       context,
       title: 'Erase online account?',
@@ -124,7 +124,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
           'The server account is tombstoned and every encrypted event, attachment and session is deleted. The device remains unchanged — your local vault is still there until you reset it from Settings. This cannot be undone.',
       confirmLabel: 'Erase account',
     );
-    if (!confirmed) return;
+    if (!confirmed || !mounted || _working) return;
     setState(() {
       _working = true;
       _error = null;
@@ -146,6 +146,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
         throw HttpException('HTTP ${res.statusCode}: $body', uri: uri);
       }
       await widget.credentials.clear();
+      if (mounted) await OnlineScope.maybeOf(context)?.sync?.wipeLocalCredentials();
       // Drop every queued outbox event. Those entries were encrypted
       // for the now-tombstoned account and must not be replayed to a
       // future account the user might sign up next.
@@ -157,7 +158,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('Online account erased. Credentials + queued sync events cleared on device.')));
     } catch (e) {
-      setState(() => _error = '$e');
+      if (mounted) setState(() => _error = '$e');
     } finally {
       if (mounted) setState(() => _working = false);
     }
@@ -170,7 +171,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
       initial: current,
       hint: 'How your account is labelled',
     );
-    if (value == null) return;
+    if (value == null || !mounted || _working) return;
     setState(() => _working = true);
     try {
       await remote.patchMe(displayName: value);
@@ -191,7 +192,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
       initial: current,
       hint: '+256 700 123 456',
     );
-    if (value == null) return;
+    if (value == null || !mounted || _working) return;
     setState(() => _working = true);
     try {
       await remote.patchMe(phone: value);
@@ -299,6 +300,9 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
               message: _error!,
               onRetry: _load,
             ),
+          if (!_loading && _profile != null && _error != null) ...[
+            const SizedBox(height: 12), ErrorState(message: _error!, onRetry: _load),
+          ],
           const SizedBox(height: 20),
           Builder(builder: (context) {
             final remote = OnlineScope.maybeOf(context)?.sync;
@@ -358,7 +362,7 @@ class _OnlinePrivacyScreenState extends State<OnlinePrivacyScreen> {
             ]);
           }),
           PrimaryCTA(
-            label: _working ? 'Working…' : 'Download DSAR export',
+            label: _working ? 'Working…' : 'Copy account data export',
             loading: _working,
             showArrow: false,
             onPressed: _profile == null ? null : _export,

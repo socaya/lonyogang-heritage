@@ -24,6 +24,7 @@ class DataSyncStatusScreen extends StatelessWidget {
   Widget build(BuildContext context) => AnimatedBuilder(
       animation: store,
       builder: (context, _) {
+        final service = sync ?? OnlineScope.maybeOf(context)?.sync;
         final encrypted = store.vault.hasPassphrase;
         final attachments = store.state.documents
             .where((d) => !d.archived && d.attachment != null)
@@ -32,7 +33,7 @@ class DataSyncStatusScreen extends StatelessWidget {
         return WealthPage(
             title: 'Data & sync',
             subtitle:
-                'How your records are stored on this device. No remote sync is active.',
+                'Storage, protection and synchronization of your portfolio.',
             children: [
               SoftCard(
                   color: encrypted ? LG.sageSoft : LG.white,
@@ -124,14 +125,15 @@ class DataSyncStatusScreen extends StatelessWidget {
               ])),
               const SizedBox(height: 18),
               const SectionTitle('Remote state'),
-              _RemoteStatusCard(sync: sync),
-              _OnlineAccountCta(sync: sync, store: store),
+              _RemoteStatusCard(sync: service),
+              _OnlineAccountCta(sync: service, store: store),
               _ResourceHydrateCta(store: store),
               const SizedBox(height: 18),
-              const SecurityNotice(
-                title: 'No silent cloud backup',
-                message:
-                    'This preview intentionally never uploads your portfolio. Use JSON export under Settings → Data management to make an offline backup; keep it somewhere safe.',
+              SecurityNotice(
+                title: 'Data and backup',
+                message: service == null || service is NoopSyncService
+                    ? 'Online sync is unavailable. Use JSON export in Settings to create a backup and store it securely.'
+                    : 'Online synchronization uses your configured account. Keep an independent secure backup; sync is not a substitute for backup.',
                 icon: Icons.cloud_off_outlined,
               ),
             ]);
@@ -147,7 +149,7 @@ class _RemoteStatusCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final service = sync;
-    if (service == null) {
+    if (service == null || service is NoopSyncService) {
       return const SoftCard(
           child: Column(children: [
         InfoLabel(label: 'Cloud sync', value: 'Not connected'),
@@ -168,10 +170,10 @@ class _RemoteStatusCard extends StatelessWidget {
               valueColor: connected ? LG.sage : null),
           InfoLabel(
               label: 'Server account',
-              value: connected ? 'Configured' : 'Not configured'),
+              value: status == SyncStatus.disconnected ? 'Not connected' : 'Check account status'),
           InfoLabel(
               label: 'Multi-device access',
-              value: connected ? 'Available' : 'Not available'),
+              value: connected ? 'Available' : 'Not confirmed'),
           InfoLabel(
               label: 'Server-backed recovery',
               value: connected ? 'Available' : 'Not available'),
@@ -268,20 +270,20 @@ class _ResourceHydrateCtaState extends State<_ResourceHydrateCta> {
           onPressed: _busy || remote.status.value == SyncStatus.syncing
               ? null
               : () async {
-                  setState(() => _status = 'Sync running…');
+                  setState(() { _busy = true; _status = 'Sync running…'; });
                   try {
                     await remote.sync();
-                    setState(() => _status = 'Sync complete.');
+                    if (mounted) setState(() => _status = remote.status.value == SyncStatus.ready ? 'Sync complete.' : describeSyncStatus(remote.status.value));
                   } catch (err) {
-                    setState(() => _status = 'Sync failed: $err');
-                  }
+                    if (mounted) setState(() => _status = 'Sync failed. Try again.');
+                  } finally { if (mounted) setState(() => _busy = false); }
                 },
           icon: const Icon(Icons.sync),
           label: const Text('Sync now'),
         ),
         const SizedBox(height: 10),
         OutlinedButton.icon(
-          onPressed: _busy || !widget.store.isUnlocked
+          onPressed: _busy || !widget.store.isUnlocked || widget.store.vault.activeKey == null
               ? null
               : () => _run(remote),
           icon: const Icon(Icons.cloud_download_outlined),
@@ -304,7 +306,7 @@ class _ResourceHydrateCtaState extends State<_ResourceHydrateCta> {
           'Pulls every record the server has on file for this account and merges it into the local portfolio under the vault content key. Existing local entries with the same id will be overwritten with the server copy.',
       confirmLabel: 'Rehydrate',
     );
-    if (!confirmed) return;
+    if (!confirmed || !mounted || _busy) return;
     setState(() {
       _busy = true;
       _status = 'Starting…';
@@ -316,12 +318,12 @@ class _ResourceHydrateCtaState extends State<_ResourceHydrateCta> {
             attachmentSyncer: widget.store.attachmentSyncer),
       );
       final result = await hydrator.hydrate(onProgress: (tick) {
-        setState(() => _status = '${tick.kind}: +${tick.applied}');
+        if (mounted) setState(() => _status = '${tick.kind}: +${tick.applied}');
       });
-      setState(() => _status =
+      if (mounted) setState(() => _status =
           'Done: ${result.applied} applied, ${result.skipped} skipped');
     } catch (err) {
-      setState(() => _status = 'Rehydration failed: $err');
+      if (mounted) setState(() => _status = 'Rehydration failed. Try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

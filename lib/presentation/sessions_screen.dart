@@ -20,6 +20,8 @@ class SessionsScreen extends StatefulWidget {
 
 class _SessionsScreenState extends State<SessionsScreen> {
   bool _loading = true;
+  bool _working = false;
+  String? _currentSessionId;
   String? _error;
   List<RemoteSyncSession> _sessions = const [];
 
@@ -30,16 +32,18 @@ class _SessionsScreenState extends State<SessionsScreen> {
   }
 
   Future<void> _load() async {
+    if (!mounted) return;
     setState(() {
       _loading = true;
       _error = null;
     });
     try {
+      final current = await widget.sync.currentSessionId();
       final rows = await widget.sync.listSessions();
       rows.sort((a, b) => b.createdAt.compareTo(a.createdAt));
-      setState(() => _sessions = rows);
+      if (mounted) setState(() { _sessions = rows; _currentSessionId = current; });
     } catch (err) {
-      setState(() => _error = '$err');
+      if (mounted) setState(() => _error = '$err');
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -53,7 +57,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
           'Every other active session on this account will be revoked. Only this device stays signed in. Use this after a lost or stolen phone.',
       confirmLabel: 'Sign out others',
     );
-    if (!confirmed) return;
+    if (!confirmed || !mounted || _working) return;
+    setState(() => _working = true);
     try {
       final count = await widget.sync.revokeOtherSessions();
       await _load();
@@ -66,7 +71,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Revoke failed: $err')));
-    }
+    } finally { if (mounted) setState(() => _working = false); }
   }
 
   Future<void> _revoke(RemoteSyncSession session) async {
@@ -77,7 +82,8 @@ class _SessionsScreenState extends State<SessionsScreen> {
           'The device currently using this session will be signed out. Nothing on that device is deleted — the next sign-in there issues a fresh session.',
       confirmLabel: 'Revoke',
     );
-    if (!confirmed) return;
+    if (!confirmed || !mounted || _working) return;
+    setState(() => _working = true);
     try {
       await widget.sync.revokeSession(session.id);
       await _load();
@@ -88,7 +94,7 @@ class _SessionsScreenState extends State<SessionsScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Revoke failed: $err')));
-    }
+    } finally { if (mounted) setState(() => _working = false); }
   }
 
   @override
@@ -103,9 +109,9 @@ class _SessionsScreenState extends State<SessionsScreen> {
             style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 20),
-          if (!_loading && _error == null && _sessions.length > 1) ...[
+          if (!_loading && _error == null && _sessions.any((s) => s.isActive && s.id != _currentSessionId)) ...[
             OutlinedButton.icon(
-              onPressed: _revokeOthers,
+              onPressed: _working ? null : _revokeOthers,
               icon: const Icon(Icons.logout),
               label: const Text('Sign out everywhere else'),
             ),
@@ -147,24 +153,25 @@ class _SessionsScreenState extends State<SessionsScreen> {
                               style: const TextStyle(
                                   color: LG.muted, fontSize: 12),
                             ),
+                            Text(s.id == _currentSessionId ? 'Current session' : s.revokedAt != null ? 'Revoked' : s.isActive ? 'Active' : 'Expired', style: const TextStyle(fontWeight: FontWeight.w600)),
                             Text('Device ${_shorten(s.deviceId)}',
                                 style: const TextStyle(
                                     color: LG.muted, fontSize: 11)),
                           ],
                         ),
                       ),
-                      if (s.isActive)
+                      if (s.isActive && _currentSessionId != null && s.id != _currentSessionId)
                         IconButton(
                           tooltip: 'Revoke session',
                           icon: const Icon(Icons.logout, color: LG.muted),
-                          onPressed: () => _revoke(s),
+                          onPressed: _working ? null : () => _revoke(s),
                         ),
                     ]),
                   ),
                 )),
           const SizedBox(height: 18),
           const Text(
-            'Revocation keeps the historical row for audit. If you lose a device entirely, revoke the session and then rotate the password from Recover Access to invalidate the refresh token too.',
+            'Revocation keeps a historical row for audit. If a device is lost, revoke its session and change your password if you suspect exposure.',
             style: TextStyle(color: LG.muted, fontSize: 12, height: 1.55),
           ),
         ],
