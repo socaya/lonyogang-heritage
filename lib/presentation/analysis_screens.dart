@@ -52,20 +52,20 @@ class AllocationScreen extends StatelessWidget {
                                       fontWeight: FontWeight.w800))),
                           Text('${driftPct >= 0 ? '+' : ''}${driftPct.toStringAsFixed(1)}%',
                               style: TextStyle(
-                                  color: color, fontWeight: FontWeight.w800))
+                                  color: LG.adaptive(context,color), fontWeight: FontWeight.w700))
                         ]),
                         const SizedBox(height: 10),
                         LinearProgressIndicator(
                           value: (d.actualBps / 10000).clamp(0, 1).toDouble(),
                           minHeight: 8,
-                          color: LG.sage,
-                          backgroundColor: LG.sageSoft,
+                          color: LG.adaptive(context,LG.sage),
+                          backgroundColor: LG.adaptive(context,LG.sageSoft),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         const SizedBox(height: 6),
                         Text(
                             'Target ${(d.targetBps / 100).toStringAsFixed(1)}% · Actual ${(d.actualBps / 100).toStringAsFixed(1)}%',
-                            style: const TextStyle(color: LG.muted, fontSize: 12)),
+                            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12)),
                       ],
                     )));
               }),
@@ -97,9 +97,9 @@ class AllocationScreen extends StatelessWidget {
                     ]),
                   ))),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                   'Submit each row with your keyboard\'s Done action. Targets do not change recorded values; they just show how far your portfolio has drifted from your plan.',
-                  style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+                  style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.5)),
             ]);
       });
 }
@@ -177,16 +177,16 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
                 ? 'Private, user-entered rates used only for display. There is no live FX feed.'
                 : 'Manual entries are kept locally. Tap Refresh from server to fold in the backend\'s signed quotes.',
             children: [
-              const SoftCard(
-                  color: LG.sageSoft,
+              SoftCard(
+                  color: LG.adaptive(context,LG.sageSoft),
                   child: Row(children: [
-                    Icon(Icons.info_outline, color: LG.sage),
+                    Icon(Icons.info_outline, color: LG.adaptive(context,LG.sage)),
                     SizedBox(width: 12),
                     Expanded(
                         child: Text(
                             'Enter the UGX amount equivalent to one unit of the foreign currency, along with the date the quote applies to. Older quotes are kept so historical values stay auditable.',
                             style: TextStyle(
-                                color: LG.muted, fontSize: 12, height: 1.5)))
+                                color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.5)))
                   ])),
               if (remote != null) ...[
                 const SizedBox(height: 14),
@@ -203,7 +203,7 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
                       padding: const EdgeInsets.only(top: 8),
                       child: Text(_refreshError!,
                           style:
-                              const TextStyle(color: LG.negative, fontSize: 12))),
+                              TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12))),
               ],
               const SizedBox(height: 18),
               FormFieldBlock(
@@ -231,7 +231,7 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
                         if (v != null) setState(() => asOf = v);
                       },
                       child: Row(children: [
-                        const Icon(Icons.calendar_today_outlined, color: LG.sage),
+                        Icon(Icons.calendar_today_outlined, color: LG.adaptive(context,LG.sage)),
                         const SizedBox(width: 10),
                         Text(LG.date(asOf))
                       ]))),
@@ -261,12 +261,12 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
                               style: const TextStyle(fontWeight: FontWeight.w800)),
                           Text(
                               '${LG.date(r.asOf)}${r.source.isEmpty ? '' : ' · ${r.source}'}',
-                              style: const TextStyle(color: LG.muted, fontSize: 12)),
+                              style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12)),
                         ])),
                     IconButton(
                         onPressed: () =>
                             widget.store.removeFxRate(r.currency, r.asOf),
-                        icon: const Icon(Icons.delete_outline, color: LG.muted)),
+                        icon: Icon(Icons.delete_outline, color: LG.adaptive(context,LG.muted))),
                   ])))),
             ]);
       });
@@ -293,9 +293,9 @@ class ScheduledContributionsScreen extends StatelessWidget {
                 ...due.map((s) => Padding(
                     padding: const EdgeInsets.only(bottom: 8),
                     child: SoftCard(
-                        color: LG.sageSoft,
+                        color: LG.adaptive(context,LG.sageSoft),
                         child: Row(children: [
-                          const Icon(Icons.event_available, color: LG.sage),
+                          Icon(Icons.event_available, color: LG.adaptive(context,LG.sage)),
                           const SizedBox(width: 10),
                           Expanded(
                               child: Column(
@@ -305,7 +305,7 @@ class ScheduledContributionsScreen extends StatelessWidget {
                                     style: const TextStyle(fontWeight: FontWeight.w800)),
                                 Text(
                                     '${LG.money(s.amountUgx, compact: true)} · ${s.frequency.name}',
-                                    style: const TextStyle(color: LG.muted, fontSize: 12))
+                                    style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12))
                               ])),
                           TextButton(
                               onPressed: () => store.fireSchedule(s),
@@ -334,7 +334,7 @@ class ScheduledContributionsScreen extends StatelessWidget {
                             label: s.active ? 'Pause schedule' : 'Resume schedule',
                             child: Switch.adaptive(
                                 value: s.active,
-                                activeTrackColor: LG.sageSoft,
+                                activeTrackColor: LG.adaptive(context,LG.sageSoft),
                                 onChanged: (v) =>
                                     store.pauseSchedule(s.id, active: v)),
                           ),
@@ -347,9 +347,9 @@ class ScheduledContributionsScreen extends StatelessWidget {
                                     style: const TextStyle(fontWeight: FontWeight.w800)),
                                 Text(
                                     '${LG.money(s.amountUgx, compact: true)} · ${s.frequency.name} · next ${LG.date(s.nextFire)}',
-                                    style: const TextStyle(color: LG.muted, fontSize: 12)),
+                                    style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12)),
                               ])),
-                          const Icon(Icons.chevron_right, color: LG.muted),
+                          Icon(Icons.chevron_right, color: LG.adaptive(context,LG.muted)),
                         ])),
                   ))),
               const SizedBox(height: 14),
@@ -359,9 +359,9 @@ class ScheduledContributionsScreen extends StatelessWidget {
                   icon: const Icon(Icons.add),
                   label: const Text('New scheduled contribution')),
               const SizedBox(height: 12),
-              const Text(
+              Text(
                   'Posting a scheduled entry creates a normal, reversible ledger event and advances the next due date by the chosen frequency.',
-                  style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+                  style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.5)),
             ]);
       });
 }
@@ -453,8 +453,8 @@ class _ScheduleFormState extends State<ScheduleForm> {
                             if (mounted && v != null) setState(() => nextFire = v);
                           },
                           child: Row(children: [
-                            const Icon(Icons.event_available_outlined,
-                                color: LG.sage),
+                            Icon(Icons.event_available_outlined,
+                                color: LG.adaptive(context,LG.sage)),
                             const SizedBox(width: 10),
                             Text(LG.date(nextFire))
                           ]))),
@@ -511,8 +511,8 @@ class _ScheduleFormState extends State<ScheduleForm> {
                           catch (_) {if(mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not delete schedule. Try again.')));}
                           finally {if(mounted)setState(()=>saving=false);}
                         },
-                        child: const Text('Delete schedule',
-                            style: TextStyle(color: LG.negative))),
+                        child: Text('Delete schedule',
+                            style: TextStyle(color: LG.adaptive(context,LG.negative)))),
                   ],
                 ]))));
   }
@@ -574,8 +574,8 @@ class _HistoricalTrendScreenState extends State<HistoricalTrendScreen> {
                                 for (final s in snapshots)
                                   s.netWorthUgx.toDouble()
                               ],
-                              lineColor: LG.gold,
-                              fillColor: LG.gold.withValues(alpha: 0.2))),
+                              lineColor: LG.darkGold,
+                              fillColor: LG.darkGold.withValues(alpha: 0.16))),
                       const SizedBox(height: 10),
                       Text(
                           '${LG.money(snapshots.first.netWorthUgx, compact: true)} → ${LG.money(snapshots.last.netWorthUgx, compact: true)}',
@@ -600,10 +600,10 @@ class _HistoricalTrendScreenState extends State<HistoricalTrendScreen> {
                   ],
                 ])),
                 const SizedBox(height: 16),
-                const Text(
+                Text(
                     'Liabilities are carried at the current outstanding balance because dated debt history is not yet modelled. Treat older snapshots as directional, not audited.',
                     style:
-                        TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+                        TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.5)),
               ],
             ]);
       });
@@ -681,10 +681,10 @@ class AssetPerformanceScreen extends StatelessWidget {
                     label: 'Valuation samples',
                     value: metrics.sampleCount.toString()),
                 const SizedBox(height: 6),
-                const Text(
+                Text(
                     'TWR uses dated valuations and excludes the impact of contributions / withdrawals. XIRR folds contributions, distributions and the current value together. Both are pure-Dart derivations with no external benchmark.',
                     style: TextStyle(
-                        color: LG.muted, fontSize: 11, height: 1.5)),
+                        color: LG.adaptive(context,LG.muted), fontSize: 11, height: 1.5)),
               ])),
               if (history.length >= 2) ...[
                 const SizedBox(height: 18),
@@ -697,8 +697,8 @@ class AssetPerformanceScreen extends StatelessWidget {
                               for (final v in history)
                                 v.fullValueUgx.toDouble()
                             ],
-                            lineColor: LG.sage,
-                            fillColor: LG.sageSoft))),
+                            lineColor: LG.adaptive(context,LG.sage),
+                            fillColor: LG.adaptive(context,LG.sageSoft)))),
               ],
               if (history.isNotEmpty) ...[
                 const SizedBox(height: 18),
@@ -723,10 +723,10 @@ class AssetPerformanceScreen extends StatelessWidget {
                         width: 36,
                         height: 36,
                         decoration: BoxDecoration(
-                            color: LG.sageSoft,
+                            color: LG.adaptive(context,LG.sageSoft),
                             borderRadius: BorderRadius.circular(10)),
                         child: Icon(_eventIcon(related[i].kind),
-                            color: LG.sage, size: 18),
+                            color: LG.adaptive(context,LG.sage), size: 18),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
@@ -738,8 +738,8 @@ class AssetPerformanceScreen extends StatelessWidget {
                                     const TextStyle(fontWeight: FontWeight.w700)),
                             Text(
                                 '${related[i].kind.name} · ${LG.date(related[i].occurredAt)}',
-                                style: const TextStyle(
-                                    color: LG.muted, fontSize: 11)),
+                                style: TextStyle(
+                                    color: LG.adaptive(context,LG.muted), fontSize: 11)),
                           ])),
                       Flexible(child: Text(LG.money(related[i].amountUgx), textAlign: TextAlign.end,
                           style: const TextStyle(fontWeight: FontWeight.w700))),
@@ -780,8 +780,8 @@ class Sparkline extends StatelessWidget {
       this.fillColor = LG.sageSoft});
   @override
   Widget build(BuildContext context) =>
-      CustomPaint(painter: _SparklinePainter(values, lineColor, fillColor),
-          size: Size.infinite);
+      Semantics(label: 'Recorded valuation trend, ${values.length} observations. Exact values are listed separately.', child: CustomPaint(painter: _SparklinePainter(values, lineColor, fillColor),
+          size: Size.infinite));
 }
 
 class _SparklinePainter extends CustomPainter {
@@ -825,5 +825,5 @@ class _SparklinePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _SparklinePainter old) =>
-      old.values != values || old.lineColor != lineColor;
+      old.values != values || old.lineColor != lineColor || old.fillColor != fillColor;
 }
