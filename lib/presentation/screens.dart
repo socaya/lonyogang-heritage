@@ -56,7 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
         : store.state.ownerName.split(' ').first;
     return RefreshIndicator(
       color: LG.gold,
-      backgroundColor: LG.white,
+      backgroundColor: LG.adaptive(context,LG.white),
       onRefresh: () async {
         HapticFeedback.selectionClick();
         setState(() {});
@@ -82,7 +82,7 @@ class _HomeScreenState extends State<HomeScreen> {
           style: Theme.of(context)
               .textTheme
               .bodyLarge
-              ?.copyWith(color: LG.muted, fontSize: 16)),
+              ?.copyWith(color: LG.adaptive(context,LG.muted), fontSize: 16)),
       const SizedBox(height: 2),
       Text(ownerFirst,
           style: Theme.of(context)
@@ -198,13 +198,12 @@ class _NetWorthHero extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(children: [
-              const Text('TOTAL NET WORTH',
+              const Expanded(child:Text('TOTAL NET WORTH',
                   style: TextStyle(
                       color: Color(0xFFC3D3D6),
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
-                      letterSpacing: 1.3)),
-              const Spacer(),
+                      letterSpacing: 1.3))),
               IconButton(
                 tooltip: masked ? 'Reveal' : 'Hide',
                 onPressed: onToggle,
@@ -214,9 +213,7 @@ class _NetWorthHero extends StatelessWidget {
                         : Icons.visibility_off_outlined,
                     color: const Color(0xFFC3D3D6),
                     size: 20),
-                visualDensity: VisualDensity.compact,
-                padding: EdgeInsets.zero,
-                constraints: const BoxConstraints(),
+                constraints: const BoxConstraints(minWidth:48,minHeight:48),
               ),
             ]),
             const SizedBox(height: 14),
@@ -236,15 +233,15 @@ class _NetWorthHero extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                    color: LG.gold.withValues(alpha: 0.22),
+                    color: LG.darkGold.withValues(alpha: 0.16),
                     borderRadius: BorderRadius.circular(999)),
                 child: const Row(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.shield_moon_outlined,
-                      color: LG.gold, size: 11),
+                      color: LG.darkGold, size: 11),
                   SizedBox(width: 4),
                   Text('Heritage Portfolio',
                       style: TextStyle(
-                          color: LG.gold,
+                          color: LG.darkGold,
                           fontSize: 11,
                           fontWeight: FontWeight.w700)),
                 ]),
@@ -289,16 +286,16 @@ class _StatCard extends StatelessWidget {
                 width: 32,
                 height: 32,
                 decoration: BoxDecoration(
-                    color: tint,
+                    color: LG.adaptive(context,tint),
                     borderRadius: BorderRadius.circular(10)),
-                child: Icon(icon, size: 17, color: iconColor),
+                child: Icon(icon, size: 17, color: LG.adaptive(context,iconColor)),
               ),
               const Spacer(),
             ]),
             const SizedBox(height: 14),
             Text(label,
                 style:
-                    const TextStyle(color: LG.muted, fontSize: 12.5)),
+                    TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12.5)),
             const SizedBox(height: 6),
             FittedBox(
               alignment: Alignment.centerLeft,
@@ -330,10 +327,10 @@ class SyncOutboxBadge extends StatelessWidget {
         final count = outbox.length;
         if (count == 0) return const SizedBox.shrink();
         return SoftCard(
-          color: LG.sageSoft,
+          color: LG.adaptive(context,LG.sageSoft),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(children: [
-            const Icon(Icons.cloud_upload_outlined, color: LG.sage, size: 20),
+            Icon(Icons.cloud_upload_outlined, color: LG.adaptive(context,LG.sage), size: 20),
             const SizedBox(width: 10),
             Expanded(
               child: Text(
@@ -371,17 +368,17 @@ class HomeRecentActivity extends StatelessWidget {
         child:SoftCard(onTap:()=>push(context,TransactionDetailScreen(store:store,event:e)),
           padding:const EdgeInsets.symmetric(horizontal:14,vertical:14),
           child:Row(children:[
-            Container(width:40,height:40,decoration:BoxDecoration(color:LG.sageSoft,
+            Container(width:40,height:40,decoration:BoxDecoration(color:LG.adaptive(context,LG.sageSoft),
               borderRadius:BorderRadius.circular(12)),
-              child:const Icon(Icons.receipt_long_outlined,color:LG.sage,size:20)),
+              child:Icon(Icons.receipt_long_outlined,color:LG.adaptive(context,LG.sage),size:20)),
             const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
               Text(e.description,maxLines:1,overflow:TextOverflow.ellipsis,
                 style:const TextStyle(fontWeight:FontWeight.w700,fontSize:14)),
               Text('${e.kind.name} · ${LG.date(e.occurredAt)}',
-                style:const TextStyle(color:LG.muted,fontSize:11)),
+                style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:11)),
             ])),Text(LG.money(e.amountUgx,compact:true),
               style:const TextStyle(fontWeight:FontWeight.w700,fontSize:13)),
-            const SizedBox(width:6),const Icon(Icons.chevron_right,color:LG.muted,size:18),
+            const SizedBox(width:6),Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted),size:18),
           ])))),
     ]);
   }
@@ -410,7 +407,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
     }
     return RefreshIndicator(
       color: LG.gold,
-      backgroundColor: LG.white,
+      backgroundColor: LG.adaptive(context,LG.white),
       onRefresh: () async {
         HapticFeedback.selectionClick();
         // Rebuild via setState; a parent Sync hook isn't wired at this
@@ -515,10 +512,10 @@ class AssetDetails extends StatelessWidget {
   @override Widget build(BuildContext context) {
     final linked=store.state.liabilities.where((x)=>!x.archived&&x.propertyId==asset.id).toList();
     return ScreenPage(title:'Asset details',children:[
-      Row(children:[Icon(assetIcon(asset.kind),color:LG.sage),const SizedBox(width:10),
+      Row(children:[Icon(assetIcon(asset.kind),color:LG.adaptive(context,LG.sage)),const SizedBox(width:10),
         Expanded(child:Text(asset.name,style:Theme.of(context).textTheme.titleLarge))]),
-      const SizedBox(height:20),SoftCard(color:LG.sageSoft,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        const Text('YOUR ATTRIBUTABLE VALUE',style:TextStyle(color:LG.sage,fontSize:11,fontWeight:FontWeight.w700)),
+      const SizedBox(height:20),SoftCard(color:LG.adaptive(context,LG.sageSoft),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Text('YOUR ATTRIBUTABLE VALUE',style:TextStyle(color:LG.adaptive(context,LG.sage),fontSize:11,fontWeight:FontWeight.w700)),
         const SizedBox(height:10),Text(LG.money(asset.attributableUgx),style:Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height:8),Pill(asset.status.name),
       ])),const SizedBox(height:16),SoftCard(child:Column(children:[
@@ -537,23 +534,23 @@ class AssetDetails extends StatelessWidget {
         SoftCard(child:Column(children:[InfoLabel(label:'Owned property value',value:LG.money(asset.attributableUgx)),
           InfoLabel(label:'Linked mortgage debt',value:LG.money(linked.fold<int>(0,(a,x)=>a+x.outstandingUgx))),
           const Divider(),InfoLabel(label:'Property equity',value:LG.money(propertyEquity(asset,store.state.liabilities)))])),
-        const SizedBox(height:8),const Text('Mortgage balances are deducted once in consolidated net worth.',
-          style:TextStyle(color:LG.muted,fontSize:11)),
+        const SizedBox(height:8),Text('Mortgage balances are deducted once in consolidated net worth.',
+          style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:11)),
       ],
       if(asset.notes.isNotEmpty)...[const SizedBox(height:18),const SectionTitle('Notes'),SoftCard(child:Text(asset.notes))],
       const SizedBox(height:16),SoftCard(onTap:()=>push(context,ValuationHistoryScreen(store:store,asset:asset)),
-        child:const Row(children:[Icon(Icons.history,color:LG.sage),SizedBox(width:12),
+        child:Row(children:[Icon(Icons.history,color:LG.adaptive(context,LG.sage)),SizedBox(width:12),
           Expanded(child:Text('Valuation history',style:TextStyle(fontWeight:FontWeight.w700))),
-          Icon(Icons.chevron_right,color:LG.muted)])),
+          Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted))])),
       const SizedBox(height:10),SoftCard(onTap:()=>push(context,AssetPerformanceScreen(store:store,asset:asset)),
-        child:const Row(children:[Icon(Icons.insights_outlined,color:LG.sage),SizedBox(width:12),
+        child:Row(children:[Icon(Icons.insights_outlined,color:LG.adaptive(context,LG.sage)),SizedBox(width:12),
           Expanded(child:Text('Performance',style:TextStyle(fontWeight:FontWeight.w700))),
-          Icon(Icons.chevron_right,color:LG.muted)])),
+          Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted))])),
       if(asset.kind==AssetKind.property)...[const SizedBox(height:10),
-        SoftCard(onTap:()=>push(context,RentalIncomeScreen(store:store)),child:const Row(children:[
-          Icon(Icons.real_estate_agent_outlined,color:LG.sage),SizedBox(width:12),
+        SoftCard(onTap:()=>push(context,RentalIncomeScreen(store:store)),child:Row(children:[
+          Icon(Icons.real_estate_agent_outlined,color:LG.adaptive(context,LG.sage)),SizedBox(width:12),
           Expanded(child:Text('Recorded property income',style:TextStyle(fontWeight:FontWeight.w700))),
-          Icon(Icons.chevron_right,color:LG.muted)]))],
+          Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted))]))],
       const SizedBox(height: 18),
       AttachmentsBlock(
         title: 'Statements & documents',
@@ -578,7 +575,7 @@ class AssetDetails extends StatelessWidget {
           Expanded(
             child: ElevatedButton.icon(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: LG.sage,
+                  backgroundColor: LG.adaptive(context,LG.sage),
                   foregroundColor: LG.white),
               onPressed: () =>
                   _recordInterestSheet(context, store, asset),
@@ -604,13 +601,13 @@ class AssetDetails extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
               '${interestFrequencyLabel(asset.interestFrequency)} • ${(asset.interestRateBps / 100).toStringAsFixed(2)}% → estimated ${LG.money(asset.projectedPeriodInterestUgx)} per period',
-              style: const TextStyle(color: LG.muted, fontSize: 13)),
+              style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13)),
         ],
       ],
       const SizedBox(height:24),ElevatedButton.icon(onPressed:()=>push(context,
         AssetForm(store:store,kind:asset.kind,existing:asset)),icon:const Icon(Icons.edit_outlined),label:const Text('Edit asset')),
       const SizedBox(height:10),TextButton(onPressed:()=>confirmArchive(context,()=>store.archiveAsset(asset)),
-        child:const Text('Archive asset',style:TextStyle(color:LG.negative))),
+        child:Text('Archive asset',style:TextStyle(color:LG.adaptive(context,LG.negative)))),
     ]);
   }
 }
@@ -649,7 +646,7 @@ Future<void> _recordInterestSheet(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Row(children: [
-                  const Icon(Icons.percent_rounded, color: LG.sage),
+                  Icon(Icons.percent_rounded, color: LG.adaptive(context,LG.sage)),
                   const SizedBox(width: 10),
                   Text('Record interest',
                       style: Theme.of(ctx).textTheme.titleLarge),
@@ -657,7 +654,7 @@ Future<void> _recordInterestSheet(
                 const SizedBox(height: 6),
                 Text('Posts an immutable interest entry for ${asset.name}.',
                     style:
-                        const TextStyle(color: LG.muted, fontSize: 13)),
+                        TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13)),
                 const SizedBox(height: 18),
                 FormFieldBlock(
                   title: 'Amount (UGX)',
@@ -688,8 +685,8 @@ Future<void> _recordInterestSheet(
                       if (d != null) setSheetState(() => day = d);
                     },
                     child: Row(children: [
-                      const Icon(Icons.calendar_today_outlined,
-                          color: LG.sage, size: 18),
+                      Icon(Icons.calendar_today_outlined,
+                          color: LG.adaptive(context,LG.sage), size: 18),
                       const SizedBox(width: 12),
                       Text(LG.date(day)),
                     ]),
@@ -776,7 +773,7 @@ Future<void> _recordDepositSheet(
                 Text(
                     'Logs a contribution into ${asset.name} and increases the current value by the same amount.',
                     style:
-                        const TextStyle(color: LG.muted, fontSize: 13)),
+                        TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13)),
                 const SizedBox(height: 18),
                 FormFieldBlock(
                   title: 'Deposit amount (UGX)',
@@ -804,8 +801,8 @@ Future<void> _recordDepositSheet(
                       if (d != null) setSheetState(() => day = d);
                     },
                     child: Row(children: [
-                      const Icon(Icons.calendar_today_outlined,
-                          color: LG.sage, size: 18),
+                      Icon(Icons.calendar_today_outlined,
+                          color: LG.adaptive(context,LG.sage), size: 18),
                       const SizedBox(width: 12),
                       Text(LG.date(day)),
                     ]),
@@ -875,10 +872,10 @@ class DebtsScreen extends StatelessWidget {
           label:'${d.name}. Outstanding ${LG.money(d.outstandingUgx)}. As of ${LG.date(d.asOf)}.',
           child:SoftCard(
           onTap:()=>push(context,LiabilityDetailScreen(store:store,liability:d)),
-          child:Column(children:[Row(children:[const Icon(Icons.account_balance_outlined,color:LG.sage),const SizedBox(width:12),
+          child:Column(children:[Row(children:[Icon(Icons.account_balance_outlined,color:LG.adaptive(context,LG.sage)),const SizedBox(width:12),
             Expanded(child:Text(d.name,style:const TextStyle(fontWeight:FontWeight.w700))),
             Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w700)),
-            const SizedBox(width:6),const Icon(Icons.chevron_right,color:LG.muted,size:18)]),
+            const SizedBox(width:6),Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted),size:18)]),
             const SizedBox(height:8),InfoLabel(label:'As of',value:LG.date(d.asOf))]))))),
       const SizedBox(height:18),ElevatedButton.icon(onPressed:()=>push(context,LiabilityForm(store:store)),
         icon:const Icon(Icons.add),label:const Text('Add liability')),
@@ -917,20 +914,20 @@ class ReportsScreen extends StatelessWidget {
       ReturnsList(store:store),
       const SizedBox(height:16),const SectionTitle('More analysis'),
       SoftCard(child:Column(children:[
-        ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.account_balance_wallet_outlined,color:LG.sage),
-          title:const Text('Financial position'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+        ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.account_balance_wallet_outlined,color:LG.adaptive(context,LG.sage)),
+          title:const Text('Financial position'),trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
           onTap:()=>push(context,WealthStatementScreen(store:store))),
-        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.payments_outlined,color:LG.sage),
-          title:const Text('Cash flow & income'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.payments_outlined,color:LG.adaptive(context,LG.sage)),
+          title:const Text('Cash flow & income'),trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
           onTap:()=>push(context,CashFlowScreen(store:store))),
-        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.home_work_outlined,color:LG.sage),
-          title:const Text('Rental income'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.home_work_outlined,color:LG.adaptive(context,LG.sage)),
+          title:const Text('Rental income'),trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
           onTap:()=>push(context,RentalIncomeScreen(store:store))),
-        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.tune_outlined,color:LG.sage),
-          title:const Text('Target allocation & drift'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.tune_outlined,color:LG.adaptive(context,LG.sage)),
+          title:const Text('Target allocation & drift'),trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
           onTap:()=>push(context,AllocationScreen(store:store))),
-        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.insights_outlined,color:LG.sage),
-          title:const Text('Historical wealth trend'),trailing:const Icon(Icons.chevron_right,color:LG.muted),
+        const Divider(),ListTile(contentPadding:EdgeInsets.zero,leading:Icon(Icons.insights_outlined,color:LG.adaptive(context,LG.sage)),
+          title:const Text('Historical wealth trend'),trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
           onTap:()=>push(context,HistoricalTrendScreen(store:store))),
       ])),const SizedBox(height:16),const PrivacyBanner(),
     ]);
@@ -946,9 +943,9 @@ class ReturnsList extends StatelessWidget {
       .map((a)=>(a,assetReturns(a,store.state.valuations,store.state.events,now)))
       .where((row)=>row.$2.hasAny).toList();
     if(rows.isEmpty){
-      return const SoftCard(child:Text(
+      return SoftCard(child:Text(
         'Returns appear here once an asset has at least two dated valuations and any linked cashflows.',
-        style:TextStyle(color:LG.muted,fontSize:12,height:1.5)));
+        style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:12,height:1.5)));
     }
     String fmt(double? v)=>v==null?'—':'${(v*100).toStringAsFixed(1)}%';
     return SoftCard(child:Column(children:[
@@ -961,10 +958,10 @@ class ReturnsList extends StatelessWidget {
             Text('TWR ${fmt(row.$2.twr)}   XIRR ${fmt(row.$2.xirr)}',
               style:const TextStyle(fontSize:12,fontWeight:FontWeight.w700)),
             const SizedBox(width:6),
-            const Icon(Icons.chevron_right,color:LG.muted,size:18)]))),
-      const SizedBox(height:4),const Text(
+            Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted),size:18)]))),
+      const SizedBox(height:4),Text(
         'Tap an asset to see its cashflows and valuation history. TWR is annualized; XIRR uses contributions, withdrawals and recorded distributions plus the current value.',
-        style:TextStyle(color:LG.muted,fontSize:11,height:1.4)),
+        style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:11,height:1.4)),
     ]));
   }
 }
@@ -1052,13 +1049,13 @@ class _TransactionsScreenState extends State<TransactionsScreen> {
       padding: const EdgeInsets.all(14),
       onTap: () => push(context, TransactionDetailScreen(store: widget.store, event: e)),
       child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Icon(e.kind == EventKind.reversal ? Icons.undo : Icons.receipt_long_outlined, color: LG.sageDark),
+        Icon(e.kind == EventKind.reversal ? Icons.undo : Icons.receipt_long_outlined, color: LG.adaptive(context,LG.sageDark)),
         const SizedBox(width: 12),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(e.description, style: const TextStyle(fontWeight: FontWeight.w600)),
           const SizedBox(height: 4),
-          Text(e.kind.name, style: const TextStyle(color: LG.muted, fontSize: 13)),
-          if (reversed) const Text('Reversed', style: TextStyle(color: LG.negative, fontSize: 13)),
+          Text(e.kind.name, style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13)),
+          if (reversed) Text('Reversed', style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 13)),
         ])),
         const SizedBox(width: 8),
         Flexible(child: Text(LG.money(e.amountUgx), textAlign: TextAlign.end,
@@ -1073,12 +1070,12 @@ class MoreScreen extends StatelessWidget {
   @override Widget build(BuildContext context)=>paddedBody([
     const SizedBox(height:8),const PageHeading('More',subtitle:'Your wealth records, plans and preferences.'),
     SoftCard(onTap:()=>push(context,ProfileScreen(store:store)),child:Row(children:[
-      CircleAvatar(backgroundColor:LG.sageSoft,child:Text(store.state.ownerName.isEmpty?'LG':store.state.ownerName.substring(0,1).toUpperCase(),
-        style:const TextStyle(fontWeight:FontWeight.w700,color:LG.sage))),
+      CircleAvatar(backgroundColor:LG.adaptive(context,LG.sageSoft),child:Text(store.state.ownerName.isEmpty?'LG':store.state.ownerName.substring(0,1).toUpperCase(),
+        style:TextStyle(fontWeight:FontWeight.w700,color:LG.adaptive(context,LG.sage)))),
       const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text(store.state.ownerName,style:const TextStyle(fontWeight:FontWeight.w700)),
-        const SizedBox(height:4),const Text('On-device portfolio',style:TextStyle(color:LG.muted,fontSize:12))])),
-      const Icon(Icons.chevron_right,color:LG.muted),
+        const SizedBox(height:4),Text('On-device portfolio',style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:12))])),
+      Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
     ])),
     const SizedBox(height:22),const SectionTitle('Your financial position'),
     SoftCard(child:Column(children:[
@@ -1117,9 +1114,9 @@ class MoreScreen extends StatelessWidget {
     ])),const SizedBox(height:18),const PrivacyBanner(),
   ]);
   Widget _moreItem(BuildContext context,IconData icon,String name,Widget target)=>ListTile(
-    contentPadding:EdgeInsets.zero,leading:Icon(icon,color:LG.sage),title:Text(name,
+    contentPadding:EdgeInsets.zero,leading:Icon(icon,color:LG.adaptive(context,LG.sage)),title:Text(name,
       style:const TextStyle(fontWeight:FontWeight.w700,fontSize:13)),
-    trailing:const Icon(Icons.chevron_right,color:LG.muted,size:20),onTap:()=>push(context,target));
+    trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted),size:20),onTap:()=>push(context,target));
 }
 
 class ScreenPage extends StatelessWidget {

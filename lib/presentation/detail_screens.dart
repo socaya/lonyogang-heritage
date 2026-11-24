@@ -71,8 +71,8 @@ class TransactionDetailScreen extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                           Text(current.kind.name,
-                              style: const TextStyle(
-                                  color: LG.muted,
+                              style: TextStyle(
+                                  color: LG.adaptive(context,LG.muted),
                                   fontSize: 11,
                                   letterSpacing: 1.2,
                                   fontWeight: FontWeight.w800)),
@@ -147,9 +147,9 @@ class TransactionDetailScreen extends StatelessWidget {
                     store.removeEventAttachment(current.id, i),
               ),
               const SizedBox(height: 18),
-              const Text(
+              Text(
                   'The transaction ledger is append-only. Every reversal preserves the original entry so audit history stays intact. Attachments are metadata and can be added or removed after posting.',
-                  style: TextStyle(color: LG.muted, fontSize: 12, height: 1.5)),
+                  style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.5)),
             ]);
       });
 
@@ -273,8 +273,8 @@ class LiabilityDetailScreen extends StatelessWidget {
                       if (!context.mounted) return;
                       Navigator.of(context).maybePop();
                     },
-                    child: const Text('Archive liability',
-                        style: TextStyle(color: LG.negative)))
+                    child: Text('Archive liability',
+                        style: TextStyle(color: LG.adaptive(context,LG.negative))))
               else
                 TextButton(
                     onPressed: () async {
@@ -282,8 +282,8 @@ class LiabilityDetailScreen extends StatelessWidget {
                       if (!context.mounted) return;
                       Navigator.of(context).maybePop();
                     },
-                    child: const Text('Restore liability',
-                        style: TextStyle(color: LG.sage))),
+                    child: Text('Restore liability',
+                        style: TextStyle(color: LG.adaptive(context,LG.sage)))),
             ]);
       });
 }
@@ -404,7 +404,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
             subtitle: current.title,
             children: [
               SoftCard(
-                  color: LG.sageSoft,
+                  color: LG.adaptive(context,LG.sageSoft),
                   child: Row(children: [
                     Container(
                       width: 52,
@@ -416,7 +416,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                           attachment == null
                               ? Icons.description_outlined
                               : Icons.lock,
-                          color: LG.sage),
+                          color: LG.adaptive(context,LG.sage)),
                     ),
                     const SizedBox(width: 12),
                     Expanded(
@@ -424,8 +424,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                           Text(current.category,
-                              style: const TextStyle(
-                                  color: LG.sage,
+                              style: TextStyle(
+                                  color: LG.adaptive(context,LG.sage),
                                   fontSize: 11,
                                   letterSpacing: 1.2,
                                   fontWeight: FontWeight.w800)),
@@ -468,8 +468,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                           widget.store.vault.hasPassphrase
                               ? 'No file attached yet. Attachments picked here are AES-GCM encrypted under your vault key before writing to disk.'
                               : 'No file attached yet. Attachments are encrypted on disk with a per-file key. Enable a passphrase from More → Encryption to bind them to your vault.',
-                          style: const TextStyle(
-                              color: LG.muted, fontSize: 12, height: 1.5)),
+                          style: TextStyle(
+                              color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.5)),
                       const SizedBox(height: 14),
                       PrimaryCTA(
                         label: _busy ? 'Encrypting…' : 'Attach encrypted file',
@@ -484,7 +484,7 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                       Row(children: [
-                        const Icon(Icons.lock, color: LG.sage),
+                        Icon(Icons.lock, color: LG.adaptive(context,LG.sage)),
                         const SizedBox(width: 10),
                         Expanded(
                             child: Column(
@@ -495,8 +495,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                                       fontWeight: FontWeight.w700)),
                               Text(
                                   '${_sizeHuman(attachment.sizeBytes)} · ${attachment.mimeType}',
-                                  style: const TextStyle(
-                                      color: LG.muted, fontSize: 12)),
+                                  style: TextStyle(
+                                      color: LG.adaptive(context,LG.muted), fontSize: 12)),
                               const SizedBox(height: 4),
                               _AttachmentSyncBadge(
                                   uploaded: attachment.serverId != null),
@@ -505,8 +505,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                             tooltip: 'Remove file',
                             onPressed:
                                 _busy ? null : () => _removeAttachment(current),
-                            icon: const Icon(Icons.delete_outline,
-                                color: LG.muted)),
+                            icon: Icon(Icons.delete_outline,
+                                color: LG.adaptive(context,LG.muted))),
                       ]),
                       const SizedBox(height: 12),
                       PrimaryCTA(
@@ -517,8 +517,8 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                       const SizedBox(height: 10),
                       Text(
                           'SHA-256 ${attachment.sha256Hex.substring(0, 12)}… · attached ${LG.date(attachment.addedAt)}',
-                          style: const TextStyle(
-                              color: LG.muted, fontSize: 11)),
+                          style: TextStyle(
+                              color: LG.adaptive(context,LG.muted), fontSize: 11)),
                     ])),
               const SizedBox(height: 18),
               SoftCard(
@@ -529,12 +529,12 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
                         widget.store.vault.hasPassphrase
                             ? Icons.lock
                             : Icons.lock_open,
-                        color: LG.sage),
+                        color: LG.adaptive(context,LG.sage)),
                     const SizedBox(width: 12),
                     const Expanded(
                         child: Text('Manage encryption',
                             style: TextStyle(fontWeight: FontWeight.w700))),
-                    const Icon(Icons.chevron_right, color: LG.muted),
+                    Icon(Icons.chevron_right, color: LG.adaptive(context,LG.muted)),
                   ])),
               const SizedBox(height: 22),
               PrimaryCTA(
@@ -549,15 +549,15 @@ class _DocumentDetailScreenState extends State<DocumentDetailScreen> {
               if (!current.archived)
                 TextButton(
                     onPressed: () => _archive(current),
-                    child: const Text('Archive record',
-                        style: TextStyle(color: LG.negative)))
+                    child: Text('Archive record',
+                        style: TextStyle(color: LG.adaptive(context,LG.negative))))
               else
                 TextButton(
                     onPressed: () async {
                       await widget.store.restoreDocument(current);
                     },
-                    child: const Text('Restore record',
-                        style: TextStyle(color: LG.sage))),
+                    child: Text('Restore record',
+                        style: TextStyle(color: LG.adaptive(context,LG.sage)))),
             ]);
       });
 
@@ -597,7 +597,7 @@ class _AttachmentSyncBadge extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: bg,
+          color: LG.surface(context,bg),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
@@ -605,7 +605,7 @@ class _AttachmentSyncBadge extends StatelessWidget {
           const SizedBox(width: 6),
           Text(label,
               style: TextStyle(
-                  color: fg, fontSize: 11, fontWeight: FontWeight.w600)),
+                  color: LG.adaptive(context,fg), fontSize: 11, fontWeight: FontWeight.w600)),
         ]),
       ),
     );

@@ -197,10 +197,10 @@ class _SummaryTile extends StatelessWidget {
               width: 32,
               height: 32,
               decoration: BoxDecoration(
-                  color: tint, borderRadius: BorderRadius.circular(10)),
-              child: Icon(icon, size: 17, color: iconColor)),
+                  color: LG.adaptive(context,tint), borderRadius: BorderRadius.circular(10)),
+              child: Icon(icon, size: 17, color: LG.adaptive(context,iconColor))),
           const SizedBox(height: 12),
-          Text(label, style: const TextStyle(color: LG.muted, fontSize: 12.5)),
+          Text(label, style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12.5)),
           const SizedBox(height: 4),
           FittedBox(
               alignment: Alignment.centerLeft,
@@ -234,7 +234,7 @@ class _ExpenseTile extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-                color: LG.goldSoft, borderRadius: BorderRadius.circular(12)),
+                color: LG.adaptive(context,LG.goldSoft), borderRadius: BorderRadius.circular(12)),
             child: const Icon(Icons.receipt_long_outlined,
                 color: LG.gold, size: 22)),
         const SizedBox(width: 12),
@@ -249,17 +249,17 @@ class _ExpenseTile extends StatelessWidget {
           Text(subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(color: LG.muted, fontSize: 12.5)),
+              style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12.5)),
           if (expense.paymentMethod.isNotEmpty) ...[
             const SizedBox(height: 7),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                  color: LG.sageSoft,
+                  color: LG.adaptive(context,LG.sageSoft),
                   borderRadius: BorderRadius.circular(999)),
               child: Text(expense.paymentMethod,
-                  style: const TextStyle(
-                      color: LG.sage,
+                  style: TextStyle(
+                      color: LG.adaptive(context,LG.sage),
                       fontSize: 11,
                       fontWeight: FontWeight.w700)),
             ),
@@ -268,13 +268,13 @@ class _ExpenseTile extends StatelessWidget {
         const SizedBox(width: 10),
         Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Text('- ${LG.money(expense.amountUgx, compact: true)}',
-              style: const TextStyle(
-                  color: LG.negative,
+              style: TextStyle(
+                  color: LG.adaptive(context,LG.negative),
                   fontWeight: FontWeight.w700,
                   fontSize: 14.5)),
           if (expense.receipt != null) ...[
             const SizedBox(height: 4),
-            const Icon(Icons.attachment_rounded, color: LG.sage, size: 15),
+            Icon(Icons.attachment_rounded, color: LG.adaptive(context,LG.sage), size: 15),
           ],
         ]),
       ]),
@@ -469,8 +469,8 @@ class _ExpenseFormState extends State<ExpenseForm> {
                     if (picked != null) setState(() => date = picked);
                   },
                   child: Row(children: [
-                    const Icon(Icons.calendar_today_outlined,
-                        color: LG.sage, size: 18),
+                    Icon(Icons.calendar_today_outlined,
+                        color: LG.adaptive(context,LG.sage), size: 18),
                     const SizedBox(width: 12),
                     Text(LG.date(date)),
                   ]),
@@ -510,8 +510,8 @@ class _ExpenseFormState extends State<ExpenseForm> {
                                 .removeExpense(widget.existing!.id);
                             if (context.mounted) Navigator.pop(context);
                           },
-                    child: const Text('Delete expense',
-                        style: TextStyle(color: LG.negative)),
+                    child: Text('Delete expense',
+                        style: TextStyle(color: LG.adaptive(context,LG.negative))),
                   ),
                 ),
             ],
@@ -666,10 +666,10 @@ class _ReceiptPicker extends StatelessWidget {
         children: [
           if (receipt != null)
             SoftCard(
-              color: LG.sageSoft,
+              color: LG.adaptive(context,LG.sageSoft),
               padding: const EdgeInsets.all(14),
               child: Row(children: [
-                const Icon(Icons.attachment_rounded, color: LG.sage),
+                Icon(Icons.attachment_rounded, color: LG.adaptive(context,LG.sage)),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Column(
@@ -682,18 +682,18 @@ class _ReceiptPicker extends StatelessWidget {
                                 fontWeight: FontWeight.w700)),
                         Text(
                             '${_sizeHuman(receipt!.sizeBytes)} · ${receipt!.mimeType}',
-                            style: const TextStyle(
-                                color: LG.muted, fontSize: 11.5)),
+                            style: TextStyle(
+                                color: LG.adaptive(context,LG.muted), fontSize: 11.5)),
                       ]),
                 ),
                 IconButton(
                     tooltip: 'Preview',
                     onPressed: onPreview,
-                    icon: const Icon(Icons.open_in_new, color: LG.sage)),
+                    icon: Icon(Icons.open_in_new, color: LG.adaptive(context,LG.sage))),
                 IconButton(
                     tooltip: 'Remove',
                     onPressed: onClear,
-                    icon: const Icon(Icons.close, color: LG.muted)),
+                    icon: Icon(Icons.close, color: LG.adaptive(context,LG.muted))),
               ]),
             ),
           if (receipt == null)
@@ -723,12 +723,12 @@ class _ReceiptPicker extends StatelessWidget {
               ),
             ]),
           if (busy)
-            const Padding(
+            Padding(
               padding: EdgeInsets.only(top: 10),
               child: LinearProgressIndicator(
                   minHeight: 3,
-                  color: LG.sage,
-                  backgroundColor: LG.sageSoft),
+                  color: LG.adaptive(context,LG.sage),
+                  backgroundColor: LG.adaptive(context,LG.sageSoft)),
             ),
         ],
       );
