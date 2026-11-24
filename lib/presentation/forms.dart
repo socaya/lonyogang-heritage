@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../core/design.dart';
+import 'appearance_screen.dart';
 import '../data/portfolio_store.dart';
 import '../domain/models.dart';
 import 'account_screens.dart';
@@ -1458,7 +1459,9 @@ class SettingsScreen extends StatelessWidget {
   final PortfolioStore store;
   const SettingsScreen({super.key,required this.store});
   @override Widget build(BuildContext context)=>ScreenPage(title:'Settings & data',subtitle:'Your data stays on this device in preview mode.',children:[
-    const PrivacyBanner(),const SizedBox(height:20),const SectionTitle('Local data management'),
+    const SectionTitle('Appearance'),
+    const AppearanceSettingsTile(),
+    const SizedBox(height:20),const SectionTitle('Local data management'),
     SoftCard(child:Column(children:[ListTile(contentPadding:EdgeInsets.zero,leading:const Icon(Icons.upload_file_outlined,color:LG.sage),
       title:const Text('Export portfolio JSON'),subtitle:const Text('Copies unencrypted JSON to clipboard'),
       trailing:const Icon(Icons.chevron_right,color:LG.muted),onTap:()=>_export(context,store)),
