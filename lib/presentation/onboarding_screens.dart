@@ -679,209 +679,107 @@ class _OtpBoxes extends StatelessWidget {
       );
 }
 
-/// Sign-in prototype (A06). The spec permits a visually complete design flow
-/// labelled as backend-gated. Any email + length-8+ password proceeds the
-/// flow; no credentials are ever verified.
+/// Password entry is separate from the authenticator challenge screen.
 class SignInScreen extends StatefulWidget {
   const SignInScreen({super.key});
-  @override
-  State<SignInScreen> createState() => _SignInScreenState();
+  @override State<SignInScreen> createState()=>_SignInScreenState();
 }
-
 class _SignInScreenState extends State<SignInScreen> {
-  final form = GlobalKey<FormState>();
-  final email = TextEditingController();
-  final password = TextEditingController();
-  final totp = TextEditingController();
-  bool _busy = false;
-  bool _passkeyAttempted = false;
-  bool _needsTotp = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    email.dispose();
-    password.dispose();
-    totp.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!form.currentState!.validate()) return;
-    final scope = OnlineScope.maybeOf(context);
-    final remote = scope?.sync;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-
-    // Preview path — no backend configured. Honour the prior UX: a plausible
-    // email and 8+ char password walks through the design flow.
-    if (remote == null || scope == null) {
-      await Future<void>.delayed(const Duration(milliseconds: 400));
-      if (!mounted) return;
-      setState(() => _busy = false);
-      Navigator.of(context).popUntil((r) => r.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'Sign-in is a design preview. Connect a backend to sign in for real.')));
+  final form=GlobalKey<FormState>();
+  final email=TextEditingController();
+  final password=TextEditingController();
+  bool busy=false;
+  String? error;
+  @override void dispose(){email.dispose();password.dispose();super.dispose();}
+  Future<void> submit() async {
+    if(busy||!form.currentState!.validate())return;
+    final scope=OnlineScope.maybeOf(context);
+    final remote=scope?.sync;
+    if(scope==null||remote==null){
+      setState(()=>error='Online sign-in is unavailable. Connect to a configured server.');
       return;
     }
-
-    try {
-      final deviceId = (await scope.credentials.load())?.deviceId ??
-          _syntheticDeviceId();
-      final creds = await remote.signIn(
-        email: email.text.trim(),
-        password: password.text,
-        deviceId: deviceId,
-        totpCode: _needsTotp ? totp.text.trim() : null,
-      );
-      await scope.credentials.save(creds);
-      if (!mounted) return;
-      setState(() => _busy = false);
-      Navigator.of(context).popUntil((r) => r.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Signed in. Syncing portfolio.')));
-      // Fire the sign-in hook so the shell can hydrate from /resources
-      // (cheap if local state is already populated; the hydrator uses
-      // the SyncReducer which is idempotent on known ids). Falls back
-      // to the plain sync() call when no hook is wired.
-      unawaited(scope.onSignInSuccess?.call() ?? remote.sync());
-    } on HttpException catch (err) {
-      final msg = err.message;
-      if (!_needsTotp && msg.contains('totp_required')) {
-        setState(() {
-          _needsTotp = true;
-          _busy = false;
-          _error = 'Enter the current TOTP code from your authenticator.';
-        });
-        return;
+    setState((){busy=true;error=null;});
+    final address=email.text.trim();
+    final secret=password.text;
+    try{
+      final deviceId=await scope.credentials.deviceId();
+      try {
+        await remote.signIn(email:address,password:secret,deviceId:deviceId);
+      } on HttpException catch(e){
+        if(!e.message.contains('totp_required'))rethrow;
+        if(!mounted)return;
+        password.clear();
+        final verified=await Navigator.of(context).push<bool>(MaterialPageRoute(builder:(_)=>AuthenticatorSignInScreen(
+          verify:(code) async {await remote.signIn(email:address,password:secret,deviceId:deviceId,totpCode:code);},
+        )));
+        if(verified!=true)return;
       }
-      setState(() {
-        _busy = false;
-        _error = msg.contains('bad_credentials')
-            ? 'Email or password is incorrect.'
-            : 'Sign-in failed: $msg';
-      });
-    } catch (err) {
-      setState(() {
-        _busy = false;
-        _error = 'Sign-in failed: $err';
-      });
-    }
+      if(!mounted)return;
+      password.clear();
+      Navigator.of(context).popUntil((r)=>r.isFirst);
+      unawaited(scope.onSignInSuccess?.call()??remote.sync());
+    } on HttpException catch(e){
+      if(mounted)setState(()=>error=e.message.contains('bad_credentials')?'Email or password is incorrect.':'Sign-in failed. Try again.');
+    } catch(_){if(mounted)setState(()=>error='Unable to sign in. Check your connection and try again.');}
+    finally{if(mounted)setState(()=>busy=false);}
   }
+  @override Widget build(BuildContext context)=>AppPage(appBar:const AppHeader(),children:[
+    const Center(child:BrandMark(height:32)),
+    const SizedBox(height:28),
+    const PageHeading('Welcome back',subtitle:'Sign in to your LonyoGang Heritage account.'),
+    Form(key:form,child:Column(children:[
+      FormFieldBlock(title:'Email',required:true,child:TextFormField(controller:email,enabled:!busy,keyboardType:TextInputType.emailAddress,
+        autofillHints:const [AutofillHints.email],textInputAction:TextInputAction.next,
+        validator:(v)=>isLikelyEmail(v??'')?null:'Enter a valid email')),
+      FormFieldBlock(title:'Password',required:true,child:TextFormField(controller:password,enabled:!busy,obscureText:true,
+        autofillHints:const [AutofillHints.password],validator:(v)=>v==null||v.isEmpty?'Enter your password':null)),
+    ])),
+    if(error!=null)Text(error!,style:const TextStyle(color:LG.negative)),
+    Align(alignment:Alignment.centerRight,child:TextButton(onPressed:busy?null:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>const RecoverAccountScreen())),child:const Text('Forgot password?'))),
+    PrimaryCTA(label:'Continue',loading:busy,onPressed:submit),
+    if(OnlineScope.maybeOf(context)?.sync==null)
+      const SecurityNotice(title:'Offline access',message:'Online sign-in requires a configured server. Your existing local portfolio is managed separately.'),
+  ]);
+}
 
-  static String _syntheticDeviceId() {
-    // When we've never spoken to the server before there is no persisted
-    // device id yet. Mint a stable UUID shape; the server will accept any
-    // v4-looking value and scope sessions to it.
-    final bytes = List<int>.generate(16, (i) => (i * 37 + 11) & 0xff);
-    bytes[6] = (bytes[6] & 0x0f) | 0x40;
-    bytes[8] = (bytes[8] & 0x3f) | 0x80;
-    String hex(int from, int to) =>
-        bytes.sublist(from, to).map((b) => b.toRadixString(16).padLeft(2, '0')).join();
-    return '${hex(0, 4)}-${hex(4, 6)}-${hex(6, 8)}-${hex(8, 10)}-${hex(10, 16)}';
+/// Uses the existing server TOTP contract. No credential persistence occurs
+/// until the server accepts the code. Email OTP challenge migration is separate.
+class AuthenticatorSignInScreen extends StatefulWidget {
+  final Future<void> Function(String) verify;
+  const AuthenticatorSignInScreen({super.key,required this.verify});
+  @override State<AuthenticatorSignInScreen> createState()=>_AuthenticatorSignInScreenState();
+}
+class _AuthenticatorSignInScreenState extends State<AuthenticatorSignInScreen> {
+  final form=GlobalKey<FormState>();
+  final code=TextEditingController();
+  bool busy=false;
+  String? error;
+  @override void dispose(){code.dispose();super.dispose();}
+  Future<void> submit() async {
+    if(busy||!form.currentState!.validate())return;
+    setState((){busy=true;error=null;});
+    try{
+      await widget.verify(code.text);
+      if(mounted)Navigator.of(context).pop(true);
+    }catch(_){
+      if(mounted)setState(()=>error='Verification failed. Enter the current code and try again.');
+    }finally{if(mounted)setState(()=>busy=false);}
   }
-
-  @override
-  Widget build(BuildContext context) => AppPage(
-        appBar: const AppHeader(),
-        children: [
-          const Center(child: BrandMark(height: 32)),
-          const SizedBox(height: 28),
-          Text('Welcome back',
-              style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 10),
-          const Text(
-            'Sign in to your LonyoGang owner profile. This preview never sends credentials off the device.',
-            style: TextStyle(color: LG.muted, fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          Form(
-            key: form,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            child: Column(children: [
-              FormFieldBlock(
-                title: 'Email',
-                child: TextFormField(
-                  controller: email,
-                  keyboardType: TextInputType.emailAddress,
-                  textInputAction: TextInputAction.next,
-                  decoration:
-                      const InputDecoration(hintText: 'you@example.com'),
-                  validator: (v) =>
-                      isLikelyEmail(v ?? '') ? null : 'Enter a valid email',
-                ),
-              ),
-              FormFieldBlock(
-                title: 'Password',
-                child: TextFormField(
-                  controller: password,
-                  obscureText: true,
-                  decoration: const InputDecoration(hintText: 'At least 8 characters'),
-                  validator: (v) => (v == null || v.length < 8)
-                      ? 'Enter at least 8 characters'
-                      : null,
-                ),
-              ),
-              if (_needsTotp)
-                FormFieldBlock(
-                  title: 'TOTP code',
-                  child: TextFormField(
-                    controller: totp,
-                    keyboardType: TextInputType.number,
-                    maxLength: 8,
-                    decoration: const InputDecoration(hintText: '6-digit code'),
-                    validator: (v) => (v == null || v.trim().length < 6)
-                        ? 'Enter the current TOTP code'
-                        : null,
-                  ),
-                ),
-              if (_error != null) ...[
-                const SizedBox(height: 4),
-                Text(_error!,
-                    style: const TextStyle(color: LG.negative, fontSize: 12)),
-              ],
-            ]),
-          ),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                    builder: (_) => const RecoverAccountScreen())),
-                child: const Text('Forgot access?',
-                    style: TextStyle(color: LG.muted))),
-          ),
-          const SizedBox(height: 4),
-          PrimaryCTA(
-              label: _busy ? 'Signing in…' : 'Sign in',
-              loading: _busy,
-              onPressed: _submit),
-          const SizedBox(height: 10),
-          OutlinedButton.icon(
-              onPressed: _passkeyAttempted
-                  ? null
-                  : () {
-                      setState(() => _passkeyAttempted = true);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                              content: Text(
-                                  'Passkey enrolment is not available yet. Use the passphrase under More → Encryption.')));
-                    },
-              icon: const Icon(Icons.vpn_key_outlined),
-              label: const Text('Use passkey (not available)')),
-          const SizedBox(height: 18),
-          const SecurityNotice(
-            title: 'Server authentication is still gated',
-            message:
-                'Until backend services are connected, any plausible email and 8+ character password will let you proceed the design flow. Lock the device copy through the passphrase in More → Encryption to protect real data.',
-            icon: Icons.info_outline,
-          ),
-          const SizedBox(height: 18),
-          const _PrototypeDisclaimer(),
-        ],
-      );
+  @override Widget build(BuildContext context)=>PopScope(canPop:!busy,child:AppPage(appBar:const AppHeader(),children:[
+    const Center(child:BrandMark(height:32)),
+    const SizedBox(height:28),
+    const Icon(Icons.shield_outlined,color:LG.sage,size:48),
+    const PageHeading('Authenticator verification',subtitle:'Open your authenticator app and enter the current six-digit code.'),
+    Form(key:form,child:FormFieldBlock(title:'Authenticator code',required:true,child:TextFormField(
+      controller:code,enabled:!busy,keyboardType:TextInputType.number,autofillHints:const [AutofillHints.oneTimeCode],
+      inputFormatters:[FilteringTextInputFormatter.digitsOnly,LengthLimitingTextInputFormatter(6)],
+      validator:(v)=>v?.length==6?null:'Enter six digits',
+    ))),
+    if(error!=null)Text(error!,style:const TextStyle(color:LG.negative)),
+    PrimaryCTA(label:'Verify and sign in',loading:busy,onPressed:submit),
+    TextButton(onPressed:busy?null:()=>Navigator.of(context).pop(false),child:const Text('Cancel and return to sign in')),
+  ]));
 }
 
 /// Account recovery initiation. Prototype only: never confirms whether an

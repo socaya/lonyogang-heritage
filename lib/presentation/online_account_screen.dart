@@ -59,7 +59,7 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
       final account = await widget.sync.signUp(
         email: _email.text.trim(),
         password: _password.text,
-        phone: _composedPhone.trim().isEmpty ? null : _composedPhone.trim(),
+        phone: _phone.text.trim().isEmpty ? null : _composedPhone.trim(),
         displayName:
             _displayName.text.trim().isEmpty ? null : _displayName.text.trim(),
       );
@@ -96,11 +96,7 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
           code: _phoneCode.text.trim(),
         );
       }
-      final deviceId = DateTime.now().microsecondsSinceEpoch.toRadixString(16)
-          .padLeft(32, '0')
-          .substring(0, 32);
-      final deviceUuid =
-          '${deviceId.substring(0, 8)}-${deviceId.substring(8, 12)}-${deviceId.substring(12, 16)}-${deviceId.substring(16, 20)}-${deviceId.substring(20, 32)}';
+      final deviceUuid = await widget.credentials.deviceId();
       await widget.sync.signIn(
         email: _email.text.trim(),
         password: _password.text,

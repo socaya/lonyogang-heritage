@@ -51,3 +51,7 @@ This is an incremental implementation, not a 100% completion or production readi
 - Device sessions identify current session from access-token sid for UI purposes, distinguish expired/revoked/active and prevent accidental self-revocation in client. Server remains authorization authority.
 - Privacy actions expose errors, prevent updates after navigation, reset remote status after account erasure and truthfully label clipboard export.
 - Native verification and mandatory two-stage authentication remain outstanding. Overall functional coverage denominator not yet audited; verified coverage 0% in this environment.
+
+## Batch 10a — authenticator UI and device identity
+- Dedicated working TOTP verification screen using existing server contract; password screen no longer embeds TOTP or simulates successful offline sign-in. Secure random persisted installation UUID shared by online registration and sign-in. Optional empty phone corrected.
+- Mandatory email OTP, server-issued pre-auth challenge, replay prevention and registration/sign-in separation still outstanding. Existing password-only server behavior remains; this is not full two-stage authentication. Native tests not run.
