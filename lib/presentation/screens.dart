@@ -15,7 +15,7 @@ import 'detail_screens.dart';
 import 'expenses_screen.dart';
 import 'security_screens.dart';
 
-Widget paddedBody(List<Widget> children)=>ListView(padding:const EdgeInsets.fromLTRB(LG.hPad,18,LG.hPad,28),children:children);
+Widget paddedBody(List<Widget> children)=>LayoutBuilder(builder:(context,c)=>ListView(keyboardDismissBehavior:ScrollViewKeyboardDismissBehavior.onDrag,padding:pageInsets(c.maxWidth,top:18,bottom:28),children:children));
 
 class HomeScreen extends StatefulWidget {
   final PortfolioStore store;
