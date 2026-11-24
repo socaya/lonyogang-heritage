@@ -328,7 +328,7 @@ class RemoteSyncService implements SyncService {
   }
 
   /// Convenience: verifies an OTP code for the given channel.
-  Future<void> verify({
+  Future<String> verify({
     required String accountId,
     required String channel,
     required String code,
@@ -342,6 +342,7 @@ class RemoteSyncService implements SyncService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw HttpException('Verify failed: $text', uri: uri);
     }
+    return (jsonDecode(text) as Map<String,dynamic>)['status'] as String;
   }
 
   /// Requests a fresh OTP code for a channel while the account is still
@@ -436,39 +437,6 @@ class RemoteSyncService implements SyncService {
 
   Future<void> cancelSignIn(SignInChallenge challenge) async {
     await _challengeRequest('/cancel',{'challengeToken':challenge.token},204);
-  }
-
-  /// Convenience: signs in with email + password (+ optional TOTP) and
-  /// persists the resulting credentials.
-  Future<RemoteSyncCredentials> signIn({
-    required String email,
-    required String password,
-    required String deviceId,
-    String? totpCode,
-  }) async {
-    final uri = _baseUri.resolve('/identity/sessions');
-    final request = await _http.postUrl(uri);
-    request.headers.contentType = ContentType.json;
-    request.write(jsonEncode({
-      'email': email,
-      'password': password,
-      'deviceId': deviceId,
-      if (totpCode != null) 'totpCode': totpCode,
-    }));
-    final response = await request.close().timeout(requestDeadline);
-    final text = await response.transform(utf8.decoder).join().timeout(requestDeadline);
-    if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw HttpException('Sign-in failed: $text', uri: uri);
-    }
-    final decoded = jsonDecode(text) as Map<String, dynamic>;
-    final creds = RemoteSyncCredentials(
-      accessToken: decoded['accessToken'] as String,
-      refreshToken: decoded['refreshToken'] as String,
-      deviceId: deviceId,
-    );
-    await credentialsSaver(creds);
-    _status.value = SyncStatus.ready;
-    return creds;
   }
 
   /// Lists every active + historical session on this account. The server

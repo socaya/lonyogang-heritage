@@ -7,6 +7,7 @@ import '../core/design.dart';
 import '../data/credentials_store.dart';
 import '../data/remote_sync.dart';
 import 'components.dart';
+import 'onboarding_screens.dart';
 import 'widgets.dart';
 
 /// Real online account onboarding — sign-up, OTP verification and sign-in
@@ -34,6 +35,7 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
   bool _busy = false;
   String? _error;
   String? _accountId;
+  bool _emailVerified = false;
   final _emailCode = TextEditingController();
   final _phoneCode = TextEditingController();
 
@@ -63,7 +65,10 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
         displayName:
             _displayName.text.trim().isEmpty ? null : _displayName.text.trim(),
       );
+      if (!mounted) return;
+      _password.clear();
       setState(() {
+        _emailVerified = false;
         _stage = _Stage.verify;
         _accountId = account.accountId;
         if (account.emailCode != null) _emailCode.text = account.emailCode!;
@@ -77,40 +82,24 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
   }
 
   Future<void> _verify() async {
-    final accountId = _accountId;
-    if (accountId == null) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await widget.sync.verify(
-        accountId: accountId,
-        channel: 'email',
-        code: _emailCode.text.trim(),
-      );
-      if (_composedPhone.trim().length > 4 && _phoneCode.text.trim().isNotEmpty) {
-        await widget.sync.verify(
-          accountId: accountId,
-          channel: 'phone',
-          code: _phoneCode.text.trim(),
-        );
+    final accountId=_accountId;
+    if(accountId==null||_busy)return;
+    setState((){_busy=true;_error=null;});
+    try{
+      String status='pending';
+      if(!_emailVerified){
+        status=await widget.sync.verify(accountId:accountId,channel:'email',code:_emailCode.text.trim());
+        if(!mounted)return;
+        setState(()=>_emailVerified=true);
       }
-      final deviceUuid = await widget.credentials.deviceId();
-      await widget.sync.signIn(
-        email: _email.text.trim(),
-        password: _password.text,
-        deviceId: deviceUuid,
-      );
-      setState(() => _stage = _Stage.done);
-      await Future<void>.delayed(const Duration(milliseconds: 600));
-      if (!mounted) return;
-      Navigator.of(context).pop();
-    } catch (e) {
-      setState(() => _error = '$e');
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+      if(status!='active'&&_phone.text.trim().isNotEmpty){
+        status=await widget.sync.verify(accountId:accountId,channel:'phone',code:_phoneCode.text.trim());
+      }
+      if(!mounted)return;
+      if(status!='active'){setState(()=>_error='Complete all registration verification steps.');return;}
+      Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder:(_)=>const SignInScreen()));
+    }catch(_){if(mounted)setState(()=>_error='Verification failed. Check your code and try again.');}
+    finally{if(mounted)setState(()=>_busy=false);}
   }
 
   @override
@@ -209,6 +198,7 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
           help: 'Check your inbox for the six-digit code.',
           child: TextFormField(
             controller: _emailCode,
+            enabled: !_emailVerified && !_busy,
             keyboardType: TextInputType.number,
             inputFormatters: [
               FilteringTextInputFormatter.digitsOnly,
@@ -218,10 +208,10 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
         ),
         _ResendButton(
           channel: 'email',
-          onPressed: _busy ? null : () => _resend('email'),
+          onPressed: _busy || _emailVerified ? null : () => _resend('email'),
           cooldown: _emailResendCooldown,
         ),
-        if (_composedPhone.trim().length > 4) ...[
+        if (_phone.text.trim().isNotEmpty) ...[
           FormFieldBlock(
             title: 'SMS verification code',
             help: 'Enter the code we texted to your phone.',
@@ -241,7 +231,7 @@ class _OnlineAccountScreenState extends State<OnlineAccountScreen> {
           ),
         ],
         PrimaryCTA(
-          label: _busy ? 'Verifying…' : 'Verify and sign in',
+          label: _busy ? 'Verifying…' : 'Verify registration',
           loading: _busy,
           onPressed: _verify,
         ),

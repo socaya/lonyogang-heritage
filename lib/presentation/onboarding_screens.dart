@@ -283,56 +283,20 @@ class _CreateAccountStep2ScreenState extends State<CreateAccountStep2Screen> {
   }
 
   Future<void> _continue() async {
-    final scope = OnlineScope.maybeOf(context);
-    final remote = scope?.sync;
-    if (password.text.length < 10) {
-      setState(() => _error = 'Password must be at least 10 characters.');
-      return;
-    }
-    final draft = widget.draft.copyWith(password: password.text);
-    if (remote == null || scope == null) {
-      // Preview path — no backend configured. Skip signUp and jump to the
-      // OTP design-preview screen (any 6 digits accepted downstream).
-      Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => OtpVerificationScreen(
-                channel: draft.email,
-                draft: draft,
-              )));
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      final account = await remote.signUp(
-        email: draft.email,
-        password: password.text,
-        phone: draft.phone.isEmpty ? null : draft.phone,
-        displayName: draft.fullName,
-      );
-      if (!mounted) return;
-      final enriched = draft.copyWith(accountId: account.accountId);
-      setState(() => _busy = false);
-      await Navigator.of(context).push(MaterialPageRoute<void>(
-          builder: (_) => OtpVerificationScreen(
-                channel: draft.email,
-                draft: enriched,
-              )));
-    } on HttpException catch (err) {
-      setState(() {
-        _busy = false;
-        _error = err.message.contains('exists')
-            ? 'An account with that email is already registered.'
-            : 'Sign-up failed: ${err.message}';
-      });
-    } catch (err) {
-      setState(() {
-        _busy = false;
-        _error = 'Sign-up failed: $err';
-      });
-    }
+    if (_busy) return;
+    final remote=OnlineScope.maybeOf(context)?.sync;
+    if(remote==null){setState(()=>_error='Account registration requires a configured server.');return;}
+    if(password.text.length<10){setState(()=>_error='Password must be at least 10 characters.');return;}
+    setState((){_busy=true;_error=null;});
+    try{
+      final account=await remote.signUp(email:widget.draft.email,password:password.text,
+        phone:widget.draft.phone.isEmpty?null:widget.draft.phone,displayName:widget.draft.fullName);
+      if(!mounted)return;
+      password.clear();
+      final draft=CreateAccountDraft(fullName:widget.draft.fullName,email:widget.draft.email,phone:widget.draft.phone,accountId:account.accountId);
+      await Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder:(_)=>OtpVerificationScreen(channel:draft.email,draft:draft)));
+    }catch(_){if(mounted)setState(()=>_error='Could not create account. Check your details and connection.');}
+    finally{if(mounted)setState(()=>_busy=false);}
   }
 
   @override
@@ -472,212 +436,55 @@ class OtpVerificationScreen extends StatefulWidget {
 }
 
 class _OtpVerificationScreenState extends State<OtpVerificationScreen> {
-  final controller = TextEditingController();
-  final focus = FocusNode();
-  int cooldown = 30;
-  Timer? _timer;
-  bool _busy = false;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _startCooldown();
+  final controller=TextEditingController();
+  int cooldown=60;
+  Timer? timer;
+  bool busy=false,phoneStage=false;
+  String? error;
+  String get channel=>phoneStage?'phone':'email';
+  @override void initState(){super.initState();startCooldown();}
+  void startCooldown(){
+    timer?.cancel();cooldown=60;
+    timer=Timer.periodic(const Duration(seconds:1),(t){if(!mounted){t.cancel();return;}setState(()=>cooldown--);if(cooldown<=0)t.cancel();});
   }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    controller.dispose();
-    focus.dispose();
-    super.dispose();
+  @override void dispose(){timer?.cancel();controller.dispose();super.dispose();}
+  Future<void> submit() async{
+    if(busy)return;
+    if(!RegExp(r'^\d{6}$').hasMatch(controller.text)){setState(()=>error='Enter all six digits.');return;}
+    final remote=OnlineScope.maybeOf(context)?.sync;
+    final draft=widget.draft;
+    if(remote==null||draft?.accountId==null){setState(()=>error='Registration verification is unavailable.');return;}
+    setState((){busy=true;error=null;});
+    try{
+      final status=await remote.verify(accountId:draft!.accountId!,channel:channel,code:controller.text);
+      if(!mounted)return;
+      if(status=='active'){
+        controller.clear();
+        Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute<void>(builder:(_)=>const SignInScreen()),(r)=>r.isFirst);
+      }else if(!phoneStage&&draft.phone.isNotEmpty){
+        setState((){phoneStage=true;controller.clear();startCooldown();});
+      }else{setState(()=>error='Account verification is not complete. Contact support if the problem persists.');}
+    }catch(_){if(mounted)setState(()=>error='Verification failed. Check your code and try again.');}
+    finally{if(mounted)setState(()=>busy=false);}
   }
-
-  void _startCooldown() {
-    _timer?.cancel();
-    setState(() => cooldown = 30);
-    _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) {
-        t.cancel();
-        return;
-      }
-      setState(() => cooldown--);
-      if (cooldown <= 0) t.cancel();
-    });
+  Future<void> resend() async{
+    if(busy||cooldown>0)return;
+    final remote=OnlineScope.maybeOf(context)?.sync;
+    final id=widget.draft?.accountId;
+    if(remote==null||id==null)return;
+    setState(()=>busy=true);
+    try{await remote.resendOtp(accountId:id,channel:channel);if(mounted)setState((){controller.clear();error=null;startCooldown();});}
+    catch(_){if(mounted)setState(()=>error='Could not resend. Try again later.');}
+    finally{if(mounted)setState(()=>busy=false);}
   }
-
-  Future<void> _submit() async {
-    if (controller.text.trim().length != 6) {
-      setState(() => _error = 'Enter all six digits.');
-      return;
-    }
-    final scope = OnlineScope.maybeOf(context);
-    final remote = scope?.sync;
-    final draft = widget.draft;
-
-    // Design-preview path.
-    if (remote == null || scope == null || draft?.accountId == null) {
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text(
-              'Code accepted in design preview. No real verification was performed.')));
-      return;
-    }
-
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      await remote.verify(
-        accountId: draft!.accountId!,
-        channel: 'email',
-        code: controller.text.trim(),
-      );
-      // Email verified. Also ask the server to issue a session right away
-      // so the user lands back on Home signed in — the password the user
-      // picked on step 2 is still in memory on the draft.
-      if (draft.password != null) {
-        final deviceId = (await scope.credentials.load())?.deviceId ??
-            _SignInScreenState._syntheticDeviceId();
-        final creds = await remote.signIn(
-          email: draft.email,
-          password: draft.password!,
-          deviceId: deviceId,
-        );
-        await scope.credentials.save(creds);
-      }
-      if (!mounted) return;
-      Navigator.of(context).popUntil((route) => route.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Account verified and signed in.')));
-      // Brand-new account won't have anything to hydrate, but fire the
-      // hook anyway so a user who signs up from device B after using
-      // device A sees existing state (the OTP + sign-in already landed
-      // credentials on device B at this point).
-      unawaited(scope.onSignInSuccess?.call() ?? remote.sync());
-    } on HttpException catch (err) {
-      setState(() {
-        _busy = false;
-        _error = 'Verification failed: ${err.message}';
-      });
-    } catch (err) {
-      setState(() {
-        _busy = false;
-        _error = 'Verification failed: $err';
-      });
-    }
-  }
-
-  Future<void> _resend() async {
-    final scope = OnlineScope.maybeOf(context);
-    final remote = scope?.sync;
-    final draft = widget.draft;
-    _startCooldown();
-    if (remote == null || draft?.accountId == null) return;
-    try {
-      await remote.resendOtp(accountId: draft!.accountId!, channel: 'email');
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('A fresh code has been sent.')));
-    } catch (err) {
-      if (!mounted) return;
-      setState(() => _error = 'Could not resend: $err');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => AppPage(
-        appBar: const AppHeader(),
-        children: [
-          const Center(child: BrandMark(height: 32)),
-          const SizedBox(height: 28),
-          Text('Verify your identity',
-              style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 10),
-          Text(
-              'Enter the six-digit code we would send to ${widget.channel}. The preview does not send a real code — any six digits will proceed the design flow.',
-              style: const TextStyle(color: LG.muted, fontSize: 14, height: 1.5)),
-          const SizedBox(height: 28),
-          _OtpBoxes(controller: controller, focusNode: focus),
-          if (_error != null) ...[
-            const SizedBox(height: 10),
-            Text(_error!,
-                style: const TextStyle(color: LG.negative, fontSize: 12)),
-          ],
-          const SizedBox(height: 22),
-          PrimaryCTA(
-            label: _busy ? 'Verifying…' : 'Continue',
-            loading: _busy,
-            onPressed: _submit,
-          ),
-          const SizedBox(height: 14),
-          Center(
-              child: TextButton(
-                  onPressed: cooldown > 0 ? null : _resend,
-                  child: Text(cooldown > 0
-                      ? 'Resend available in $cooldown s'
-                      : 'Resend code'))),
-          const SizedBox(height: 18),
-          const _PrototypeDisclaimer(),
-        ],
-      );
-}
-
-class _OtpBoxes extends StatelessWidget {
-  final TextEditingController controller;
-  final FocusNode focusNode;
-  const _OtpBoxes({required this.controller, required this.focusNode});
-  @override
-  Widget build(BuildContext context) => Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: List.generate(6, (i) {
-          final char = i < controller.text.length ? controller.text[i] : '';
-          return GestureDetector(
-            onTap: () => focusNode.requestFocus(),
-            child: Container(
-              width: 44,
-              height: 54,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                color: LG.white,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: LG.line),
-              ),
-              child: i == controller.text.length
-                  ? SizedBox(
-                      width: 1,
-                      child: TextField(
-                        controller: controller,
-                        focusNode: focusNode,
-                        autofocus: true,
-                        keyboardType: TextInputType.number,
-                        inputFormatters: [
-                          FilteringTextInputFormatter.digitsOnly,
-                          LengthLimitingTextInputFormatter(6),
-                        ],
-                        showCursor: true,
-                        style: const TextStyle(
-                            color: Colors.transparent, fontSize: 1),
-                        decoration: const InputDecoration(
-                          counterText: '',
-                          border: InputBorder.none,
-                          enabledBorder: InputBorder.none,
-                          focusedBorder: InputBorder.none,
-                        ),
-                        onChanged: (_) => (context as Element).markNeedsBuild(),
-                      ),
-                    )
-                  : Text(char,
-                      style: const TextStyle(
-                          fontSize: 22,
-                          fontWeight: FontWeight.w800,
-                          color: LG.navy)),
-            ),
-          );
-        }),
-      );
+  @override Widget build(BuildContext context)=>AppPage(appBar:const AppHeader(),children:[
+    const Center(child:BrandMark(height:32)),const SizedBox(height:28),
+    PageHeading(phoneStage?'Verify mobile number':'Verify email address',subtitle:'Enter the registration code sent to ${phoneStage?'your mobile number':'your email address'}. You will sign in separately after verification.'),
+    FormFieldBlock(title:'Registration code',child:TextField(controller:controller,enabled:!busy,keyboardType:TextInputType.number,autofillHints:const [AutofillHints.oneTimeCode],inputFormatters:[FilteringTextInputFormatter.digitsOnly,LengthLimitingTextInputFormatter(6)])),
+    if(error!=null)Text(error!,style:const TextStyle(color:LG.negative)),
+    PrimaryCTA(label:'Verify registration',loading:busy,onPressed:submit),
+    TextButton(onPressed:busy||cooldown>0?null:resend,child:Text(cooldown>0?'Resend in $cooldown s':'Resend code')),
+  ]);
 }
 
 /// Password entry is separate from the authenticator challenge screen.
