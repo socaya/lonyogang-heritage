@@ -15,7 +15,7 @@ import 'detail_screens.dart';
 import 'expenses_screen.dart';
 import 'security_screens.dart';
 
-Widget paddedBody(List<Widget> children)=>ListView(padding:const EdgeInsets.fromLTRB(22,18,22,28),children:children);
+Widget paddedBody(List<Widget> children)=>ListView(padding:const EdgeInsets.fromLTRB(LG.hPad,18,LG.hPad,28),children:children);
 
 class HomeScreen extends StatefulWidget {
   final PortfolioStore store;
@@ -64,7 +64,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: paddedBody([
       Row(children: [
-        const BrandMark(height: 32),
+        const Flexible(child: BrandMark(height: 32)),
         const Spacer(),
         IconButton(
             tooltip: 'Search',
@@ -121,12 +121,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 tint: LG.goldSoft,
                 iconColor: LG.gold)),
       ]),
+      const SizedBox(height: 16),
+      ElevatedButton.icon(onPressed: widget.onAdd, icon: const Icon(Icons.add), label: const Text('Add record')),
       const SizedBox(height: 24),
       SectionTitle('Wealth composition',
           action: TextButton(
               onPressed: () => widget.onNavigate(3),
               child: const Text('View reports'))),
-      SoftCard(
+      if (!_maskBalances) SoftCard(
           child: WealthBreakdown(values: {
         'Investments': total.investments,
         'Properties': total.property,
@@ -138,7 +140,9 @@ class _HomeScreenState extends State<HomeScreen> {
           action: TextButton(
               onPressed: () => widget.onNavigate(1),
               child: const Text('View all'))),
-      if (assets.isEmpty)
+      if (_maskBalances)
+        const Text('Asset values hidden.')
+      else if (assets.isEmpty)
         EmptySection(
             title: 'Start building your portfolio',
             detail: 'Add an investment, property or savings account.',
@@ -153,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> {
       const SizedBox(height: 18),
       SyncOutboxBadge(store: store),
       const SizedBox(height: 18),
-      HomeRecentActivity(store: store),
+      if (!_maskBalances) HomeRecentActivity(store: store),
       const SizedBox(height: 18),
       const PrivacyBanner(),
     ]),
@@ -186,11 +190,8 @@ class _NetWorthHero extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(LG.r),
-          gradient: const LinearGradient(
-            colors: [LG.navy, LG.navyDark],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
+          color: LG.navy,
+          border: const Border(top: BorderSide(color: LG.gold, width: 3)),
         ),
         padding: const EdgeInsets.fromLTRB(20, 20, 16, 22),
         child: Column(
@@ -201,7 +202,7 @@ class _NetWorthHero extends StatelessWidget {
                   style: TextStyle(
                       color: Color(0xFFC3D3D6),
                       fontSize: 11,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: 1.3)),
               const Spacer(),
               IconButton(
@@ -225,7 +226,7 @@ class _NetWorthHero extends StatelessWidget {
               child: Text(netWorth,
                   style: const TextStyle(
                       fontSize: 36,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       color: Colors.white,
                       letterSpacing: -.6)),
             ),
@@ -245,7 +246,7 @@ class _NetWorthHero extends StatelessWidget {
                       style: TextStyle(
                           color: LG.gold,
                           fontSize: 11,
-                          fontWeight: FontWeight.w800)),
+                          fontWeight: FontWeight.w700)),
                 ]),
               ),
               const SizedBox(width: 10),
@@ -304,7 +305,7 @@ class _StatCard extends StatelessWidget {
               child: Text(value,
                   style: const TextStyle(
                       fontSize: 20,
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       letterSpacing: -.3)),
             ),
           ],
@@ -379,7 +380,7 @@ class HomeRecentActivity extends StatelessWidget {
               Text('${e.kind.name} · ${LG.date(e.occurredAt)}',
                 style:const TextStyle(color:LG.muted,fontSize:11)),
             ])),Text(LG.money(e.amountUgx,compact:true),
-              style:const TextStyle(fontWeight:FontWeight.w800,fontSize:13)),
+              style:const TextStyle(fontWeight:FontWeight.w700,fontSize:13)),
             const SizedBox(width:6),const Icon(Icons.chevron_right,color:LG.muted,size:18),
           ])))),
     ]);
@@ -441,7 +442,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
                   assets.fold<int>(0, (n, a) => n + a.attributableUgx),
                   compact: true),
               style: const TextStyle(
-                  fontWeight: FontWeight.w900, fontSize: 16)),
+                  fontWeight: FontWeight.w700, fontSize: 16)),
         ]),
         const SizedBox(height: 16),
         if (assets.isEmpty)
@@ -482,7 +483,7 @@ class AssetDetails extends StatelessWidget {
       Row(children:[Icon(assetIcon(asset.kind),color:LG.sage),const SizedBox(width:10),
         Expanded(child:Text(asset.name,style:Theme.of(context).textTheme.titleLarge))]),
       const SizedBox(height:20),SoftCard(color:LG.sageSoft,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        const Text('YOUR ATTRIBUTABLE VALUE',style:TextStyle(color:LG.sage,fontSize:11,fontWeight:FontWeight.w800)),
+        const Text('YOUR ATTRIBUTABLE VALUE',style:TextStyle(color:LG.sage,fontSize:11,fontWeight:FontWeight.w700)),
         const SizedBox(height:10),Text(LG.money(asset.attributableUgx),style:Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height:8),Pill(asset.status.name),
       ])),const SizedBox(height:16),SoftCard(child:Column(children:[
@@ -831,7 +832,7 @@ class DebtsScreen extends StatelessWidget {
     return ScreenPage(title:'Liabilities',subtitle:'Track loans and mortgages separately from assets.',children:[
       SoftCard(color:LG.navy,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('TOTAL OUTSTANDING',style:TextStyle(color:Colors.white70,fontSize:12)),
-        const SizedBox(height:8),Text(LG.money(store.totals.liabilities),style:const TextStyle(fontSize:27,color:Colors.white,fontWeight:FontWeight.w800))])),
+        const SizedBox(height:8),Text(LG.money(store.totals.liabilities),style:const TextStyle(fontSize:27,color:Colors.white,fontWeight:FontWeight.w700))])),
       const SizedBox(height:18),
       if(debts.isEmpty)const EmptySection(title:'No liabilities recorded',detail:'Add loans and mortgages for an accurate net-worth view.')
       else ...debts.map((d)=>Padding(padding:const EdgeInsets.only(bottom:10),
@@ -841,7 +842,7 @@ class DebtsScreen extends StatelessWidget {
           onTap:()=>push(context,LiabilityDetailScreen(store:store,liability:d)),
           child:Column(children:[Row(children:[const Icon(Icons.account_balance_outlined,color:LG.sage),const SizedBox(width:12),
             Expanded(child:Text(d.name,style:const TextStyle(fontWeight:FontWeight.w700))),
-            Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
+            Text(LG.money(d.outstandingUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w700)),
             const SizedBox(width:6),const Icon(Icons.chevron_right,color:LG.muted,size:18)]),
             const SizedBox(height:8),InfoLabel(label:'As of',value:LG.date(d.asOf))]))))),
       const SizedBox(height:18),ElevatedButton.icon(onPressed:()=>push(context,LiabilityForm(store:store)),
@@ -859,7 +860,7 @@ class ReportsScreen extends StatelessWidget {
       const SizedBox(height:10),const PageHeading('Reports & insights',subtitle:'Understand your financial standing and legacy.'),
       SoftCard(color:LG.navy,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('NET WORTH',style:TextStyle(color:Colors.white70,fontSize:11,letterSpacing:1.1)),
-        const SizedBox(height:7),Text(LG.money(total.netWorth),style:const TextStyle(color:Colors.white,fontSize:29,fontWeight:FontWeight.w800)),
+        const SizedBox(height:7),Text(LG.money(total.netWorth),style:const TextStyle(color:Colors.white,fontSize:29,fontWeight:FontWeight.w700)),
         const SizedBox(height:4),const Text('Current values • user-entered / estimated',
           style:TextStyle(color:Colors.white70,fontSize:11)),
       ])),const SizedBox(height:20),const SectionTitle('Statement of financial position'),
@@ -954,7 +955,7 @@ class TransactionsScreen extends StatelessWidget {
               Text('${e.kind.name} · ${LG.date(e.occurredAt)}',style:const TextStyle(fontSize:11,color:LG.muted)),
               if(reversed)const Text('Reversed',style:TextStyle(color:LG.negative,fontSize:11)),
             ])),Column(crossAxisAlignment:CrossAxisAlignment.end,children:[
-              Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w800)),
+              Text(LG.money(e.amountUgx,compact:true),style:const TextStyle(fontWeight:FontWeight.w700)),
               const SizedBox(height:4),
               const Icon(Icons.chevron_right,color:LG.muted,size:18),
             ])]))));}),
@@ -971,9 +972,9 @@ class MoreScreen extends StatelessWidget {
     const SizedBox(height:8),const PageHeading('More',subtitle:'Your wealth records, plans and preferences.'),
     SoftCard(onTap:()=>push(context,ProfileScreen(store:store)),child:Row(children:[
       CircleAvatar(backgroundColor:LG.sageSoft,child:Text(store.state.ownerName.isEmpty?'LG':store.state.ownerName.substring(0,1).toUpperCase(),
-        style:const TextStyle(fontWeight:FontWeight.w800,color:LG.sage))),
+        style:const TextStyle(fontWeight:FontWeight.w700,color:LG.sage))),
       const SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-        Text(store.state.ownerName,style:const TextStyle(fontWeight:FontWeight.w800)),
+        Text(store.state.ownerName,style:const TextStyle(fontWeight:FontWeight.w700)),
         const SizedBox(height:4),const Text('On-device portfolio',style:TextStyle(color:LG.muted,fontSize:12))])),
       const Icon(Icons.chevron_right,color:LG.muted),
     ])),

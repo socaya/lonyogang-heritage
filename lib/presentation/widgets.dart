@@ -5,17 +5,20 @@ import '../domain/models.dart';
 class BrandMark extends StatelessWidget {
   final double height;
   const BrandMark({super.key,this.height=38});
-  @override Widget build(BuildContext context)=>Row(mainAxisSize:MainAxisSize.min,children:[
-    Image.asset('assets/brand/theme1-granary.png',height:height,width:height,fit:BoxFit.contain,
-      errorBuilder:(_,__,___)=>Icon(Icons.home_work_outlined,color:LG.gold,size:height)),
-    const SizedBox(width:8),Column(crossAxisAlignment:CrossAxisAlignment.start,mainAxisSize:MainAxisSize.min,children:[
-      RichText(text:TextSpan(children:[const TextSpan(text:'LONYO',style:TextStyle(color:LG.navy)),
-        const TextSpan(text:'GANG',style:TextStyle(color:LG.gold))],
-        style:TextStyle(fontSize:height*.46,fontFamily:'Roboto',fontWeight:FontWeight.w900,letterSpacing:-1.1))),
-      Align(alignment:Alignment.centerRight,child:Text('H E R I T A G E',
-        style:TextStyle(fontSize:height*.17,color:LG.navy,fontWeight:FontWeight.w800,letterSpacing:1.1))),
-    ]),
-  ]);
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: 'LonyoGang Heritage',
+        image: true,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: height * 4),
+          child: Image.asset(
+            'assets/brand/theme1-primary.png',
+            height: height,
+            fit: BoxFit.contain,
+            excludeFromSemantics: true,
+          ),
+        ),
+      );
 }
 
 class PageHeading extends StatelessWidget {
@@ -129,20 +132,20 @@ class LGFilterChip extends StatelessWidget {
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,
-          borderRadius: BorderRadius.circular(999),
+          borderRadius: BorderRadius.circular(8),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 160),
             padding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
             decoration: BoxDecoration(
-              color: selected ? LG.navy : LG.white,
-              borderRadius: BorderRadius.circular(999),
+              color: selected ? LG.goldSoft : LG.white,
+              borderRadius: BorderRadius.circular(8),
               border: Border.all(
-                  color: selected ? LG.navy : LG.line, width: 1.2),
+                  color: selected ? LG.gold : LG.line, width: 1.2),
             ),
             child: Text(label,
                 style: TextStyle(
-                    color: selected ? LG.white : LG.navy,
+                    color: LG.navy,
                     fontSize: 13,
                     fontWeight: FontWeight.w700)),
           ),
@@ -231,7 +234,7 @@ class AssetTile extends StatelessWidget {
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(
                                 fontSize: 15.5,
-                                fontWeight: FontWeight.w800,
+                                fontWeight: FontWeight.w700,
                                 letterSpacing: -.1))),
                     if (_isStale) ...[
                       const SizedBox(width: 6),
@@ -240,12 +243,12 @@ class AssetTile extends StatelessWidget {
                               horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(
                               color: const Color(0xFFFBF3DD),
-                              borderRadius: BorderRadius.circular(999)),
+                              borderRadius: BorderRadius.circular(8)),
                           child: const Text('Stale',
                               style: TextStyle(
                                   color: Color(0xFF8C6A1D),
                                   fontSize: 10,
-                                  fontWeight: FontWeight.w800))),
+                                  fontWeight: FontWeight.w700))),
                     ],
                   ]),
                   const SizedBox(height: 4),
@@ -262,7 +265,7 @@ class AssetTile extends StatelessWidget {
                           horizontal: 8, vertical: 3),
                       decoration: BoxDecoration(
                           color: LG.goldSoft,
-                          borderRadius: BorderRadius.circular(999)),
+                          borderRadius: BorderRadius.circular(8)),
                       child: Row(mainAxisSize: MainAxisSize.min, children: [
                         const Icon(Icons.percent_rounded,
                             size: 10.5, color: LG.gold),
@@ -271,7 +274,7 @@ class AssetTile extends StatelessWidget {
                             style: const TextStyle(
                                 color: LG.gold,
                                 fontSize: 11,
-                                fontWeight: FontWeight.w800)),
+                                fontWeight: FontWeight.w700)),
                       ]),
                     ),
                   ],
@@ -280,7 +283,7 @@ class AssetTile extends StatelessWidget {
             Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
               Text(LG.money(asset.attributableUgx, compact: true),
                   style: const TextStyle(
-                      fontWeight: FontWeight.w900,
+                      fontWeight: FontWeight.w700,
                       fontSize: 14.5,
                       letterSpacing: -.2)),
               if (asset.ownershipBps < 10000)
@@ -359,7 +362,7 @@ class FormFieldBlock extends StatelessWidget {
                       style: TextStyle(
                           color: LG.gold,
                           fontSize: 15,
-                          fontWeight: FontWeight.w900)),
+                          fontWeight: FontWeight.w700)),
                 ],
               ],
             ),
@@ -380,7 +383,7 @@ class PrivacyBanner extends StatelessWidget {
   const PrivacyBanner({super.key});
   @override Widget build(BuildContext context)=>const SoftCard(color:LG.sageSoft,child:Row(children:[
     Icon(Icons.shield_outlined,color:LG.sage,size:27),SizedBox(width:12),Expanded(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
-      Text('Local alpha mode',style:TextStyle(fontWeight:FontWeight.w800,fontSize:13)),SizedBox(height:3),
+      Text('Local alpha mode',style:TextStyle(fontWeight:FontWeight.w700,fontSize:13)),SizedBox(height:3),
       Text('Optional AES-GCM encryption on this device. No cloud sync. Keep an unencrypted JSON export as your backup.',
         style:TextStyle(fontSize:11,height:1.45,color:LG.muted))
     ]))]));

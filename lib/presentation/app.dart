@@ -23,18 +23,22 @@ class _AppRootState extends State<AppRoot> {
     if(!widget.store.state.onboardingDone)return WelcomeScreen(store:widget.store);
     return Scaffold(
       body:SafeArea(child:IndexedStack(index:tab,children:[
-        HomeScreen(store:widget.store,onNavigate:(v)=>setState(()=>tab=v),onAdd:()=>openCreateSheet(context,widget.store)),
+        HomeScreen(store:widget.store,onNavigate:(v)=>setState(()=>tab=v==3?2:v),onAdd:()=>openCreateSheet(context,widget.store)),
         PortfolioScreen(store:widget.store),
-        const SizedBox.shrink(),
         ReportsScreen(store:widget.store),
         MoreScreen(store:widget.store),
       ])),
+      floatingActionButton: tab == 1 ? FloatingActionButton.extended(
+        backgroundColor: LG.navy,
+        foregroundColor: LG.white,
+        onPressed: () => openCreateSheet(context, widget.store),
+        icon: const Icon(Icons.add), label: const Text('Add record'),
+      ) : null,
       bottomNavigationBar:NavigationBar(selectedIndex:tab,onDestinationSelected:(idx){
-        if(idx==2){openCreateSheet(context,widget.store);}else{setState(()=>tab=idx);}
+        setState(()=>tab=idx);
       },destinations:const [
         NavigationDestination(icon:Icon(Icons.home_outlined),selectedIcon:Icon(Icons.home_rounded),label:'Home'),
         NavigationDestination(icon:Icon(Icons.pie_chart_outline),selectedIcon:Icon(Icons.pie_chart),label:'Portfolio'),
-        NavigationDestination(icon:Icon(Icons.add_circle_outline,color:LG.gold,size:28),label:'Add'),
         NavigationDestination(icon:Icon(Icons.bar_chart_outlined),selectedIcon:Icon(Icons.bar_chart_rounded),label:'Reports'),
         NavigationDestination(icon:Icon(Icons.more_horiz),label:'More'),
       ]),
@@ -73,10 +77,12 @@ class WelcomeScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: LG.hPad, vertical: 30),
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const BrandMark(height: 48),
-              const SizedBox(height: 56),
-              Text('Your wealth.\nOne view.',
+              const SizedBox(height: 32),
+              Container(width: 48, height: 3, color: LG.gold),
+              const SizedBox(height: 24),
+              Text('Your wealth.\nYour heritage.',
                   style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontSize: 42, height: 1.13)),
+                      fontSize: 36, height: 1.13)),
               const SizedBox(height: 18),
               const Text(
                   'A home for your investments, property, savings and lasting worth.',

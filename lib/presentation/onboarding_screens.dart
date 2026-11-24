@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) => Scaffold(
-        backgroundColor: LG.canvas,
+        backgroundColor: LG.navyDark,
         body: SafeArea(
           child: Padding(
             padding: const EdgeInsets.all(LG.hPad),
@@ -51,14 +51,14 @@ class _SplashScreenState extends State<SplashScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Spacer(flex: 2),
-                const Center(child: BrandMark(height: 72)),
+                const Center(child: ColoredBox(color: LG.ivory, child: Padding(padding: EdgeInsets.all(16), child: BrandMark(height: 72)))),
                 const SizedBox(height: 36),
                 const Center(
                   child: Text(
                     'Your wealth, in one steady view.',
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                        color: LG.muted, fontSize: 14, height: 1.5),
+                        color: LG.ivory, fontSize: 14, height: 1.5),
                   ),
                 ),
                 const Spacer(flex: 3),
@@ -66,12 +66,12 @@ class _SplashScreenState extends State<SplashScreen> {
                     child: SizedBox(
                         width: 24,
                         height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2))),
+                        child: CircularProgressIndicator(strokeWidth: 2, color: LG.gold))),
                 const SizedBox(height: 16),
                 const Center(
                   child: Text(
                     'Loading your local portfolio',
-                    style: TextStyle(color: LG.muted, fontSize: 12),
+                    style: TextStyle(color: LG.ivory, fontSize: 12),
                   ),
                 ),
                 const Spacer(),

@@ -81,8 +81,8 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             SizedBox(
-              width: 44,
-              height: 44,
+              width: 48,
+              height: 48,
               child: IconButton(
                 tooltip: 'Back',
                 onPressed:
@@ -97,7 +97,7 @@ class AppHeader extends StatelessWidget implements PreferredSizeWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: LG.sageSoft,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   '${step!.toString().padLeft(2, '0')} / ${totalSteps!.toString().padLeft(2, '0')}',
@@ -140,7 +140,7 @@ class StepProgress extends StatelessWidget {
               style: const TextStyle(
                 color: LG.sage,
                 fontSize: 11,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 letterSpacing: 1.3,
               ),
             ),
@@ -188,7 +188,6 @@ class PrimaryCTA extends StatelessWidget {
         label: label,
         child: SizedBox(
           width: double.infinity,
-          height: 52,
           child: ElevatedButton(
             onPressed:
                 (onPressed == null || loading) ? null : () => onPressed!(),
@@ -205,7 +204,7 @@ class PrimaryCTA extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(label,
-                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.center,
                             style: const TextStyle(
                                 fontSize: 16, fontWeight: FontWeight.w700)),
                       ),
@@ -239,7 +238,7 @@ class SecurityNotice extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: LG.sageSoft,
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(8),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -252,7 +251,7 @@ class SecurityNotice extends StatelessWidget {
                     children: [
                   Text(title,
                       style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w800)),
+                          fontSize: 13, fontWeight: FontWeight.w700)),
                   const SizedBox(height: 4),
                   Text(message,
                       style: const TextStyle(
@@ -283,7 +282,7 @@ class StatusChip extends StatelessWidget {
     };
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(999)),
+      decoration: BoxDecoration(color: bg, borderRadius: BorderRadius.circular(8)),
       child: Text(label,
           style: TextStyle(
               color: fg, fontWeight: FontWeight.w700, fontSize: 11, letterSpacing: 0.2)),
@@ -538,7 +537,7 @@ class ErrorState extends StatelessWidget {
             Icon(Icons.error_outline, color: LG.negative),
             SizedBox(width: 10),
             Text('Something went wrong',
-                style: TextStyle(fontWeight: FontWeight.w800)),
+                style: TextStyle(fontWeight: FontWeight.w700)),
           ]),
           const SizedBox(height: 8),
           Text(message, style: const TextStyle(color: LG.muted, height: 1.5)),
@@ -611,7 +610,7 @@ class ListHeaderRow extends StatelessWidget {
           if (trailing != null)
             Text(trailing!,
                 style: const TextStyle(
-                    fontWeight: FontWeight.w800, fontSize: 14)),
+                    fontWeight: FontWeight.w700, fontSize: 14)),
         ]),
       );
 }
