@@ -49,6 +49,14 @@ class RemoteSyncCredentials {
       );
 }
 
+class SignInChallenge {
+  final String token, method, deviceId;
+  final String? maskedDestination;
+  final DateTime expiresAt;
+  final int resendAfterSeconds;
+  const SignInChallenge({required this.token, required this.method, required this.deviceId, required this.expiresAt, required this.resendAfterSeconds, this.maskedDestination});
+}
+
 /// An event the client ships to the server. Payload is already AES-GCM
 /// encrypted on the device; the server never sees the plaintext.
 class RemoteSyncEvent {
@@ -392,6 +400,42 @@ class RemoteSyncService implements SyncService {
     if (response.statusCode != 204 && response.statusCode != 200) {
       throw HttpException('Reset complete failed: $text', uri: uri);
     }
+  }
+
+  Future<Map<String,dynamic>> _challengeRequest(String suffix, Map<String,dynamic> body, int expected) async {
+    final uri=_baseUri.resolve('/identity/sessions/challenge$suffix');
+    final req=await _http.postUrl(uri).timeout(requestDeadline);
+    req.headers.contentType=ContentType.json;
+    req.write(jsonEncode(body));
+    final res=await req.close().timeout(requestDeadline);
+    final text=await res.transform(utf8.decoder).join().timeout(requestDeadline);
+    if(res.statusCode!=expected) throw HttpException('Verification request rejected: $text',uri:uri);
+    return text.isEmpty?<String,dynamic>{}:jsonDecode(text) as Map<String,dynamic>;
+  }
+
+  Future<SignInChallenge> beginSignIn({required String email,required String password,required String deviceId}) async {
+    final j=await _challengeRequest('',{'email':email,'password':password,'deviceId':deviceId},202);
+    final method=j['method'] as String;
+    if(method!='email'&&method!='totp')throw StateError('Unsupported verification method');
+    return SignInChallenge(token:j['challengeToken'] as String,method:method,deviceId:deviceId,
+      expiresAt:DateTime.parse(j['expiresAt'] as String),resendAfterSeconds:(j['resendAfterSeconds'] as num).toInt(),maskedDestination:j['maskedDestination'] as String?);
+  }
+
+  Future<RemoteSyncCredentials> finishSignIn(SignInChallenge challenge,String code) async {
+    final j=await _challengeRequest('/verify',{'challengeToken':challenge.token,'code':code},200);
+    final creds=RemoteSyncCredentials(accessToken:j['accessToken'] as String,refreshToken:j['refreshToken'] as String,deviceId:challenge.deviceId);
+    await credentialsSaver(creds);
+    _status.value=SyncStatus.ready;
+    return creds;
+  }
+
+  Future<int> resendSignIn(SignInChallenge challenge) async {
+    final j=await _challengeRequest('/resend',{'challengeToken':challenge.token},202);
+    return (j['resendAfterSeconds'] as num).toInt();
+  }
+
+  Future<void> cancelSignIn(SignInChallenge challenge) async {
+    await _challengeRequest('/cancel',{'challengeToken':challenge.token},204);
   }
 
   /// Convenience: signs in with email + password (+ optional TOTP) and

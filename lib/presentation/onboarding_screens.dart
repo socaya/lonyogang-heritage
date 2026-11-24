@@ -6,6 +6,7 @@ import 'package:flutter/services.dart';
 
 import '../core/design.dart';
 import '../data/portfolio_store.dart';
+import '../data/remote_sync.dart';
 import 'components.dart';
 import 'online_scope.dart';
 import 'widgets.dart';
@@ -701,20 +702,16 @@ class _SignInScreenState extends State<SignInScreen> {
     }
     setState((){busy=true;error=null;});
     final address=email.text.trim();
-    final secret=password.text;
     try{
       final deviceId=await scope.credentials.deviceId();
-      try {
-        await remote.signIn(email:address,password:secret,deviceId:deviceId);
-      } on HttpException catch(e){
-        if(!e.message.contains('totp_required'))rethrow;
-        if(!mounted)return;
-        password.clear();
-        final verified=await Navigator.of(context).push<bool>(MaterialPageRoute(builder:(_)=>AuthenticatorSignInScreen(
-          verify:(code) async {await remote.signIn(email:address,password:secret,deviceId:deviceId,totpCode:code);},
-        )));
-        if(verified!=true)return;
-      }
+      if(!mounted)return;
+      final challenge=await remote.beginSignIn(email:address,password:password.text,deviceId:deviceId);
+      if(!mounted){try{await remote.cancelSignIn(challenge);}catch(_){}return;}
+      password.clear();
+      final verified=await Navigator.of(context).push<bool>(MaterialPageRoute(builder:(_)=>challenge.method=='totp'
+        ?AuthenticatorSignInScreen(remote:remote,challenge:challenge)
+        :EmailOtpSignInScreen(remote:remote,challenge:challenge)));
+      if(verified!=true){try{await remote.cancelSignIn(challenge);}catch(_){}return;}
       if(!mounted)return;
       password.clear();
       Navigator.of(context).popUntil((r)=>r.isFirst);
@@ -743,41 +740,78 @@ class _SignInScreenState extends State<SignInScreen> {
   ]);
 }
 
-/// Uses the existing server TOTP contract. No credential persistence occurs
-/// until the server accepts the code. Email OTP challenge migration is separate.
-class AuthenticatorSignInScreen extends StatefulWidget {
-  final Future<void> Function(String) verify;
-  const AuthenticatorSignInScreen({super.key,required this.verify});
-  @override State<AuthenticatorSignInScreen> createState()=>_AuthenticatorSignInScreenState();
+/// Separate server-selected verification routes.
+class AuthenticatorSignInScreen extends StatelessWidget {
+  final RemoteSyncService remote;
+  final SignInChallenge challenge;
+  const AuthenticatorSignInScreen({super.key,required this.remote,required this.challenge});
+  @override Widget build(BuildContext context)=>_SignInVerification(remote:remote,challenge:challenge,email:false);
 }
-class _AuthenticatorSignInScreenState extends State<AuthenticatorSignInScreen> {
+class EmailOtpSignInScreen extends StatelessWidget {
+  final RemoteSyncService remote;
+  final SignInChallenge challenge;
+  const EmailOtpSignInScreen({super.key,required this.remote,required this.challenge});
+  @override Widget build(BuildContext context)=>_SignInVerification(remote:remote,challenge:challenge,email:true);
+}
+class _SignInVerification extends StatefulWidget {
+  final RemoteSyncService remote;
+  final SignInChallenge challenge;
+  final bool email;
+  const _SignInVerification({required this.remote,required this.challenge,required this.email});
+  @override State<_SignInVerification> createState()=>_SignInVerificationState();
+}
+class _SignInVerificationState extends State<_SignInVerification> {
   final form=GlobalKey<FormState>();
   final code=TextEditingController();
   bool busy=false;
   String? error;
-  @override void dispose(){code.dispose();super.dispose();}
+  late DateTime resendAt;
+  Timer? timer;
+  int resends=0;
+  bool get expired=>!widget.challenge.expiresAt.isAfter(DateTime.now());
+  int get cooldown=>(resendAt.difference(DateTime.now()).inMilliseconds/1000).ceil().clamp(0,3600).toInt();
+  @override void initState(){
+    super.initState();
+    resendAt=DateTime.now().add(Duration(seconds:widget.challenge.resendAfterSeconds));
+    timer=Timer.periodic(const Duration(seconds:1),(_){if(mounted)setState((){});});
+  }
+  @override void dispose(){timer?.cancel();code.dispose();super.dispose();}
   Future<void> submit() async {
-    if(busy||!form.currentState!.validate())return;
+    if(busy||expired||!form.currentState!.validate())return;
     setState((){busy=true;error=null;});
     try{
-      await widget.verify(code.text);
-      if(mounted)Navigator.of(context).pop(true);
+      await widget.remote.finishSignIn(widget.challenge,code.text);
+      if(mounted){setState(()=>busy=false);Navigator.of(context).pop(true);}
     }catch(_){
-      if(mounted)setState(()=>error='Verification failed. Enter the current code and try again.');
+      if(mounted)setState(()=>error='Verification failed. Check the code or return to sign in.');
     }finally{if(mounted)setState(()=>busy=false);}
+  }
+  Future<void> resend() async {
+    if(busy||expired||cooldown>0||resends>=2||!widget.email)return;
+    setState((){busy=true;error=null;});
+    try{
+      final seconds=await widget.remote.resendSignIn(widget.challenge);
+      if(mounted)setState((){resendAt=DateTime.now().add(Duration(seconds:seconds));resends++;code.clear();});
+    }catch(_){if(mounted)setState(()=>error='Could not resend the code. Wait or sign in again.');}
+    finally{if(mounted)setState(()=>busy=false);}
   }
   @override Widget build(BuildContext context)=>PopScope(canPop:!busy,child:AppPage(appBar:const AppHeader(),children:[
     const Center(child:BrandMark(height:32)),
     const SizedBox(height:28),
-    const Icon(Icons.shield_outlined,color:LG.sage,size:48),
-    const PageHeading('Authenticator verification',subtitle:'Open your authenticator app and enter the current six-digit code.'),
-    Form(key:form,child:FormFieldBlock(title:'Authenticator code',required:true,child:TextFormField(
-      controller:code,enabled:!busy,keyboardType:TextInputType.number,autofillHints:const [AutofillHints.oneTimeCode],
+    Icon(widget.email?Icons.mail_outline:Icons.shield_outlined,color:LG.sage,size:48),
+    PageHeading(widget.email?'Email verification':'Authenticator verification',subtitle:widget.email
+      ?'Enter the six-digit code sent to ${widget.challenge.maskedDestination??"your verified email"}.'
+      :'Open your authenticator app and enter the current six-digit code.'),
+    Form(key:form,child:FormFieldBlock(title:widget.email?'Verification code':'Authenticator code',child:TextFormField(
+      controller:code,enabled:!busy&&!expired,keyboardType:TextInputType.number,autofillHints:const [AutofillHints.oneTimeCode],
       inputFormatters:[FilteringTextInputFormatter.digitsOnly,LengthLimitingTextInputFormatter(6)],
       validator:(v)=>v?.length==6?null:'Enter six digits',
     ))),
+    if(expired)const Text('Verification expired. Return to sign in.',style:TextStyle(color:LG.negative)),
     if(error!=null)Text(error!,style:const TextStyle(color:LG.negative)),
-    PrimaryCTA(label:'Verify and sign in',loading:busy,onPressed:submit),
+    PrimaryCTA(label:'Verify and sign in',loading:busy,onPressed:expired?null:submit),
+    if(widget.email)TextButton(onPressed:busy||expired||cooldown>0||resends>=2?null:resend,
+      child:Text(resends>=2?'Resend limit reached':cooldown>0?'Resend in $cooldown s':'Resend code')),
     TextButton(onPressed:busy?null:()=>Navigator.of(context).pop(false),child:const Text('Cancel and return to sign in')),
   ]));
 }
