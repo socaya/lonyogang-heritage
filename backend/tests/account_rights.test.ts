@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startHarness, type Harness } from './support/harness.js';
+import { signInForTest, startHarness, type Harness } from './support/harness.js';
 
 let harness: Harness;
 
@@ -36,7 +36,7 @@ async function newSession(email: string) {
       code: harness.otp.latestCode(accountId, 'phone'),
     },
   });
-  const signIn = await harness.app.inject({
+  const signIn = await signInForTest(harness, {
     method: 'POST',
     url: '/identity/sessions',
     payload: {
@@ -117,7 +117,7 @@ describe('data-subject rights', () => {
       payload: { password: 'correct-horse-battery-staple' },
     });
     expect(del.statusCode).toBe(204);
-    const signInAgain = await harness.app.inject({
+    const signInAgain = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -135,7 +135,7 @@ describe('sign-in lockout', () => {
     const email = 'lockout@example.com';
     const s = await newSession(email);
     for (let i = 0; i < 5; i += 1) {
-      const res = await harness.app.inject({
+      const res = await signInForTest(harness, {
         method: 'POST',
         url: '/identity/sessions',
         payload: {
@@ -146,7 +146,7 @@ describe('sign-in lockout', () => {
       });
       expect(res.statusCode).toBe(401);
     }
-    const locked = await harness.app.inject({
+    const locked = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {

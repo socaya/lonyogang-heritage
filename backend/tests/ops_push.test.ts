@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startHarness, type Harness } from './support/harness.js';
+import { signInForTest, startHarness, type Harness } from './support/harness.js';
 import { ConsolePushTransport } from '../src/services/push.js';
 import { ROPA_ACTIVITIES } from '../src/services/ropa.js';
 
@@ -38,7 +38,7 @@ async function authed(email: string) {
       code: harness.otp.latestCode(accountId, 'email'),
     },
   });
-  const signIn = await harness.app.inject({
+  const signIn = await signInForTest(harness, {
     method: 'POST',
     url: '/identity/sessions',
     payload: {

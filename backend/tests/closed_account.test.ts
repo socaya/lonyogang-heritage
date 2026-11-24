@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startHarness, type Harness } from './support/harness.js';
+import { signInForTest, startHarness, type Harness } from './support/harness.js';
 
 let harness: Harness;
 
@@ -39,7 +39,7 @@ describe('closed account sign-in', () => {
 
     await harness.services.account.eraseAccount(accountId);
 
-    const attempt = await harness.app.inject({
+    const attempt = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {

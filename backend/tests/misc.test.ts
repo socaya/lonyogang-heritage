@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { startHarness, type Harness } from './support/harness.js';
+import { signInForTest, startHarness, type Harness } from './support/harness.js';
 import { RecoveryService } from '../src/services/recovery.js';
 import { createHmac } from 'node:crypto';
 
@@ -38,7 +38,7 @@ async function authedAccount(email: string) {
       code: harness.otp.latestCode(accountId, 'phone'),
     },
   });
-  const signIn = await harness.app.inject({
+  const signIn = await signInForTest(harness, {
     method: 'POST',
     url: '/identity/sessions',
     payload: {
