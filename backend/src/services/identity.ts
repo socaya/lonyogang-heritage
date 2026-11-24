@@ -396,6 +396,25 @@ export class IdentityService {
     return {accessToken:result.accessToken,refreshToken:result.refreshToken,sessionId:result.sessionId,expiresAt:result.expiresAt};
   }
 
+  async resendSignIn(token: string) {
+    const hash = this.hashCode(token);
+    const delivery = await withTx(this.db, async client => {
+      const lookup = (await client.query<{account_id:string}>('select account_id from signin_challenges where token_hash=$1',[hash])).rows[0];
+      if (!lookup) throw new ClientError('challenge_invalid','Sign in again');
+      const account = (await client.query<AccountRow>('select * from accounts where id=$1 for update',[lookup.account_id])).rows[0];
+      const c = (await client.query<{method:string;code_hash:Buffer;credential_version:string;expires_at:Date;consumed_at:Date|null;attempts:number;sent_at:Date;resends:number}>('select * from signin_challenges where token_hash=$1 for update',[hash])).rows[0];
+      if (!account || !c || c.method !== 'email' || c.consumed_at || c.expires_at.getTime() <= Date.now() || c.attempts >= 5 || account.status !== 'active' || (account.locked_until && account.locked_until.getTime() > Date.now()) || c.credential_version !== this.credentialVersion(account)) throw new ClientError('challenge_invalid','Sign in again');
+      if (c.resends >= 2 || Date.now()-c.sent_at.getTime()<60_000) throw new ClientError('cooldown','Wait before requesting another code');
+      let code = this.generateOtp();
+      while (timingSafeEqual(c.code_hash,this.hashCode(token+':'+code))) code=this.generateOtp();
+      await client.query('update signin_challenges set code_hash=$2,sent_at=now(),resends=resends+1 where token_hash=$1',[hash,this.hashCode(token+':'+code)]);
+      return {accountId:account.id,email:account.email,code,expiresAt:c.expires_at};
+    });
+    try { await this.dispatcher.send({accountId:delivery.accountId,channel:'email',destination:delivery.email,code:delivery.code,purpose:'signin'}); }
+    catch (_) { await this.cancelSignIn(token); throw new ClientError('delivery_unavailable','Could not send verification code. Sign in again.'); }
+    return {expiresAt:delivery.expiresAt,resendAfterSeconds:60};
+  }
+
   async cancelSignIn(token: string): Promise<void> {
     await this.db.query('update signin_challenges set consumed_at=now() where token_hash=$1 and consumed_at is null',[this.hashCode(token)]);
   }

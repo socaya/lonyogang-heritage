@@ -107,6 +107,11 @@ export async function registerIdentityRoutes(
     try { return reply.send(await deps.identity.verifySignIn(body.challengeToken,body.code)); }
     catch(err) { return reply.code(401).send(toError(err)); }
   });
+  app.post('/identity/sessions/challenge/resend', { config: resendLimit }, async (req, reply) => {
+    const body=z.object({challengeToken:z.string().regex(/^[a-f0-9]{64}$/)}).parse(req.body);
+    try {return reply.code(202).send(await deps.identity.resendSignIn(body.challengeToken));}
+    catch(err){return reply.code(400).send(toError(err));}
+  });
   app.post('/identity/sessions/challenge/cancel', { config: verifyLimit }, async (req, reply) => {
     const body=z.object({challengeToken:z.string().regex(/^[a-f0-9]{64}$/)}).parse(req.body);
     await deps.identity.cancelSignIn(body.challengeToken);
