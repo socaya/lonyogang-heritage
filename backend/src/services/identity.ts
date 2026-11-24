@@ -265,6 +265,29 @@ export class IdentityService {
     deviceId: string;
     userAgent?: string;
   }): Promise<SessionResult> {
+    const account = await this.checkPassword(input);
+
+    if (account.totp_secret) {
+      if (!input.totpCode) {
+        throw new ClientError('totp_required', 'Second factor is required');
+      }
+      const secret = (
+        await this.kms.unseal(Buffer.from(account.totp_secret, 'base64'), Buffer.from(account.id, 'utf8'))
+      ).toString('utf8');
+      if (!authenticator.check(input.totpCode, secret)) {
+        await this.recordFailedAttempt(account.id);
+        throw new ClientError('bad_totp', 'Second factor code is invalid');
+      }
+    }
+
+    await this.db.query(
+      `update accounts set failed_login_count = 0, locked_until = null where id = $1`,
+      [account.id],
+    );
+    return await this.openSession(account.id, input.deviceId, input.userAgent);
+  }
+
+  private async checkPassword(input: { email: string; password: string }): Promise<AccountRow> {
     const normalised = input.email.trim().toLowerCase();
     const account = await queryOne<AccountRow>(
       this.db,
@@ -298,24 +321,83 @@ export class IdentityService {
       throw new ClientError('bad_credentials', 'Email or password is incorrect');
     }
 
-    if (account.totp_secret) {
-      if (!input.totpCode) {
-        throw new ClientError('totp_required', 'Second factor is required');
-      }
-      const secret = (
-        await this.kms.unseal(Buffer.from(account.totp_secret, 'base64'), Buffer.from(account.id, 'utf8'))
-      ).toString('utf8');
-      if (!authenticator.check(input.totpCode, secret)) {
-        await this.recordFailedAttempt(account.id);
-        throw new ClientError('bad_totp', 'Second factor code is invalid');
-      }
-    }
 
-    await this.db.query(
-      `update accounts set failed_login_count = 0, locked_until = null where id = $1`,
-      [account.id],
-    );
-    return await this.openSession(account.id, input.deviceId, input.userAgent);
+    return account;
+  }
+
+  private credentialVersion(account: AccountRow): string {
+    return createHash('sha256').update(JSON.stringify([account.email, account.password_hash, account.totp_secret])).digest('hex');
+  }
+
+  async beginSignIn(input: { email: string; password: string; deviceId: string; userAgent?: string }) {
+    const account = await this.checkPassword(input);
+    const method = account.totp_secret ? 'totp' : 'email';
+    if (method === 'email' && this.config.NODE_ENV === 'production' && (!this.config.SMTP_HOST || !this.config.SMTP_FROM)) {
+      throw new ClientError('delivery_unavailable', 'Email verification is unavailable');
+    }
+    const token = randomBytes(32).toString('hex');
+    const hash = this.hashCode(token);
+    const code = method === 'email' ? this.generateOtp() : null;
+    const expiresAt = new Date(Date.now() + 300_000);
+    await withTx(this.db, async client => {
+      const live = (await client.query<AccountRow>('select * from accounts where id = $1 for update', [account.id])).rows[0];
+      if (!live || live.status !== 'active' || (live.locked_until && live.locked_until.getTime() > Date.now()) || this.credentialVersion(live) !== this.credentialVersion(account)) throw new ClientError('challenge_invalid', 'Sign in again');
+      await client.query("delete from signin_challenges where account_id = $1 and expires_at < now() - interval '1 day'", [account.id]);
+      const recent = (await client.query<{count: string}>("select count(*)::text as count from signin_challenges where account_id = $1 and created_at > now() - interval '5 minutes'", [account.id])).rows[0]!;
+      if (Number(recent.count) >= 5) throw new ClientError('cooldown', 'Too many verification requests. Try again later');
+      await client.query('update signin_challenges set consumed_at = now() where account_id = $1 and device_id = $2 and consumed_at is null', [account.id, input.deviceId]);
+      await client.query(`insert into signin_challenges(token_hash, account_id, device_id, user_agent, method, code_hash, credential_version, expires_at)
+        values ($1,$2,$3,$4,$5,$6,$7,$8)`, [hash, account.id, input.deviceId, input.userAgent ?? null, method, code ? this.hashCode(token + ':' + code) : null, this.credentialVersion(account), expiresAt]);
+    });
+    if (code) {
+      try { await this.dispatcher.send({accountId: account.id, channel: 'email', destination: account.email, code, purpose: 'signin'}); }
+      catch (_) { await this.cancelSignIn(token); throw new ClientError('delivery_unavailable', 'Could not send verification code'); }
+    }
+    const [local, domain] = account.email.split('@');
+    return { challengeToken: token, method, expiresAt, maskedDestination: method === 'email' ? local!.slice(0,1) + '***@' + domain : null, resendAfterSeconds: method === 'email' ? 60 : 0 };
+  }
+
+  async verifySignIn(token: string, code: string): Promise<SessionResult> {
+    const hash = this.hashCode(token);
+    const result = await withTx(this.db, async client => {
+      const lookup = (await client.query<{account_id:string}>('select account_id from signin_challenges where token_hash=$1', [hash])).rows[0];
+      if (!lookup) return null;
+      const account = (await client.query<AccountRow>('select * from accounts where id=$1 for update', [lookup.account_id])).rows[0];
+      const c = (await client.query<{account_id:string;device_id:string;user_agent:string|null;method:string;code_hash:Buffer|null;credential_version:string;expires_at:Date;consumed_at:Date|null;attempts:number}>('select * from signin_challenges where token_hash=$1 for update',[hash])).rows[0];
+      if (!account || !c || c.consumed_at || c.expires_at.getTime() <= Date.now() || c.attempts >= 5 || account.status !== 'active' || (account.locked_until && account.locked_until.getTime() > Date.now()) || c.credential_version !== this.credentialVersion(account)) return null;
+      let valid = false;
+      if (/^\d{6}$/.test(code)) {
+        if (c.method === 'email' && c.code_hash) valid = timingSafeEqual(c.code_hash, this.hashCode(token + ':' + code));
+        if (c.method === 'totp' && account.totp_secret) {
+          const secret = (await this.kms.unseal(Buffer.from(account.totp_secret,'base64'), Buffer.from(account.id,'utf8'))).toString('utf8');
+          valid = authenticator.check(code, secret);
+          if (valid) {
+            await client.query('delete from signin_totp_replays where account_id=$1 and expires_at <= now()', [account.id]);
+            const replay = await client.query("insert into signin_totp_replays(account_id,code_hash,expires_at) values ($1,$2,now()+interval '120 seconds') on conflict do nothing", [account.id,this.hashCode(code)]);
+            valid = replay.rowCount === 1;
+          }
+        }
+      }
+      if (!valid) {
+        await client.query('update signin_challenges set attempts=attempts+1 where token_hash=$1',[hash]);
+        await client.query("update accounts set failed_login_count=coalesce(failed_login_count,0)+1, locked_until=case when coalesce(failed_login_count,0)+1 >= $2 then now()+interval '15 minutes' else locked_until end where id=$1",[account.id,MAX_FAILED_BEFORE_LOCK]);
+        return null;
+      }
+      await client.query('update signin_challenges set consumed_at=now() where token_hash=$1',[hash]);
+      await client.query('update accounts set failed_login_count=0,locked_until=null where id=$1',[account.id]);
+      const {token:refreshToken,hash:refreshHash}=this.tokens.issueRefresh();
+      const expiresAt=new Date(Date.now()+this.config.JWT_REFRESH_TTL_SECONDS*1000);
+      const row=(await client.query<{id:string}>('insert into sessions(account_id,device_id,refresh_hash,user_agent,expires_at) values ($1,$2,$3,$4,$5) returning id',[account.id,c.device_id,refreshHash,c.user_agent,expiresAt])).rows[0]!;
+      const accessToken=await this.tokens.signAccess({accountId:account.id,sessionId:row.id,deviceId:c.device_id});
+      return {accessToken,refreshToken,sessionId:row.id,expiresAt,accountId:account.id,deviceId:c.device_id};
+    });
+    if (!result) throw new ClientError('challenge_invalid', 'Verification failed or expired');
+    await this.audit.record({accountId:result.accountId, actor:{kind:'user',id:result.accountId},action:'session.opened',resource:'session:'+result.sessionId,context:{deviceId:result.deviceId}});
+    return {accessToken:result.accessToken,refreshToken:result.refreshToken,sessionId:result.sessionId,expiresAt:result.expiresAt};
+  }
+
+  async cancelSignIn(token: string): Promise<void> {
+    await this.db.query('update signin_challenges set consumed_at=now() where token_hash=$1 and consumed_at is null',[this.hashCode(token)]);
   }
 
   private async recordFailedAttempt(accountId: string): Promise<void> {

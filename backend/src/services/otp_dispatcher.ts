@@ -8,7 +8,7 @@ export interface OtpDeliveryRequest {
   channel: OtpChannel;
   code: string;
   destination: string;
-  purpose: 'signup' | 'password_reset';
+  purpose: 'signup' | 'password_reset' | 'signin';
 }
 
 export interface OtpDispatcher {
@@ -67,7 +67,7 @@ export class SmtpOtpDispatcher implements OtpDispatcher {
       this.options.subject ??
       (req.purpose === 'password_reset'
         ? 'Reset your LonyoGang account'
-        : 'Verify your LonyoGang account');
+        : req.purpose === 'signin' ? 'Your LonyoGang sign-in code' : 'Verify your LonyoGang account');
     const bodyLines =
       req.purpose === 'password_reset'
         ? [
@@ -77,7 +77,7 @@ export class SmtpOtpDispatcher implements OtpDispatcher {
             '',
             'It expires in 30 minutes. If you did not request this, ignore the message.',
           ]
-        : [
+        : req.purpose === 'signin' ? ['Your sign-in code is ' + req.code + '.', 'Expires in five minutes. Do not share this code.'] : [
             'Welcome to LonyoGang Heritage.',
             '',
             `Your verification code is ${req.code}.`,
@@ -143,6 +143,7 @@ export class CompositeOtpDispatcher implements OtpDispatcher {
       console.warn(
         `[otp] channel ${req.channel} is unconfigured; dropped ${req.purpose} for account ${req.accountId}`,
       );
+      if (req.purpose === 'signin') throw new Error('Verification delivery unavailable');
       return;
     }
     try {

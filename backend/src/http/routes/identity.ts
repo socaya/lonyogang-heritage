@@ -97,6 +97,22 @@ export async function registerIdentityRoutes(
     }
   });
 
+  app.post('/identity/sessions/challenge', { config: sessionLimit }, async (req, reply) => {
+    const body = z.object({email:emailSchema,password:z.string().min(1).max(1024),deviceId:z.string().uuid()}).parse(req.body);
+    try { return reply.code(202).send(await deps.identity.beginSignIn({...body,userAgent:req.headers['user-agent']})); }
+    catch(err) { return reply.code(401).send(toError(err)); }
+  });
+  app.post('/identity/sessions/challenge/verify', { config: verifyLimit }, async (req, reply) => {
+    const body=z.object({challengeToken:z.string().regex(/^[a-f0-9]{64}$/),code:z.string().regex(/^\d{6}$/)}).parse(req.body);
+    try { return reply.send(await deps.identity.verifySignIn(body.challengeToken,body.code)); }
+    catch(err) { return reply.code(401).send(toError(err)); }
+  });
+  app.post('/identity/sessions/challenge/cancel', { config: verifyLimit }, async (req, reply) => {
+    const body=z.object({challengeToken:z.string().regex(/^[a-f0-9]{64}$/)}).parse(req.body);
+    await deps.identity.cancelSignIn(body.challengeToken);
+    return reply.code(204).send();
+  });
+
   app.post('/identity/sessions/refresh', { config: refreshLimit }, async (req, reply) => {
     const body = z.object({ refreshToken: z.string().min(32) }).parse(req.body);
     try {

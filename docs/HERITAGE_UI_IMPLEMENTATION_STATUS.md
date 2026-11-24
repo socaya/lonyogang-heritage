@@ -55,3 +55,6 @@ This is an incremental implementation, not a 100% completion or production readi
 ## Batch 10a — authenticator UI and device identity
 - Dedicated working TOTP verification screen using existing server contract; password screen no longer embeds TOTP or simulates successful offline sign-in. Secure random persisted installation UUID shared by online registration and sign-in. Optional empty phone corrected.
 - Mandatory email OTP, server-issued pre-auth challenge, replay prevention and registration/sign-in separation still outstanding. Existing password-only server behavior remains; this is not full two-stage authentication. Native tests not run.
+
+## Batch 10b — restricted authentication challenge endpoints
+- Database-backed hashed challenge tokens, five-minute expiry, attempt and account limits, credential binding, single-use verification, cancellation, email delivery and TOTP replay protection on new challenge endpoints. Session creation and consumption are transactional. Legacy endpoint remains available for compatibility until client and test migration; mandatory enforcement is NOT complete. Resend endpoint and Flutter wiring remain outstanding. Backend integration tests not run.

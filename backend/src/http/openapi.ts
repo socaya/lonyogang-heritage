@@ -235,6 +235,9 @@ export function buildOpenApi(config: AppConfig): Record<string, unknown> {
           responses: { '200': { description: 'Session list.' } },
         },
       },
+      '/identity/sessions/challenge': { post: { tags: ['identity'], summary: 'Validate password and issue restricted verification challenge', responses: {'202':{description:'Challenge issued; no session tokens'},'401':{description:'Request rejected'}} } },
+      '/identity/sessions/challenge/verify': { post: { tags: ['identity'], summary: 'Verify single-use email or authenticator challenge', responses: {'200':{description:'Session issued'},'401':{description:'Verification rejected'}} } },
+      '/identity/sessions/challenge/cancel': { post: { tags: ['identity'], summary: 'Invalidate verification challenge', responses: {'204':{description:'Cancelled'}} } },
       '/identity/sessions/refresh': {
         post: {
           tags: ['identity'],
