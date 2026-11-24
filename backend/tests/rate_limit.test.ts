@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startHarness, type Harness } from './support/harness.js';
+import { signInForTest, startHarness, type Harness } from './support/harness.js';
 
 let harness: Harness;
 
@@ -27,7 +27,7 @@ describe('sign-in rate limit', () => {
     // 2xx/4xx is fine — we are asserting the 429 shape, not auth success.
     let sawRateLimit = false;
     for (let i = 0; i < 15; i += 1) {
-      const res = await harness.app.inject({
+      const res = await signInForTest(harness, {
         method: 'POST',
         url: '/identity/sessions',
         payload: {
@@ -65,7 +65,7 @@ describe('resource write rate limit', () => {
         code: harness.otp.latestCode(accountId, 'email'),
       },
     });
-    const signIn = await harness.app.inject({
+    const signIn = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {

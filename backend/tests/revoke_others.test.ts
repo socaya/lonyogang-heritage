@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { startHarness, type Harness } from './support/harness.js';
+import { signInForTest, startHarness, type Harness } from './support/harness.js';
 
 let harness: Harness;
 
@@ -33,7 +33,7 @@ describe('revoke-others', () => {
         code: harness.otp.latestCode(accountId, 'email'),
       },
     });
-    const signIn = await harness.app.inject({
+    const signIn = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -51,7 +51,7 @@ describe('revoke-others', () => {
   it('revokes other sessions but keeps the caller alive', async () => {
     const email = `revoke-${Date.now()}@example.com`;
     const first = await authed(email, '00000000-0000-0000-0000-000000000090');
-    const second = await harness.app.inject({
+    const second = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -61,7 +61,7 @@ describe('revoke-others', () => {
       },
     });
     expect(second.statusCode).toBe(200);
-    const third = await harness.app.inject({
+    const third = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {

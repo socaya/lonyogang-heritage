@@ -95,3 +95,18 @@ async function applyMigrations(pool: pg.Pool): Promise<void> {
 export function freshMockBankProvider(): MockBankProvider {
   return new MockBankProvider();
 }
+
+/** Exercise real password validation, dispatch and verification in tests.
+ * Negative password and rate-limit responses are returned unchanged.
+ */
+export async function signInForTest(harness: Harness, request: {
+  method: 'POST'; url: string; payload: {email:string;password:string;deviceId:string;totpCode?:string}; remoteAddress?:string;
+}) {
+  const {totpCode,...payload}=request.payload;
+  const begin=await harness.app.inject({...request,payload});
+  if(begin.statusCode!==202)return begin;
+  const challenge=begin.json<{challengeToken:string;method:string}>();
+  const code=challenge.method==='totp'?totpCode:[...harness.otp.dispatched].reverse().find(d=>d.purpose==='signin'&&d.destination===payload.email.trim().toLowerCase())?.code;
+  if(!code)throw new Error('Test sign-in requires a delivered verification code');
+  return harness.app.inject({method:'POST',url:'/identity/sessions/challenge/verify',payload:{challengeToken:challenge.challengeToken,code},...(request.remoteAddress?{remoteAddress:request.remoteAddress}:{})});
+}

@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeAll, afterAll } from 'vitest';
-import { startHarness, type Harness } from './support/harness.js';
+import { signInForTest, startHarness, type Harness } from './support/harness.js';
 
 let harness: Harness;
 
@@ -49,7 +49,7 @@ describe('identity service', () => {
   it('signs up, verifies, signs in, refreshes and revokes', async () => {
     const email = 'signup@example.com';
     const accountId = await createVerifiedAccount(email);
-    const signIn = await harness.app.inject({
+    const signIn = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -93,7 +93,7 @@ describe('identity service', () => {
 
   it('rejects bad password and preserves constant-time semantics', async () => {
     await createVerifiedAccount('bad-pw@example.com');
-    const attempt = await harness.app.inject({
+    const attempt = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -109,7 +109,7 @@ describe('identity service', () => {
   it('issues and verifies a working TOTP secret', async () => {
     const email = 'totp@example.com';
     await createVerifiedAccount(email);
-    const session = await harness.app.inject({
+    const session = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -128,7 +128,7 @@ describe('identity service', () => {
     const { secret } = enrol.json<{ secret: string; otpauthUrl: string }>();
     const { authenticator } = await import('otplib');
     const totpCode = authenticator.generate(secret);
-    const totpSignIn = await harness.app.inject({
+    const totpSignIn = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -140,7 +140,7 @@ describe('identity service', () => {
     });
     expect(totpSignIn.statusCode).toBe(200);
 
-    const badTotp = await harness.app.inject({
+    const badTotp = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -171,7 +171,7 @@ describe('identity service', () => {
       payload: { email, token: dispatched, newPassword: 'new-password-123' },
     });
     expect(complete.statusCode).toBe(204);
-    const oldAttempt = await harness.app.inject({
+    const oldAttempt = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
@@ -181,7 +181,7 @@ describe('identity service', () => {
       },
     });
     expect(oldAttempt.statusCode).toBe(401);
-    const newAttempt = await harness.app.inject({
+    const newAttempt = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {

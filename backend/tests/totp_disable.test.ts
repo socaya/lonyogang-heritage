@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { authenticator } from 'otplib';
-import { startHarness, type Harness } from './support/harness.js';
+import { signInForTest, startHarness, type Harness } from './support/harness.js';
 
 let harness: Harness;
 
@@ -33,7 +33,7 @@ describe('DELETE /identity/totp', () => {
         code: harness.otp.latestCode(accountId, 'email'),
       },
     });
-    const signIn = await harness.app.inject({
+    const signIn = await signInForTest(harness, {
       method: 'POST',
       url: '/identity/sessions',
       payload: {
