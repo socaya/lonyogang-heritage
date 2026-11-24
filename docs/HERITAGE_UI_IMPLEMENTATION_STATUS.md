@@ -13,3 +13,10 @@
 - Two-stage authentication remains outstanding: current backend accepts combined password/TOTP and permits password-only accounts. Implement expiring, single-use server challenge and supported second-factor enrollment/delivery, then migrate all clients and integration tests. Do not expose a fake OTP or claim MFA enforcement.
 
 This is an incremental implementation, not a 100% completion or production readiness declaration.
+
+## Batch 2 — portfolio and asset entry
+- Added ownership-adjusted total holdings hero, live portfolio search and sorting, and filter-aware empty states.
+- Asset registration now groups existing fields by purpose and retains fractional ownership on edit.
+- Allocation chart omits zero segments, avoids misleading charts for nonpositive totals, and presents exact values and percentages.
+- Updated navigation regression test for four tabs, contextual Add and search.
+- Tests not executed: Flutter SDK unavailable. Authentication, native dark mode and remaining screen-specific work remain open.

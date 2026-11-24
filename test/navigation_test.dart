@@ -25,7 +25,14 @@ void main(){
     await tester.pumpAndSettle();
     expect(find.text('Your portfolio'),findsOneWidget);
     expect(find.text('Rental Property'),findsOneWidget);
-    await tester.tap(find.byIcon(Icons.add_circle_outline));
+    expect(find.byType(NavigationDestination), findsNWidgets(4));
+    await tester.enterText(find.byKey(const ValueKey('portfolio-search')), 'no-match-xyz');
+    await tester.pumpAndSettle();
+    expect(find.text('No matching assets'), findsOneWidget);
+    await tester.enterText(find.byKey(const ValueKey('portfolio-search')), '');
+    await tester.pumpAndSettle();
+    expect(find.text('Rental Property'),findsOneWidget);
+    await tester.tap(find.text('Add record'));
     await tester.pumpAndSettle();
     expect(find.text('Add to your wealth'),findsOneWidget);
     expect(find.text('Investment'),findsOneWidget);

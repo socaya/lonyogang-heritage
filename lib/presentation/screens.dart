@@ -394,12 +394,20 @@ class PortfolioScreen extends StatefulWidget {
 }
 class _PortfolioScreenState extends State<PortfolioScreen> {
   AssetKind? filter;
+  String query = '';
+  bool highestFirst = false;
   @override
   Widget build(BuildContext context) {
     final assets = widget.store.state.assets
         .where((x) =>
-            !x.archived && (filter == null || x.kind == filter))
+            !x.archived && (filter == null || x.kind == filter) &&
+            '${x.name} ${x.category} ${x.institution} ${x.location}'.toLowerCase().contains(query.trim().toLowerCase()))
         .toList();
+    if (highestFirst) {
+      assets.sort((a, b) => b.attributableUgx.compareTo(a.attributableUgx));
+    } else {
+      assets.sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
+    }
     return RefreshIndicator(
       color: LG.gold,
       backgroundColor: LG.white,
@@ -415,8 +423,25 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         const SizedBox(height: 8),
         const PageHeading('Your portfolio',
             subtitle: 'Every asset and account in one view.'),
+        SoftCard(color: LG.navy, child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('TOTAL ASSET VALUE', style: TextStyle(color: LG.ivory, fontSize: 12, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text(LG.money(widget.store.totals.grossAssets), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 6),
+            const Text('Ownership-adjusted holdings before debt', style: TextStyle(color: LG.ivory, fontSize: 13)),
+          ],
+        )),
+        const SizedBox(height: 20),
+        TextField(
+          key: const ValueKey('portfolio-search'),
+          onChanged: (value) => setState(() => query = value),
+          decoration: const InputDecoration(labelText: 'Search assets', prefixIcon: Icon(Icons.search)),
+        ),
+        const SizedBox(height: 12),
         SizedBox(
-          height: 42,
+          height: 48,
           child: ListView(scrollDirection: Axis.horizontal, children: [
             LGFilterChip(
                 label: 'All assets',
@@ -432,7 +457,16 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             ],
           ]),
         ),
-        const SizedBox(height: 22),
+        const SizedBox(height: 12),
+        Row(children: [
+          const Expanded(child: Text('Sort holdings')),
+          DropdownButton<bool>(
+            value: highestFirst,
+            items: const [DropdownMenuItem(value: false, child: Text('Name A–Z')), DropdownMenuItem(value: true, child: Text('Highest value'))],
+            onChanged: (value) => setState(() => highestFirst = value ?? false),
+          ),
+        ]),
+        const SizedBox(height: 12),
         Row(children: [
           Expanded(
               child: Text('${assets.length} assets',
@@ -446,9 +480,9 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
         ]),
         const SizedBox(height: 16),
         if (assets.isEmpty)
-          const EmptySection(
-              title: 'Nothing here yet',
-              detail: 'Choose Add to create your first asset.')
+          EmptySection(
+              title: query.isNotEmpty || filter != null ? 'No matching assets' : 'Nothing here yet',
+              detail: query.isNotEmpty || filter != null ? 'Change your search or asset category.' : 'Choose Add record to create your first asset.')
         else
           ...assets.map((a) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
@@ -469,6 +503,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
             child: InfoLabel(
                 label: 'Outstanding debt',
                 value: LG.money(widget.store.totals.liabilities))),
+        const SizedBox(height: 80),
       ]),
     );
   }

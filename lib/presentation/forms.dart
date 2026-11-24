@@ -128,7 +128,7 @@ class _AssetFormState extends State<AssetForm> {
           : widget.existing!.valueUgx.toString());
   late final owned = TextEditingController(
       text: ((widget.existing?.ownershipBps ?? 10000) / 100)
-          .toStringAsFixed(0));
+          .toStringAsFixed(2));
   late final cost = TextEditingController(
       text: widget.existing == null ? '' : widget.existing!.costUgx.toString());
   late final customInstitution = TextEditingController(
@@ -227,7 +227,7 @@ class _AssetFormState extends State<AssetForm> {
         child: Form(
           key: key,
           child: ListView(
-            padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: LG.hPad, vertical: 16),
             children: [
               PageHeading(
                   widget.existing == null
@@ -235,6 +235,7 @@ class _AssetFormState extends State<AssetForm> {
                       : 'Update ${widget.existing!.name}',
                   subtitle:
                       'Capture value, ownership and the date of the source.'),
+              const SectionTitle('Asset information'),
               FormFieldBlock(
                 title: 'Asset name',
                 required: true,
@@ -276,6 +277,7 @@ class _AssetFormState extends State<AssetForm> {
                         : null,
                   ),
                 ),
+              const SectionTitle('Value and ownership'),
               FormFieldBlock(
                 title: 'Current value (UGX)',
                 required: true,
@@ -322,7 +324,8 @@ class _AssetFormState extends State<AssetForm> {
                       v == null || v.trim().isEmpty ? null : _validateDecimalAmount(v),
                 ),
               ),
-              if (widget.kind == AssetKind.property)
+              if (widget.kind == AssetKind.property) ...[
+                const SectionTitle('Property information'),
                 FormFieldBlock(
                   title: 'Property location',
                   child: TextFormField(
@@ -331,7 +334,9 @@ class _AssetFormState extends State<AssetForm> {
                         const InputDecoration(hintText: 'District / area'),
                   ),
                 ),
+              ],
               if (showInstitution) ...[
+                const SectionTitle('Institution and reference'),
                 FormFieldBlock(
                   title: 'Institution or provider',
                   help:
@@ -377,6 +382,7 @@ class _AssetFormState extends State<AssetForm> {
                 ),
               if (widget.kind == AssetKind.investment ||
                   widget.kind == AssetKind.savings) ...[
+                const SectionTitle('Interest and returns'),
                 FormFieldBlock(
                   title: 'Interest frequency',
                   help:
@@ -420,6 +426,7 @@ class _AssetFormState extends State<AssetForm> {
                     ),
                   ),
               ],
+              const SectionTitle('Valuation and evidence'),
               FormFieldBlock(
                 title: 'Valuation date',
                 child: SoftCard(

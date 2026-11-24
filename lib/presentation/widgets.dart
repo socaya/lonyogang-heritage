@@ -272,7 +272,7 @@ class AssetTile extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(_interestLabel,
                             style: const TextStyle(
-                                color: LG.gold,
+                                color: LG.navy,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w700)),
                       ]),
@@ -301,18 +301,42 @@ class AssetTile extends StatelessWidget {
 class WealthBreakdown extends StatelessWidget {
   final Map<String,int> values;
   const WealthBreakdown({super.key,required this.values});
-  @override Widget build(BuildContext context) {
-    final colors=[LG.gold,LG.sage,const Color(0xFF487A94),const Color(0xFF9EAEB1)];
-    final total=values.values.fold<int>(0,(a,b)=>a+b);
-    return Column(children:[
-      ClipRRect(borderRadius:BorderRadius.circular(8),child:Row(children:[for(var i=0;i<values.length;i++)
-        Expanded(flex:total==0?1:((values.values.elementAt(i)/total*1000).round().clamp(1,1000).toInt()),
-          child:Container(height:10,color:colors[i%colors.length]))])),
-      const SizedBox(height:16),for(var i=0;i<values.length;i++)Padding(padding:const EdgeInsets.only(bottom:12),child:Row(children:[
-        Container(width:9,height:9,decoration:BoxDecoration(color:colors[i%colors.length],borderRadius:BorderRadius.circular(4))),
-        const SizedBox(width:9),Expanded(child:Text(values.keys.elementAt(i),style:const TextStyle(color:LG.muted,fontSize:13))),
-        Text(LG.money(values.values.elementAt(i),compact:true),style:const TextStyle(fontWeight:FontWeight.w700,fontSize:13))
-      ]))
+  @override
+  Widget build(BuildContext context) {
+    final colors = [LG.gold, LG.sage, LG.navy, const Color(0xFF487A94)];
+    final total = values.values.fold<int>(0, (a, b) => a + b);
+    final entries = values.entries.toList();
+    return Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (total > 0 && entries.every((e) => e.value >= 0))
+        Semantics(
+          label: 'Asset allocation. Exact amounts and percentages below.',
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: Row(children: [
+              for (var i = 0; i < entries.length; i++)
+                if (entries[i].value > 0)
+                  Expanded(flex: (entries[i].value / total * 10000).round().clamp(1, 10000).toInt(),
+                    child: Container(height: 10, color: colors[i % colors.length])),
+            ]),
+          ),
+        )
+      else
+        const Text('Allocation chart unavailable', style: TextStyle(color: LG.muted)),
+      const SizedBox(height: 16),
+      for (var i = 0; i < entries.length; i++)
+        Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Container(width: 9, height: 9, margin: const EdgeInsets.only(top: 5), color: colors[i % colors.length]),
+            const SizedBox(width: 9),
+            Expanded(child: Text(entries[i].key, style: const TextStyle(color: LG.muted, fontSize: 13))),
+            Flexible(child: Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+              Text(LG.money(entries[i].value), textAlign: TextAlign.end, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+              if (total > 0 && entries.every((e) => e.value >= 0))
+                Text('${(entries[i].value / total * 100).toStringAsFixed(1)}%', style: const TextStyle(color: LG.muted, fontSize: 12)),
+            ])),
+          ]),
+        ),
     ]);
   }
 }
@@ -342,7 +366,7 @@ class FormFieldBlock extends StatelessWidget {
   });
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 22),
+        padding: const EdgeInsets.only(bottom: 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
