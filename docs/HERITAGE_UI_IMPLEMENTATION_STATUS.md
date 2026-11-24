@@ -29,3 +29,8 @@ This is an incremental implementation, not a 100% completion or production readi
 
 ## Batch 5 — liability entry and detail
 - Original principal, balance date and repayment due date now editable and persisted using existing model fields. Preserve archive state, custom category input and previously linked archived or unavailable property. Stable ID during retry, duplicate-submit guard and inline save failure feedback. Detail shows category/reference and unknown principal explicitly. Added store validation for negative principal and persistence regression test. Flutter tests not run.
+
+## Batch 6 — reporting improvements
+- Rental income uses property/period filters, current ledger receipts and costs, exact totals and dated records; excludes reversed and future entries.
+- Cash flow excludes future entries; exact row amounts wrap. Historical net-worth range selection uses actual dated observations only. Asset performance refreshes current asset and includes a numeric valuation list.
+- Native build, screenshots and regression tests remain unexecuted; no verified coverage claim.

@@ -510,25 +510,37 @@ class _ScheduleFormState extends State<ScheduleForm> {
 /// Historical wealth trend (F06). Synthesizes net-worth snapshots from the
 /// valuation history and shows an honest "Not enough history" state when
 /// the series is too short to be meaningful.
-class HistoricalTrendScreen extends StatelessWidget {
+class HistoricalTrendScreen extends StatefulWidget {
   final PortfolioStore store;
   const HistoricalTrendScreen({super.key, required this.store});
   @override
+  State<HistoricalTrendScreen> createState() => _HistoricalTrendScreenState();
+}
+
+class _HistoricalTrendScreenState extends State<HistoricalTrendScreen> {
+  int days = 0;
+  @override
   Widget build(BuildContext context) => AnimatedBuilder(
-      animation: store,
+      animation: widget.store,
       builder: (context, _) {
-        final snapshots = wealthHistory(
-            store.state.assets, store.state.liabilities, store.state.valuations);
+        final all = wealthHistory(widget.store.state.assets, widget.store.state.liabilities, widget.store.state.valuations);
+        final now = DateTime.now();
+        final since = now.subtract(Duration(days: days));
+        final snapshots = all.where((s) => !s.at.isAfter(now) && (days == 0 || !s.at.isBefore(since))).toList();
         return WealthPage(
             title: 'Wealth trend',
             subtitle:
                 'Derived from the dated valuations you have recorded. We never fabricate a growth curve.',
             children: [
+              DropdownButtonFormField<int>(initialValue: days, decoration: const InputDecoration(labelText: 'History range'),
+                items: const [DropdownMenuItem(value: 0, child: Text('All dates')), DropdownMenuItem(value: 90, child: Text('Last 90 days')), DropdownMenuItem(value: 365, child: Text('Last year'))],
+                onChanged: (value) => setState(() => days = value ?? 0)),
+              const SizedBox(height: 16),
               if (snapshots.length < 2)
                 const AppEmptyState(
                   title: 'Not enough history yet',
                   detail:
-                      'Record at least two dated valuations for any asset to see a wealth trend. The series uses the freshest value known at each date.',
+                      'Choose a wider period or record more dated valuations. The series uses the freshest value known at each date.',
                   icon: Icons.insights_outlined,
                 )
               else ...[
@@ -570,9 +582,8 @@ class HistoricalTrendScreen extends StatelessWidget {
                           child: Text(LG.date(snapshots[i].at),
                               style: const TextStyle(
                                   fontWeight: FontWeight.w700))),
-                      Text(LG.money(snapshots[i].netWorthUgx, compact: true),
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w800)),
+                      Flexible(child: Text(LG.money(snapshots[i].netWorthUgx), textAlign: TextAlign.end,
+                          style: const TextStyle(fontWeight: FontWeight.w700))),
                     ]),
                     if (i > 0) const Divider(),
                   ],
@@ -600,8 +611,9 @@ class AssetPerformanceScreen extends StatelessWidget {
       animation: store,
       builder: (context, _) {
         final now = DateTime.now();
+        final current = store.state.assets.firstWhere((a) => a.id == asset.id, orElse: () => asset);
         final metrics = assetReturns(
-            asset, store.state.valuations, store.state.events, now);
+            current, store.state.valuations, store.state.events, now);
         final history = store.state.valuations
             .where((v) => v.assetId == asset.id)
             .toList()
@@ -619,7 +631,7 @@ class AssetPerformanceScreen extends StatelessWidget {
 
         return WealthPage(
             title: 'Performance',
-            subtitle: asset.name,
+            subtitle: current.name,
             children: [
               SoftCard(
                   color: LG.navy,
@@ -633,14 +645,14 @@ class AssetPerformanceScreen extends StatelessWidget {
                             letterSpacing: 1.3,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 10),
-                    Text(LG.money(asset.attributableUgx),
+                    Text(LG.money(current.attributableUgx),
                         style: const TextStyle(
                             color: Colors.white,
                             fontSize: 28,
                             fontWeight: FontWeight.w800)),
                     const SizedBox(height: 10),
                     Text(
-                        'Valued ${LG.date(asset.valuedAt)} · ${asset.status.name}',
+                        'Valued ${LG.date(current.valuedAt)} · ${current.status.name}',
                         style: const TextStyle(
                             color: Colors.white70, fontSize: 12)),
                   ])),
@@ -677,8 +689,14 @@ class AssetPerformanceScreen extends StatelessWidget {
                             lineColor: LG.sage,
                             fillColor: LG.sageSoft))),
               ],
+              if (history.isNotEmpty) ...[
+                const SizedBox(height: 18),
+                const SectionTitle('Recorded valuations'),
+                SoftCard(child: Column(children: [for (final v in history)
+                  InfoLabel(label: LG.date(v.asOf), value: LG.money(v.fullValueUgx))])),
+              ],
               const SizedBox(height: 18),
-              const SectionTitle('Cashflows feeding XIRR'),
+              const SectionTitle('Linked cashflows'),
               if (related.isEmpty)
                 const AppEmptyState(
                     title: 'No linked cashflows',
@@ -712,9 +730,8 @@ class AssetPerformanceScreen extends StatelessWidget {
                                 style: const TextStyle(
                                     color: LG.muted, fontSize: 11)),
                           ])),
-                      Text(LG.money(related[i].amountUgx, compact: true),
-                          style:
-                              const TextStyle(fontWeight: FontWeight.w800)),
+                      Flexible(child: Text(LG.money(related[i].amountUgx), textAlign: TextAlign.end,
+                          style: const TextStyle(fontWeight: FontWeight.w700))),
                     ]),
                     if (i < related.length - 1) const Divider(),
                   ]
