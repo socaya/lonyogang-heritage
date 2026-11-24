@@ -40,3 +40,8 @@ This is an incremental implementation, not a 100% completion or production readi
 - Beneficiary basis-point precision preserved, combined share validated before saving, destructive actions confirmed.
 - Goal and schedule date pickers accept existing overdue dates, stable IDs protect retries, trusted contact and schedule deletion require confirmation. Scheduled postings described truthfully as reviewed/manual.
 - Native verification remains outstanding.
+
+## Batch 8 — notifications and reminders
+- Persisted scheduled-contribution preference; inbox and native scheduling use it. Dismissals suppress corresponding native alerts; short lead-time reminders schedule at due date. Added restore-dismissed action and alert detail dismissal.
+- Full reminder add/edit/remove form with stable IDs, validation, failure handling and reactive list. Existing reminder completion preserved. Regression tests added but not run.
+- Overall functional coverage percentage remains unmeasured; 0% independently verified in this environment. Do not count source mapping as implementation.

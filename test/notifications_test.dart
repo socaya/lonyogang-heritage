@@ -111,4 +111,17 @@ void main() {
     ]);
     expect((await scheduler.listPending()).length, 1);
   });
+  test('Scheduled contribution preference persists and suppresses native alerts', () {
+    final options = const NotificationOptions(scheduledContributions:false);
+    expect(NotificationOptions.fromJson(options.toJson()).scheduledContributions,isFalse);
+    final state=PortfolioState(notificationOptions:options,scheduled:[
+      ScheduledContribution(id:'s',name:'Monthly',amountUgx:1000,frequency:ContributionFrequency.monthly,nextFire:now.add(const Duration(days:3))),
+    ]);
+    expect(computeScheduledAlerts(state,now).where((a)=>a.kind==AlertKind.scheduledContribution),isEmpty);
+  });
+  test('Dismissed reminder is not rescheduled',(){
+    final due=now.add(const Duration(days:4));
+    final state=PortfolioState(reminders:[ReminderRecord(id:'r',title:'Task',dueAt:due)],dismissedAlertKeys:{'reminder:r:${due.toIso8601String()}'});
+    expect(computeScheduledAlerts(state,now),isEmpty);
+  });
 }

@@ -479,7 +479,11 @@ class PortfolioStore extends ChangeNotifier {
   }
 
   Future<void> addReminder(ReminderRecord reminder) async {
-    _state = _replace(reminders: [..._state.reminders, reminder]);
+    if (reminder.title.trim().isEmpty) throw ArgumentError('Reminder title is required');
+    final records = [..._state.reminders];
+    final index = records.indexWhere((r) => r.id == reminder.id);
+    if (index < 0) { records.add(reminder); } else { records[index] = reminder; }
+    _state = _replace(reminders: records);
     await _save();
     await _recordOutbox(payloadType: 'reminder', payload: reminder.toJson());
   }

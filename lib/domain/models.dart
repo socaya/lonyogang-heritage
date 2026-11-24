@@ -618,17 +618,18 @@ class NotificationOptions {
   final bool upcomingReminders;
   final bool expiringDocuments;
   final bool staleValuations;
+  final bool scheduledContributions;
   const NotificationOptions({this.upcomingReminders=true,
-    this.expiringDocuments=true,this.staleValuations=true});
+    this.expiringDocuments=true,this.staleValuations=true,this.scheduledContributions=true});
   Json toJson()=>{'upcomingReminders':upcomingReminders,
-    'expiringDocuments':expiringDocuments,'staleValuations':staleValuations};
+    'expiringDocuments':expiringDocuments,'staleValuations':staleValuations,'scheduledContributions':scheduledContributions};
   factory NotificationOptions.fromJson(Json j)=>NotificationOptions(
     upcomingReminders:j['upcomingReminders']!=false,
     expiringDocuments:j['expiringDocuments']!=false,
-    staleValuations:j['staleValuations']!=false);
+    staleValuations:j['staleValuations']!=false,scheduledContributions:j['scheduledContributions']!=false);
   NotificationOptions copyWith({bool? upcomingReminders,bool? expiringDocuments,
-    bool? staleValuations})=>NotificationOptions(
+    bool? staleValuations,bool? scheduledContributions})=>NotificationOptions(
       upcomingReminders:upcomingReminders??this.upcomingReminders,
       expiringDocuments:expiringDocuments??this.expiringDocuments,
-      staleValuations:staleValuations??this.staleValuations);
+      staleValuations:staleValuations??this.staleValuations,scheduledContributions:scheduledContributions??this.scheduledContributions);
 }

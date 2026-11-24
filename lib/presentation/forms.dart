@@ -1398,7 +1398,7 @@ class _ContactFormState extends State<ContactForm> {
 class RemindersScreen extends StatelessWidget {
   final PortfolioStore store;
   const RemindersScreen({super.key,required this.store});
-  @override Widget build(BuildContext context)=>ScreenPage(title:'Reminders',
+  @override Widget build(BuildContext context)=>AnimatedBuilder(animation:store,builder:(context,_)=>ScreenPage(title:'Reminders',
     subtitle:'Dates and tasks you want to keep in view.',children:[
     if(store.state.reminders.isEmpty)const EmptySection(title:'No reminders',detail:'Record a maturity, rent, renewal or contribution date.')
     else ...([...store.state.reminders]..sort((a,b)=>a.dueAt.compareTo(b.dueAt))).map((r)=>Padding(
@@ -1406,25 +1406,52 @@ class RemindersScreen extends StatelessWidget {
         contentPadding:EdgeInsets.zero,value:r.completed,activeColor:LG.sage,
         onChanged:(_)=>store.toggleReminder(r.id),title:Text(r.title,style:TextStyle(
           decoration:r.completed?TextDecoration.lineThrough:null,fontWeight:FontWeight.w700,fontSize:14)),
-        subtitle:Text(LG.date(r.dueAt)),controlAffinity:ListTileControlAffinity.leading)))),
-    const SizedBox(height:16),ElevatedButton.icon(onPressed:()=>_reminderDialog(context,store),icon:const Icon(Icons.add_alert_outlined),label:const Text('Add reminder')),
-    const SizedBox(height:12),const Text('In this offline preview, reminders appear in-app only. System notifications are not yet enabled.',
+        subtitle:Text(LG.date(r.dueAt)),secondary:IconButton(tooltip:'Edit reminder',icon:const Icon(Icons.edit_outlined),onPressed:()=>push(context,ReminderForm(store:store,existing:r))),controlAffinity:ListTileControlAffinity.leading)))),
+    const SizedBox(height:16),ElevatedButton.icon(onPressed:()=>push(context,ReminderForm(store:store)),icon:const Icon(Icons.add_alert_outlined),label:const Text('Add reminder')),
+    const SizedBox(height:12),const Text('Reminders appear in-app. Device notifications depend on platform support and permissions.',
       style:TextStyle(color:LG.muted,fontSize:11)),
-  ]);
+  ]));
 }
-Future<void> _reminderDialog(BuildContext context,PortfolioStore store)async{
-  final controller=TextEditingController();DateTime due=DateTime.now().add(const Duration(days:7));
-  await showDialog<void>(context:context,builder:(ctx)=>StatefulBuilder(builder:(ctx,setDialog)=>AlertDialog(
-    title:const Text('Add reminder'),content:Column(mainAxisSize:MainAxisSize.min,children:[
-      TextField(controller:controller,decoration:const InputDecoration(labelText:'Reminder title')),
-      const SizedBox(height:14),TextButton.icon(onPressed:()async{final p=await showDatePicker(context:ctx,
-        initialDate:due,firstDate:DateTime(2020),lastDate:DateTime(2100));if(p!=null)setDialog(()=>due=p);},
-        icon:const Icon(Icons.calendar_month),label:Text(LG.date(due))),
-    ]),actions:[TextButton(onPressed:()=>Navigator.pop(ctx),child:const Text('Cancel')),
-      TextButton(onPressed:()async{if(controller.text.trim().isEmpty)return;
-        await store.addReminder(ReminderRecord(id:makeId(),title:controller.text.trim(),dueAt:due));
-        if(ctx.mounted)Navigator.pop(ctx);},child:const Text('Save'))])));
-  controller.dispose();
+class ReminderForm extends StatefulWidget {
+  final PortfolioStore store;
+  final ReminderRecord? existing;
+  const ReminderForm({super.key, required this.store, this.existing});
+  @override State<ReminderForm> createState()=>_ReminderFormState();
+}
+class _ReminderFormState extends State<ReminderForm> {
+  final form=GlobalKey<FormState>();
+  late final title=TextEditingController(text:widget.existing?.title??'');
+  late final id=widget.existing?.id??makeId();
+  late DateTime due=widget.existing?.dueAt??DateTime.now().add(const Duration(days:7));
+  bool busy=false;
+  @override void dispose(){title.dispose();super.dispose();}
+  Future<void> save() async {
+    if(busy||!form.currentState!.validate())return;
+    setState(()=>busy=true);
+    try {
+      await widget.store.addReminder(ReminderRecord(id:id,title:title.text.trim(),dueAt:due,completed:widget.existing?.completed??false));
+      if(mounted)Navigator.of(context).pop();
+    } catch (_) {if(mounted)snack(context,'Could not save reminder. Try again.');}
+    finally {if(mounted)setState(()=>busy=false);}
+  }
+  @override Widget build(BuildContext context)=>ScreenPage(title:widget.existing==null?'Add reminder':'Edit reminder',children:[
+    Form(key:form,child:Column(children:[
+      FormFieldBlock(title:'Reminder title',required:true,child:TextFormField(controller:title,validator:(v)=>v==null||v.trim().isEmpty?'Required':null)),
+      FormFieldBlock(title:'Due date',required:true,child:OutlinedButton.icon(icon:const Icon(Icons.calendar_today_outlined),label:Text(LG.date(due)),onPressed:busy?null:()async{
+        final selected=await showDatePicker(context:context,initialDate:due,firstDate:DateTime(due.year<1900?due.year:1900),lastDate:DateTime(due.year>2200?due.year+1:2201));
+        if(mounted&&selected!=null)setState(()=>due=selected);
+      })),
+    ])),
+    PrimaryCTA(label:'Save reminder',loading:busy,onPressed:save),
+    if(widget.existing!=null)TextButton(onPressed:busy?null:()async{
+      final ok=await confirmActionSheet(context,title:'Remove reminder?',consequence:'The reminder and its future alerts will be removed.',confirmLabel:'Remove');
+      if(!ok||!mounted||busy)return;
+      setState(()=>busy=true);
+      try {await widget.store.removeReminder(id);if(mounted)Navigator.of(context).pop();}
+      catch(_){if(mounted)snack(context,'Could not remove reminder. Try again.');}
+      finally{if(mounted)setState(()=>busy=false);}
+    },child:const Text('Remove reminder',style:TextStyle(color:LG.negative))),
+  ]);
 }
 
 class SettingsScreen extends StatelessWidget {

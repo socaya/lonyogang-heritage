@@ -6,6 +6,7 @@ import '../data/portfolio_store.dart';
 import '../data/remote_sync.dart';
 import '../domain/models.dart';
 import 'components.dart';
+import 'analysis_screens.dart';
 import 'detail_screens.dart';
 import 'forms.dart';
 import 'online_privacy_screen.dart';
@@ -369,7 +370,7 @@ class _BeneficiaryFormScreenState extends State<BeneficiaryFormScreen> {
     ]))));
 }
 
-enum LocalAlertSource { reminder, documentExpiry, staleValuation }
+enum LocalAlertSource { reminder, documentExpiry, staleValuation, scheduledContribution }
 
 class LocalAlert {
   final LocalAlertSource source;
@@ -402,7 +403,7 @@ List<LocalAlert> buildLocalAlerts(PortfolioState state, DateTime now) {
       state.dismissedAlertKeys.contains(localAlertKey(s, id, occ));
   if (state.notificationOptions.upcomingReminders) {
     for (final r in state.reminders.where((x) => !x.completed)) {
-      final delta = r.dueAt.difference(now).inDays;
+      final delta = DateUtils.dateOnly(r.dueAt.toLocal()).difference(DateUtils.dateOnly(now.toLocal())).inDays;
       if (delta <= 30) {
         if (isDismissed(LocalAlertSource.reminder, r.id, r.dueAt)) continue;
         out.add(LocalAlert(
@@ -419,7 +420,7 @@ List<LocalAlert> buildLocalAlerts(PortfolioState state, DateTime now) {
   }
   if (state.notificationOptions.expiringDocuments) {
     for (final d in state.documents.where((x) => !x.archived && x.expiresAt != null)) {
-      final delta = d.expiresAt!.difference(now).inDays;
+      final delta = DateUtils.dateOnly(d.expiresAt!.toLocal()).difference(DateUtils.dateOnly(now.toLocal())).inDays;
       if (delta <= 60) {
         if (isDismissed(LocalAlertSource.documentExpiry, d.id, d.expiresAt!)) continue;
         out.add(LocalAlert(
@@ -448,6 +449,14 @@ List<LocalAlert> buildLocalAlerts(PortfolioState state, DateTime now) {
           occurrence: a.valuedAt,
         ));
       }
+    }
+  }
+  if (state.notificationOptions.scheduledContributions) {
+    for (final s in state.scheduled.where((s) => s.active && !s.nextFire.isAfter(now.add(const Duration(days: 30))))) {
+      if (isDismissed(LocalAlertSource.scheduledContribution, s.id, s.nextFire)) continue;
+      out.add(LocalAlert(source: LocalAlertSource.scheduledContribution, sourceId: s.id, title: s.name,
+        detail: 'Contribution due ${LG.date(s.nextFire)}', icon: Icons.event_repeat_outlined,
+        urgent: s.nextFire.isBefore(now), occurrence: s.nextFire));
     }
   }
   return out..sort((a, b) => a.occurrence.compareTo(b.occurrence));
@@ -598,6 +607,11 @@ class NotificationDetailScreen extends StatelessWidget {
             onPressed: () async => _openSource(context),
           ),
           const SizedBox(height: 10),
+          TextButton(onPressed: () async {
+            try { await store.dismissAlert(localAlertKey(alert.source, alert.sourceId, alert.occurrence));
+              if (context.mounted) Navigator.of(context).pop();
+            } catch (_) { if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not dismiss alert. Try again.'))); }
+          }, child: const Text('Dismiss alert')),
           TextButton(
               onPressed: () => openWealthPage(
                   context, NotificationPreferencesScreen(store: store)),
@@ -612,6 +626,8 @@ class NotificationDetailScreen extends StatelessWidget {
 
   Future<void> _openSource(BuildContext context) async {
     switch (alert.source) {
+      case LocalAlertSource.scheduledContribution:
+        openWealthPage(context, ScheduledContributionsScreen(store: store));
       case LocalAlertSource.reminder:
         openWealthPage(context, RemindersScreen(store: store));
       case LocalAlertSource.documentExpiry:
@@ -638,6 +654,7 @@ class NotificationDetailScreen extends StatelessWidget {
 
   static String _sourceLabel(LocalAlertSource s) => switch (s) {
         LocalAlertSource.reminder => 'Reminder',
+        LocalAlertSource.scheduledContribution => 'Scheduled contribution',
         LocalAlertSource.documentExpiry => 'Document renewal',
         LocalAlertSource.staleValuation => 'Stale valuation',
       };
@@ -664,9 +681,14 @@ class NotificationPreferencesScreen extends StatelessWidget {
           subtitle:const Text('Valuations older than one year'),
           value:options.staleValuations,activeTrackColor:LG.sageSoft,
           onChanged:(v)=>store.updateNotificationOptions(options.copyWith(staleValuations:v))),
+        const Divider(),
+        SwitchListTile.adaptive(contentPadding:EdgeInsets.zero,title:const Text('Scheduled contributions'),
+          subtitle:const Text('Contributions due within 30 days'),value:options.scheduledContributions,
+          onChanged:(v)=>store.updateNotificationOptions(store.state.notificationOptions.copyWith(scheduledContributions:v))),
       ])),const SizedBox(height:18),
+      if(store.state.dismissedAlertKeys.isNotEmpty) TextButton(onPressed:() async {await store.clearDismissedAlerts();},child:const Text('Restore dismissed alerts')),
       const SoftCard(color:LG.sageSoft,child:Text(
-        'Preferences apply only to the on-screen notification center. No system notifications, SMS or email are sent.',
+        'Preferences apply to in-app alerts and native notifications where supported and permitted. No SMS or email is sent.',
         style:TextStyle(color:LG.muted,fontSize:12,height:1.5))),
     ]);
   });

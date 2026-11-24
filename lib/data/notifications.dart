@@ -46,9 +46,12 @@ List<ScheduledAlert> computeScheduledAlerts(
   final out = <ScheduledAlert>[];
   final opts = state.notificationOptions;
 
+  bool dismissed(String source, String id, DateTime at) => state.dismissedAlertKeys.contains('$source:$id:${at.toIso8601String()}');
   if (opts.upcomingReminders) {
     for (final r in state.reminders.where((x) => !x.completed)) {
-      final fire = r.dueAt.subtract(reminderLead);
+      if (dismissed('reminder', r.id, r.dueAt)) continue;
+      final lead = r.dueAt.subtract(reminderLead);
+      final fire = lead.isAfter(now) ? lead : r.dueAt;
       if (fire.isAfter(now)) {
         out.add(ScheduledAlert(
           id: 'reminder-${r.id}',
@@ -63,7 +66,9 @@ List<ScheduledAlert> computeScheduledAlerts(
 
   if (opts.expiringDocuments) {
     for (final d in state.documents.where((x) => !x.archived && x.expiresAt != null)) {
-      final fire = d.expiresAt!.subtract(documentLead);
+      if (dismissed('documentExpiry', d.id, d.expiresAt!)) continue;
+      final lead = d.expiresAt!.subtract(documentLead);
+      final fire = lead.isAfter(now) ? lead : d.expiresAt!;
       if (fire.isAfter(now)) {
         out.add(ScheduledAlert(
           id: 'document-${d.id}',
@@ -76,8 +81,8 @@ List<ScheduledAlert> computeScheduledAlerts(
     }
   }
 
-  for (final s in dueSchedules(state.scheduled, now.add(const Duration(days: 30)))) {
-    if (s.nextFire.isAfter(now)) {
+  if (opts.scheduledContributions) for (final s in dueSchedules(state.scheduled, now.add(const Duration(days: 30)))) {
+    if (s.nextFire.isAfter(now) && !dismissed('scheduledContribution', s.id, s.nextFire)) {
       out.add(ScheduledAlert(
         id: 'schedule-${s.id}',
         title: 'Scheduled contribution due',
@@ -95,6 +100,7 @@ List<ScheduledAlert> computeScheduledAlerts(
     //   - already stale → fire a "please re-value" alert right now so the
     //     user is not left ignorant about a year-old number.
     for (final a in state.assets.where((x) => !x.archived)) {
+      if (dismissed('staleValuation', a.id, a.valuedAt)) continue;
       final aging = now.difference(a.valuedAt);
       final fireAt = aging > staleAfter ? now : a.valuedAt.add(staleAfter);
       out.add(ScheduledAlert(
