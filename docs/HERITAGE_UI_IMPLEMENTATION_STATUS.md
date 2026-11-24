@@ -63,3 +63,8 @@ This is an incremental implementation, not a 100% completion or production readi
 - Server-side resend rotation and independent Flutter email and authenticator routes use restricted sign-in challenges. Registration verifies all required channels before navigating to sign-in; no registration password is reused to issue sessions.
 - Legacy password session issuance removed from client and service. Historical POST /identity/sessions now issues only a challenge (202), never credentials. The separate passkey authentication path remains unchanged.
 - Existing integration test callers of the historical endpoint require contract migration; native and backend builds and tests have not yet been executed. Mandatory password authentication source changes are committed; release readiness is not established.
+
+## Batch 12a — shared responsive UI foundation
+- Adaptive page gutters and centered maximum content widths on AppPage and WealthPage; keyboard dismissal on scroll; orientation lock removed to allow platform-supported landscape.
+- Responsive heading and detail label/value rows, wrapping form labels, 48dp filter targets with selected semantics and reduced-motion support, scrollable confirmation sheets, wrapped error and list headings. Existing logo and palette preserved.
+- Native viewport and text-scale tests remain unexecuted; individual screen overflow and tablet layouts remain to be audited. No claim of overall screen completion.

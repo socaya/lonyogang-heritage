@@ -21,9 +21,9 @@ class WealthPage extends StatelessWidget {
   const WealthPage({super.key,required this.title,this.subtitle='',required this.children});
   @override Widget build(BuildContext context)=>Scaffold(
     appBar:AppBar(title:const BrandMark(height:29)),
-    body:SafeArea(child:ListView(padding:const EdgeInsets.fromLTRB(LG.hPad,18,LG.hPad,36),children:[
+    body:SafeArea(child:LayoutBuilder(builder:(context,c)=>ListView(keyboardDismissBehavior:ScrollViewKeyboardDismissBehavior.onDrag,padding:pageInsets(c.maxWidth,top:18,bottom:36),children:[
       PageHeading(title,subtitle:subtitle.isEmpty?null:subtitle),...children,
-    ])),
+    ]))),
   );
 }
 

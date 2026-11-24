@@ -31,25 +31,17 @@ class AppPage extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: background,
-        appBar: appBar,
-        bottomNavigationBar: bottomBar,
-        body: SafeArea(
-          child: withScroll
-              ? SingleChildScrollView(
-                  padding: padding,
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: children))
-              : Padding(
-                  padding: padding,
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: children),
-                ),
-        ),
-      );
+  Widget build(BuildContext context)=>Scaffold(
+    backgroundColor:background,
+    appBar:appBar,bottomNavigationBar:bottomBar,
+    body:SafeArea(child:LayoutBuilder(builder:(context,c){
+      final adaptive=padding==const EdgeInsets.fromLTRB(LG.hPad,20,LG.hPad,32)
+        ?pageInsets(c.maxWidth,maxWidth:680):padding;
+      final content=Column(crossAxisAlignment:CrossAxisAlignment.start,children:children);
+      return withScroll?SingleChildScrollView(keyboardDismissBehavior:ScrollViewKeyboardDismissBehavior.onDrag,padding:adaptive,child:content)
+        :Padding(padding:adaptive,child:content);
+    })),
+  );
 }
 
 /// A back button + optional step pill + compact brand, matching the top
@@ -459,8 +451,8 @@ Future<bool> confirmActionSheet(BuildContext context, {
     showDragHandle: true,
     isScrollControlled: true,
     builder: (ctx) => SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(LG.hPad, 4, LG.hPad, 20),
+      child: SingleChildScrollView(
+        padding: EdgeInsets.fromLTRB(LG.hPad, 4, LG.hPad, 20 + MediaQuery.viewInsetsOf(ctx).bottom),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -536,8 +528,8 @@ class ErrorState extends StatelessWidget {
           const Row(children: [
             Icon(Icons.error_outline, color: LG.negative),
             SizedBox(width: 10),
-            Text('Something went wrong',
-                style: TextStyle(fontWeight: FontWeight.w700)),
+            Expanded(child:Text('Something went wrong',
+                style: TextStyle(fontWeight: FontWeight.w700))),
           ]),
           const SizedBox(height: 8),
           Text(message, style: const TextStyle(color: LG.muted, height: 1.5)),
@@ -608,9 +600,9 @@ class ListHeaderRow extends StatelessWidget {
               child: Text(leading,
                   style: Theme.of(context).textTheme.titleMedium)),
           if (trailing != null)
-            Text(trailing!,
+            Flexible(child:Text(trailing!,textAlign:TextAlign.end,
                 style: const TextStyle(
-                    fontWeight: FontWeight.w700, fontSize: 14)),
+                    fontWeight: FontWeight.w700, fontSize: 14))),
         ]),
       );
 }

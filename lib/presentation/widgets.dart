@@ -2,6 +2,16 @@ import 'package:flutter/material.dart';
 import '../core/design.dart';
 import '../domain/models.dart';
 
+/// Shared page grid: compact 16, standard 20, wide 24 logical pixels.
+double pageGutter(double width) => width < 360 ? 16 : width < 430 ? 20 : 24;
+EdgeInsets pageInsets(double width,{double top=20,double bottom=32,double maxWidth=840}) {
+  final gutter=pageGutter(width);
+  final horizontal=width>maxWidth? (width-maxWidth)/2+gutter:gutter;
+  return EdgeInsets.fromLTRB(horizontal,top,horizontal,bottom);
+}
+bool stackedLayout(BuildContext context,double width) =>
+    width < 300 || MediaQuery.textScalerOf(context).scale(15)>19.5;
+
 class BrandMark extends StatelessWidget {
   final double height;
   const BrandMark({super.key,this.height=38});
@@ -25,32 +35,19 @@ class PageHeading extends StatelessWidget {
   final String title;
   final String? subtitle;
   final Widget? trailing;
-  const PageHeading(this.title, {super.key, this.subtitle, this.trailing});
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 26),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: Theme.of(context).textTheme.headlineMedium),
-                  if (subtitle != null) ...[
-                    const SizedBox(height: 10),
-                    Text(subtitle!,
-                        style: const TextStyle(
-                            color: LG.muted, fontSize: 15, height: 1.5)),
-                  ],
-                ],
-              ),
-            ),
-            if (trailing != null) trailing!
-          ],
-        ),
-      );
+  const PageHeading(this.title,{super.key,this.subtitle,this.trailing});
+  @override Widget build(BuildContext context)=>Padding(
+    padding:const EdgeInsets.only(bottom:24),
+    child:LayoutBuilder(builder:(context,c){
+      final heading=Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
+        Semantics(header:true,child:Text(title,style:Theme.of(context).textTheme.headlineMedium)),
+        if(subtitle!=null)...[const SizedBox(height:8),Text(subtitle!,style:Theme.of(context).textTheme.bodyMedium?.copyWith(color:LG.muted))],
+      ]);
+      if(trailing==null)return heading;
+      if(stackedLayout(context,c.maxWidth))return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[heading,const SizedBox(height:12),trailing!]);
+      return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:heading),const SizedBox(width:12),Flexible(child:trailing!)]);
+    }),
+  );
 }
 
 class SoftCard extends StatelessWidget {
@@ -80,38 +77,25 @@ class SectionTitle extends StatelessWidget {
             Expanded(
                 child: Text(title,
                     style: Theme.of(context).textTheme.titleMedium)),
-            if (action != null) action!
+            if (action != null) Flexible(child:action!)
           ],
         ),
       );
 }
 
 class InfoLabel extends StatelessWidget {
-  final String label;
-  final String value;
+  final String label,value;
   final Color? valueColor;
-  const InfoLabel(
-      {super.key, required this.label, required this.value, this.valueColor});
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 11),
-        child: Row(
-          children: [
-            Expanded(
-                child: Text(label,
-                    style: const TextStyle(
-                        color: LG.muted, fontSize: 14, height: 1.3))),
-            Flexible(
-              child: Text(value,
-                  style: TextStyle(
-                      color: valueColor ?? LG.navy,
-                      fontWeight: FontWeight.w700,
-                      fontSize: 14),
-                  textAlign: TextAlign.end),
-            ),
-          ],
-        ),
-      );
+  const InfoLabel({super.key,required this.label,required this.value,this.valueColor});
+  @override Widget build(BuildContext context)=>Padding(
+    padding:const EdgeInsets.symmetric(vertical:10),
+    child:LayoutBuilder(builder:(context,c){
+      final name=Text(label,style:const TextStyle(color:LG.muted,fontSize:14,height:1.3));
+      final detail=Text(value,style:TextStyle(color:valueColor??LG.navy,fontWeight:FontWeight.w700,fontSize:14),textAlign:stackedLayout(context,c.maxWidth)?TextAlign.start:TextAlign.end);
+      if(stackedLayout(context,c.maxWidth))return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[name,const SizedBox(height:4),detail]);
+      return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:name),const SizedBox(width:12),Expanded(child:detail)]);
+    }),
+  );
 }
 
 /// Pill-shaped filter chip used across the portfolio / transactions /
@@ -122,35 +106,18 @@ class LGFilterChip extends StatelessWidget {
   final String label;
   final bool selected;
   final VoidCallback onTap;
-  const LGFilterChip(
-      {super.key,
-      required this.label,
-      required this.selected,
-      required this.onTap});
-  @override
-  Widget build(BuildContext context) => Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 160),
-            padding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
-            decoration: BoxDecoration(
-              color: selected ? LG.goldSoft : LG.white,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                  color: selected ? LG.gold : LG.line, width: 1.2),
-            ),
-            child: Text(label,
-                style: TextStyle(
-                    color: LG.navy,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
-          ),
-        ),
-      );
+  const LGFilterChip({super.key,required this.label,required this.selected,required this.onTap});
+  @override Widget build(BuildContext context)=>Semantics(
+    selected:selected,button:true,
+    child:Material(color:Colors.transparent,child:InkWell(onTap:onTap,borderRadius:BorderRadius.circular(8),
+      child:AnimatedContainer(duration:MediaQuery.disableAnimationsOf(context)?Duration.zero:const Duration(milliseconds:160),
+        constraints:const BoxConstraints(minHeight:48,minWidth:48),
+        padding:const EdgeInsets.symmetric(horizontal:12,vertical:12),
+        decoration:BoxDecoration(color:selected?LG.goldSoft:LG.white,borderRadius:BorderRadius.circular(8),border:Border.all(color:selected?LG.gold:LG.line,width:1.2)),
+        child:Text(label,style:const TextStyle(color:LG.navy,fontSize:13,fontWeight:FontWeight.w600)),
+      ),
+    )),
+  );
 }
 
 class Pill extends StatelessWidget {
@@ -374,15 +341,15 @@ class FormFieldBlock extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
-                Text(title,
+                Flexible(child:Text(title,
                     style: const TextStyle(
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w600,
                         fontSize: 15,
                         color: LG.navy,
-                        letterSpacing: -.1)),
+                        letterSpacing: -.1))),
                 if (required) ...[
                   const SizedBox(width: 6),
-                  const Text('•',
+                  const Text('*',
                       style: TextStyle(
                           color: LG.gold,
                           fontSize: 15,

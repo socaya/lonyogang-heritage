@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 
 import 'core/design.dart';
 import 'data/attachment_syncer.dart';
@@ -21,7 +20,6 @@ import 'presentation/online_scope.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
   final outbox = SyncOutbox();
   final NotificationScheduler scheduler =
       kIsWeb ? NoopNotificationScheduler() : LocalNotificationScheduler();
