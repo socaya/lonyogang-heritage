@@ -163,7 +163,7 @@ class _LonyoGangAppState extends State<LonyoGangApp>
 
   Future<void> _runRemoteSync() async {
     final sync = widget.sync;
-    if (sync == null) return;
+    if (sync == null || !widget.store.isLoaded || !widget.store.isUnlocked || widget.store.loadError!=null || widget.store.isDemo) return;
     try {
       // Opportunistic attachment upload retry — picks up anything that
       // was attached while offline so the document rows the outbox has
@@ -178,7 +178,7 @@ class _LonyoGangAppState extends State<LonyoGangApp>
 
   Future<void> _syncScheduler() async {
     final scheduler = widget.scheduler;
-    if (scheduler == null || !_schedulerReady) return;
+    if (scheduler == null || !_schedulerReady || !widget.store.isLoaded || !widget.store.isUnlocked || widget.store.loadError!=null) return;
     try {
       await scheduler.syncWith(
           computeScheduledAlerts(widget.store.state, DateTime.now()));

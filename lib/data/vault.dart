@@ -59,12 +59,22 @@ class Vault extends ChangeNotifier {
   Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(metadataKey);
-    if (raw == null) return;
+    if (raw == null) {
+      if(prefs.containsKey(encryptedPayloadKey))throw const FormatException('Encrypted vault metadata is missing');
+      _metadata=const VaultMetadata(mode:LockMode.none,salt:[]);
+      _activeKey=null;
+      return;
+    }
     try {
-      _metadata = VaultMetadata.fromJson(
-        jsonDecode(raw) as Map<String, dynamic>);
+      final decoded=jsonDecode(raw) as Map<String,dynamic>;
+      if(!LockMode.values.any((mode)=>mode.name==decoded['mode']))throw const FormatException('Invalid vault mode');
+      final metadata=VaultMetadata.fromJson(decoded);
+      if(metadata.mode==LockMode.passphrase&&(metadata.salt.isEmpty||metadata.fingerprint==null||!prefs.containsKey(encryptedPayloadKey)))throw const FormatException('Incomplete encrypted vault');
+      if(metadata.mode==LockMode.none&&prefs.containsKey(encryptedPayloadKey))throw const FormatException('Conflicting vault storage');
+      _metadata=metadata;
+      _activeKey=null;
     } catch (_) {
-      _metadata = const VaultMetadata(mode: LockMode.none, salt: []);
+      throw const FormatException('Vault metadata could not be read');
     }
   }
 

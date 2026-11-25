@@ -28,59 +28,44 @@ class SplashScreen extends StatefulWidget {
   State<SplashScreen> createState() => _SplashScreenState();
 }
 
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    unawaited(_bootstrap());
+class _SplashScreenState extends State<SplashScreen>{
+  bool busy=true;
+  bool failed=false;
+  @override void initState(){super.initState();unawaited(_bootstrap());}
+  Future<void> _bootstrap()async{
+    if(mounted)setState((){busy=true;failed=false;});
+    try{
+      await Future.wait([Future<void>.delayed(widget.minimumVisible),widget.store.load()]);
+      if(widget.store.loadError!=null)throw StateError('Local storage unavailable');
+      if(!mounted)return;
+      await widget.onReady(context);
+    }catch(_){if(mounted)setState(()=>failed=true);}
+    finally{if(mounted)setState(()=>busy=false);}
   }
-
-  Future<void> _bootstrap() async {
-    final waited = Future<void>.delayed(widget.minimumVisible);
-    await Future.wait([waited, widget.store.load()]);
-    if (!mounted) return;
-    await widget.onReady(context);
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: LG.navyDark,
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(LG.hPad),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Spacer(flex: 2),
-                const Center(child: ColoredBox(color: LG.ivory, child: Padding(padding: EdgeInsets.all(16), child: BrandMark(height: 72)))),
-                const SizedBox(height: 36),
-                const Center(
-                  child: Text(
-                    'Your wealth, in one steady view.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        color: LG.ivory, fontSize: 14, height: 1.5),
-                  ),
-                ),
-                const Spacer(flex: 3),
-                const Center(
-                    child: SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: CircularProgressIndicator(strokeWidth: 2, color: LG.gold))),
-                const SizedBox(height: 16),
-                const Center(
-                  child: Text(
-                    'Loading your local portfolio',
-                    style: TextStyle(color: LG.ivory, fontSize: 12),
-                  ),
-                ),
-                const Spacer(),
-              ],
-            ),
-          ),
-        ),
-      );
+  @override Widget build(BuildContext context)=>Scaffold(backgroundColor:LG.navyDark,body:SafeArea(child:LayoutBuilder(builder:(context,c)=>SingleChildScrollView(
+    padding:pageInsets(c.maxWidth,top:32,bottom:32,maxWidth:560),
+    child:ConstrainedBox(constraints:BoxConstraints(minHeight:(c.maxHeight-64).clamp(0.0,double.infinity).toDouble()),
+      child:Column(mainAxisAlignment:MainAxisAlignment.center,children:[
+        const ColoredBox(color:LG.ivory,child:Padding(padding:EdgeInsets.all(16),child:BrandMark(height:64))),
+        const SizedBox(height:32),
+        const Text('Your wealth, in one steady view.',textAlign:TextAlign.center,style:TextStyle(color:LG.ivory,fontSize:16,height:1.5)),
+        const SizedBox(height:32),
+        if(busy)...[
+          const CircularProgressIndicator(color:LG.darkGold,strokeWidth:2),
+          const SizedBox(height:16),
+          const Text('Opening your portfolio…',style:TextStyle(color:LG.ivory),textAlign:TextAlign.center),
+        ]else if(failed)...[
+          const Icon(Icons.error_outline,color:LG.darkNegative,size:40),
+          const SizedBox(height:12),
+          const Text('Unable to open your portfolio',style:TextStyle(color:LG.ivory,fontSize:20,fontWeight:FontWeight.w700),textAlign:TextAlign.center),
+          const SizedBox(height:8),
+          const Text('Your saved records have not been reset. Retry opening local storage.',style:TextStyle(color:LG.darkMuted),textAlign:TextAlign.center),
+          const SizedBox(height:20),
+          ElevatedButton(onPressed:_bootstrap,style:ElevatedButton.styleFrom(backgroundColor:LG.darkGold,foregroundColor:LG.navy),child:const Text('Retry')),
+        ],
+      ]),
+    ),
+  ))));
 }
 
 /// Canonical flat **Create Account** (step 1 of 2). This is a *prototype*

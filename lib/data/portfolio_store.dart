@@ -117,17 +117,25 @@ class PortfolioStore extends ChangeNotifier {
   DateTime? get lastSavedAt => _lastSavedAt;
 
   Future<void> load() async {
-    await vault.load();
+    _loaded=false;
+    loadError=null;
     try {
+      await vault.load();
       final raw = await vault.readPayload();
       if (raw != null) {
         _state = PortfolioState.fromJson(jsonDecode(raw) as Json);
       }
       loadError = null;
     } on StateError {
-      // Vault is locked; wait for an unlock call.
-    } catch (e) {
+      if(!vault.hasPassphrase || vault.isUnlocked){
+        loadError='Saved local data could not be loaded. Nothing was deleted.';
+        notifyListeners();
+        rethrow;
+      }
+    } catch (_) {
       loadError = 'Saved local data could not be loaded. Nothing was deleted.';
+      notifyListeners();
+      rethrow;
     }
     _loaded = true;
     notifyListeners();
@@ -139,14 +147,18 @@ class PortfolioStore extends ChangeNotifier {
       _state = PortfolioState.fromJson(jsonDecode(raw) as Json);
       loadError = null;
     } catch (_) {
-      loadError = 'Vault unlocked, but contents could not be parsed.';
+      vault.lock();
+      loadError = 'Vault contents could not be parsed. Nothing was deleted.';
+      notifyListeners();
+      rethrow;
     }
     notifyListeners();
   }
 
   Future<void> unlockWithBiometrics() async {
     final raw = await vault.unlockWithBiometricStash();
-    _state = PortfolioState.fromJson(jsonDecode(raw) as Json);
+    try{_state=PortfolioState.fromJson(jsonDecode(raw) as Json);loadError=null;}
+    catch(_){vault.lock();loadError='Vault contents could not be parsed. Nothing was deleted.';notifyListeners();rethrow;}
     notifyListeners();
   }
 
