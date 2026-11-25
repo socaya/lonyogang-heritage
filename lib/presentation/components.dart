@@ -466,7 +466,7 @@ Future<bool> confirmActionSheet(BuildContext context, {
             ]),
             const SizedBox(height: 10),
             Text(consequence,
-                style: const TextStyle(color: LG.adaptive(context,LG.muted), height: 1.5)),
+                style: TextStyle(color: LG.adaptive(context,LG.muted), height: 1.5)),
             const SizedBox(height: 18),
             PrimaryCTA(
               label: confirmLabel,
@@ -477,7 +477,7 @@ Future<bool> confirmActionSheet(BuildContext context, {
             TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
                 child: Text(cancelLabel,
-                    style: const TextStyle(color: LG.adaptive(context,LG.muted)))),
+                    style: TextStyle(color: LG.adaptive(context,LG.muted)))),
           ],
         ),
       ),
@@ -502,7 +502,7 @@ class LoadingState extends StatelessWidget {
                 child: CircularProgressIndicator(strokeWidth: 2)),
             if (message != null) ...[
               const SizedBox(height: 16),
-              Text(message!, style: const TextStyle(color: LG.adaptive(context,LG.muted))),
+              Text(message!, style: TextStyle(color: LG.adaptive(context,LG.muted))),
             ],
           ],
         ),
@@ -532,7 +532,7 @@ class ErrorState extends StatelessWidget {
                 style: TextStyle(fontWeight: FontWeight.w700))),
           ]),
           const SizedBox(height: 8),
-          Text(message, style: const TextStyle(color: LG.adaptive(context,LG.muted), height: 1.5)),
+          Text(message, style: TextStyle(color: LG.adaptive(context,LG.muted), height: 1.5)),
           if (onRetry != null) ...[
             const SizedBox(height: 10),
             OutlinedButton.icon(

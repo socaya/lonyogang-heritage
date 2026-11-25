@@ -414,7 +414,7 @@ class _SignInScreenState extends State<SignInScreen> {
   final form=GlobalKey<FormState>();
   final email=TextEditingController();
   final password=TextEditingController();
-  bool busy=false;
+  bool busy=false,showPassword=false;
   String? error;
   @override void dispose(){email.dispose();password.dispose();super.dispose();}
   Future<void> submit() async {
@@ -433,36 +433,37 @@ class _SignInScreenState extends State<SignInScreen> {
       final challenge=await remote.beginSignIn(email:address,password:password.text,deviceId:deviceId);
       if(!mounted){try{await remote.cancelSignIn(challenge);}catch(_){}return;}
       password.clear();
+      if(challenge.method!='totp'&&challenge.method!='email'){await remote.cancelSignIn(challenge);if(mounted)setState(()=>error='Unsupported verification method. Contact support.');return;}
       final verified=await Navigator.of(context).push<bool>(MaterialPageRoute(builder:(_)=>challenge.method=='totp'
         ?AuthenticatorSignInScreen(remote:remote,challenge:challenge)
         :EmailOtpSignInScreen(remote:remote,challenge:challenge)));
       if(verified!=true){try{await remote.cancelSignIn(challenge);}catch(_){}return;}
       if(!mounted)return;
       password.clear();
-      Navigator.of(context).popUntil((r)=>r.isFirst);
-      unawaited(scope.onSignInSuccess?.call()??remote.sync());
+      try{await (scope.onSignInSuccess?.call()??remote.sync());}catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Signed in. Synchronization is not yet complete.')));}
+      if(mounted)Navigator.of(context).popUntil((r)=>r.isFirst);
     } on HttpException catch(e){
       if(mounted)setState(()=>error=e.message.contains('bad_credentials')?'Email or password is incorrect.':'Sign-in failed. Try again.');
     } catch(_){if(mounted)setState(()=>error='Unable to sign in. Check your connection and try again.');}
     finally{if(mounted)setState(()=>busy=false);}
   }
-  @override Widget build(BuildContext context)=>AppPage(appBar:const AppHeader(),children:[
-    const Center(child:BrandMark(height:32)),
-    const SizedBox(height:28),
+  @override Widget build(BuildContext context)=>PopScope(canPop:!busy,child:AppPage(appBar:AppHeader(onBack:busy?(){}:null),children:[
+    const SizedBox(height:16),
     const PageHeading('Welcome back',subtitle:'Sign in to your LonyoGang Heritage account.'),
-    Form(key:form,child:Column(children:[
+    AutofillGroup(child:Form(key:form,child:Column(children:[
       FormFieldBlock(title:'Email',required:true,child:TextFormField(controller:email,enabled:!busy,keyboardType:TextInputType.emailAddress,
         autofillHints:const [AutofillHints.email],textInputAction:TextInputAction.next,
         validator:(v)=>isLikelyEmail(v??'')?null:'Enter a valid email')),
-      FormFieldBlock(title:'Password',required:true,child:TextFormField(controller:password,enabled:!busy,obscureText:true,
+      FormFieldBlock(title:'Password',required:true,child:TextFormField(controller:password,enabled:!busy,obscureText:!showPassword,textInputAction:TextInputAction.done,onFieldSubmitted:(_)=>submit(),
+        decoration:InputDecoration(suffixIcon:IconButton(tooltip:showPassword?'Hide password':'Show password',onPressed:busy?null:()=>setState(()=>showPassword=!showPassword),icon:Icon(showPassword?Icons.visibility_off:Icons.visibility))),
         autofillHints:const [AutofillHints.password],validator:(v)=>v==null||v.isEmpty?'Enter your password':null)),
-    ])),
-    if(error!=null)Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative))),
+    ]))),
+    if(error!=null)Semantics(liveRegion:true,child:Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative)))),
     Align(alignment:Alignment.centerRight,child:TextButton(onPressed:busy?null:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>const RecoverAccountScreen())),child:const Text('Forgot password?'))),
-    PrimaryCTA(label:'Continue',loading:busy,onPressed:submit),
+    PrimaryCTA(label:'Continue',loading:busy,onPressed:OnlineScope.maybeOf(context)?.sync==null?null:submit),
     if(OnlineScope.maybeOf(context)?.sync==null)
       const SecurityNotice(title:'Offline access',message:'Online sign-in requires a configured server. Your existing local portfolio is managed separately.'),
-  ]);
+  ]));
 }
 
 /// Separate server-selected verification routes.
@@ -493,6 +494,7 @@ class _SignInVerificationState extends State<_SignInVerification> {
   late DateTime resendAt;
   Timer? timer;
   int resends=0;
+  int get remainingSeconds=>(widget.challenge.expiresAt.difference(DateTime.now()).inMilliseconds/1000).ceil().clamp(0,3600).toInt();
   bool get expired=>!widget.challenge.expiresAt.isAfter(DateTime.now());
   int get cooldown=>(resendAt.difference(DateTime.now()).inMilliseconds/1000).ceil().clamp(0,3600).toInt();
   @override void initState(){
@@ -506,7 +508,7 @@ class _SignInVerificationState extends State<_SignInVerification> {
     setState((){busy=true;error=null;});
     try{
       await widget.remote.finishSignIn(widget.challenge,code.text);
-      if(mounted){setState(()=>busy=false);Navigator.of(context).pop(true);}
+      if(mounted){code.clear();setState(()=>busy=false);Navigator.of(context).pop(true);}
     }catch(_){
       if(mounted)setState(()=>error='Verification failed. Check the code or return to sign in.');
     }finally{if(mounted)setState(()=>busy=false);}
@@ -520,20 +522,23 @@ class _SignInVerificationState extends State<_SignInVerification> {
     }catch(_){if(mounted)setState(()=>error='Could not resend the code. Wait or sign in again.');}
     finally{if(mounted)setState(()=>busy=false);}
   }
-  @override Widget build(BuildContext context)=>PopScope(canPop:!busy,child:AppPage(appBar:const AppHeader(),children:[
-    const Center(child:BrandMark(height:32)),
-    const SizedBox(height:28),
+  @override Widget build(BuildContext context)=>PopScope(canPop:!busy,child:AppPage(appBar:AppHeader(onBack:busy?(){}:null),children:[
+    const SizedBox(height:16),
     Icon(widget.email?Icons.mail_outline:Icons.shield_outlined,color:LG.adaptive(context,LG.sage),size:48),
     PageHeading(widget.email?'Email verification':'Authenticator verification',subtitle:widget.email
       ?'Enter the six-digit code sent to ${widget.challenge.maskedDestination??"your verified email"}.'
       :'Open your authenticator app and enter the current six-digit code.'),
-    Form(key:form,child:FormFieldBlock(title:widget.email?'Verification code':'Authenticator code',child:TextFormField(
-      controller:code,enabled:!busy&&!expired,keyboardType:TextInputType.number,autofillHints:const [AutofillHints.oneTimeCode],
+    if(!expired)Text('Sign-in request expires in ${remainingSeconds~/60}:${(remainingSeconds%60).toString().padLeft(2,'0')}',style:Theme.of(context).textTheme.bodySmall),
+    const SizedBox(height:16),
+    Form(key:form,child:FormFieldBlock(title:widget.email?'Verification code':'Authenticator code',required:true,child:TextFormField(
+      controller:code,enabled:!busy&&!expired,keyboardType:TextInputType.number,textInputAction:TextInputAction.done,onFieldSubmitted:(_)=>submit(),autofillHints:widget.email?const [AutofillHints.oneTimeCode]:null,
+      decoration:const InputDecoration(hintText:'000000'),
+      style:TextStyle(fontFamily:LG.uiFont,fontFeatures:LG.financialFeatures,fontSize:24,letterSpacing:4),
       inputFormatters:[FilteringTextInputFormatter.digitsOnly,LengthLimitingTextInputFormatter(6)],
       validator:(v)=>v?.length==6?null:'Enter six digits',
     ))),
-    if(expired)Text('Verification expired. Return to sign in.',style:TextStyle(color:LG.adaptive(context,LG.negative))),
-    if(error!=null)Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative))),
+    if(expired)Semantics(liveRegion:true,child:Text('Verification expired. Return to sign in.',style:TextStyle(color:LG.adaptive(context,LG.negative)))),
+    if(error!=null)Semantics(liveRegion:true,child:Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative)))),
     PrimaryCTA(label:'Verify and sign in',loading:busy,onPressed:expired?null:submit),
     if(widget.email)TextButton(onPressed:busy||expired||cooldown>0||resends>=2?null:resend,
       child:Text(resends>=2?'Resend limit reached':cooldown>0?'Resend in $cooldown s':'Resend code')),
