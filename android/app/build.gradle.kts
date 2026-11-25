@@ -47,6 +47,7 @@ flutter {
 }
 
 dependencies {
+    implementation("androidx.biometric:biometric:1.1.0")
     // Keeps java.time + ThreeTen-style APIs usable on API 21-25 where
     // the OS doesn't ship them. flutter_local_notifications transitively
     // demands this for scheduled notifications.

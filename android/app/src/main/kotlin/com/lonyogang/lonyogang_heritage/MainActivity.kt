@@ -33,6 +33,8 @@ class MainActivity : FlutterFragmentActivity() {
     }
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        val vault = BiometricVault(this)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lonyogang/biometric_vault").setMethodCallHandler(vault::handle)
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "lonyogang/secure_session").setMethodCallHandler { call, result ->
             try {
                 if (Build.VERSION.SDK_INT < 23) {
