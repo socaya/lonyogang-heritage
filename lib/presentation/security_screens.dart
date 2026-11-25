@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../core/design.dart';
-import '../data/biometric.dart';
+import 'components.dart';
 import '../data/portfolio_store.dart';
 import 'widgets.dart';
 import 'wealth_screens.dart';
@@ -16,116 +16,43 @@ class UnlockScreen extends StatefulWidget {
   State<UnlockScreen> createState() => _UnlockScreenState();
 }
 
-class _UnlockScreenState extends State<UnlockScreen> {
-  final passphrase = TextEditingController();
-  final form = GlobalKey<FormState>();
-  final biometric = BiometricGateway();
-  bool working = false;
+class _UnlockScreenState extends State<UnlockScreen>{
+  final passphrase=TextEditingController();
+  final form=GlobalKey<FormState>();
+  bool working=false,showPassphrase=false;
   String? error;
-  bool biometricAvailable = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkBiometric();
-  }
-
-  Future<void> _checkBiometric() async {
-    final available = await biometric.isAvailable();
-    if (mounted) setState(() => biometricAvailable = available);
-  }
-
-  @override
-  void dispose() {
-    passphrase.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!form.currentState!.validate()) return;
-    setState(() {
-      working = true;
-      error = null;
-    });
-    try {
+  @override void dispose(){passphrase.dispose();super.dispose();}
+  Future<void> submit()async{
+    if(working||!form.currentState!.validate())return;
+    setState((){working=true;error=null;});
+    try{
       await widget.store.unlock(passphrase.text);
-    } catch (e) {
-      setState(() => error = 'Could not unlock: $e');
-    } finally {
-      if (mounted) setState(() => working = false);
-    }
+      if(mounted)passphrase.clear();
+    }on ArgumentError{
+      if(mounted)setState(()=>error='Incorrect passphrase. Try again.');
+    }catch(_){
+      if(mounted)setState(()=>error='Unable to open the vault. Your saved records have not been reset.');
+    }finally{if(mounted)setState(()=>working=false);}
   }
-
-  Future<void> _biometric() async {
-    if (!widget.store.vault.hasBiometricStash) return;
-    final ok = await biometric.authenticate('Unlock your portfolio');
-    if (!ok) return;
-    setState(() {
-      working = true;
-      error = null;
-    });
-    try {
-      await widget.store.unlockWithBiometrics();
-    } catch (e) {
-      setState(() => error = 'Biometric unlock failed: $e');
-    } finally {
-      if (mounted) setState(() => working = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: LG.hPad, vertical: 30),
-            child: Form(
-              key: form,
-              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const BrandMark(height: 48),
-                const SizedBox(height: 40),
-                Text('Unlock your portfolio',
-                    style: Theme.of(context).textTheme.headlineMedium),
-                const SizedBox(height: 10),
-                Text(
-                    'Enter the passphrase you set when you turned on encryption on this device.',
-                    style: TextStyle(color: LG.adaptive(context,LG.muted), height: 1.5)),
-                const SizedBox(height: 28),
-                FormFieldBlock(
-                    title: 'Passphrase',
-                    child: TextFormField(
-                      controller: passphrase,
-                      autofocus: true,
-                      obscureText: true,
-                      decoration: const InputDecoration(hintText: '••••••••'),
-                      validator: (v) => (v == null || v.length < 8)
-                          ? 'At least 8 characters'
-                          : null,
-                    )),
-                if (error != null)
-                  Padding(
-                      padding: const EdgeInsets.only(bottom: 14),
-                      child: Text(error!,
-                          style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12))),
-                ElevatedButton(
-                    onPressed: working ? null : _submit,
-                    child: Text(working ? 'Checking…' : 'Unlock')),
-                if (biometricAvailable &&
-                    widget.store.vault.hasBiometricStash) ...[
-                  const SizedBox(height: 10),
-                  OutlinedButton.icon(
-                      onPressed: working ? null : _biometric,
-                      icon: const Icon(Icons.fingerprint),
-                      label: const Text('Use biometrics')),
-                ],
-                const SizedBox(height: 24),
-                Text(
-                    'Lost your passphrase? The encrypted data on this device cannot be recovered without it. Restore from an unencrypted JSON export if you kept one.',
-                    style: TextStyle(fontSize: 12, color: LG.adaptive(context,LG.muted), height: 1.5)),
-              ]),
-            ),
-          ),
-        ),
-      );
+  @override Widget build(BuildContext context)=>AppPage(children:[
+    const SizedBox(height:28),
+    const BrandMark(height:48),
+    const SizedBox(height:32),
+    Icon(Icons.lock_outline,size:40,color:LG.adaptive(context,LG.sage)),
+    const SizedBox(height:16),
+    const PageHeading('Unlock your portfolio',subtitle:'Enter the local vault passphrase to access your encrypted records.'),
+    Form(key:form,child:FormFieldBlock(title:'Vault passphrase',required:true,child:TextFormField(
+      controller:passphrase,enabled:!working,obscureText:!showPassphrase,autocorrect:false,enableSuggestions:false,
+      textInputAction:TextInputAction.done,onFieldSubmitted:(_)=>submit(),
+      decoration:InputDecoration(suffixIcon:IconButton(tooltip:showPassphrase?'Hide passphrase':'Show passphrase',onPressed:working?null:()=>setState(()=>showPassphrase=!showPassphrase),icon:Icon(showPassphrase?Icons.visibility_off:Icons.visibility))),
+      validator:(v)=>v==null||v.isEmpty?'Enter your vault passphrase':null,
+    ))),
+    if(error!=null)Semantics(liveRegion:true,child:Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative)))),
+    const SizedBox(height:16),
+    PrimaryCTA(label:'Unlock portfolio',loading:working,onPressed:submit,showArrow:false),
+    const SizedBox(height:20),
+    const SecurityNotice(title:'Passphrase required',message:'Biometric vault unlock is unavailable. Your online account password cannot unlock this device’s encrypted records. Keep your vault passphrase safe.'),
+  ]);
 }
 
 class EncryptionSetupScreen extends StatefulWidget {
@@ -139,18 +66,8 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
   final passphrase = TextEditingController();
   final confirm = TextEditingController();
   final form = GlobalKey<FormState>();
-  final biometric = BiometricGateway();
   bool working = false;
-  bool biometricAvailable = false;
   String? message;
-
-  @override
-  void initState() {
-    super.initState();
-    biometric.isAvailable().then((v) {
-      if (mounted) setState(() => biometricAvailable = v);
-    });
-  }
 
   @override
   void dispose() {
@@ -160,7 +77,7 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
   }
 
   Future<void> _enable() async {
-    if (!form.currentState!.validate()) return;
+    if (working || !form.currentState!.validate()) return;
     if (passphrase.text != confirm.text) {
       setState(() => message = 'Passphrases do not match');
       return;
@@ -171,9 +88,9 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
     });
     try {
       await widget.store.enablePassphrase(passphrase.text);
-      if (mounted) setState(() => message = 'Encryption enabled');
+      if (mounted){passphrase.clear();confirm.clear();setState(() => message = 'Encryption enabled');}
     } catch (e) {
-      if (mounted) setState(() => message = 'Could not enable: $e');
+      if (mounted) setState(() => message = 'Could not enable encryption. Try again.');
     } finally {
       if (mounted) setState(() => working = false);
     }
@@ -199,18 +116,6 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
     if (mounted) setState(() => message = 'Encryption removed');
   }
 
-  Future<void> _linkBiometric() async {
-    final gated = await biometric.authenticate(
-        'Link this device\'s biometrics to your passphrase');
-    if (!gated) return;
-    try {
-      await widget.store.vault.enableBiometricStash(passphrase.text);
-      if (mounted) setState(() => message = 'Biometrics linked');
-    } catch (e) {
-      if (mounted) setState(() => message = 'Could not link biometrics: $e');
-    }
-  }
-
   @override
   Widget build(BuildContext context) => AnimatedBuilder(
       animation: widget.store,
@@ -219,7 +124,7 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
         return WealthPage(
             title: 'Encryption',
             subtitle:
-                'Lock this device\'s copy of your portfolio behind a passphrase and optional biometrics.',
+                'Lock this device\'s copy of your portfolio behind a vault passphrase.',
             children: [
               SoftCard(
                   color: hasPassphrase ? LG.sageSoft : LG.white,
@@ -264,28 +169,7 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
                               working ? 'Encrypting…' : 'Enable encryption')),
                     ])),
               ] else ...[
-                if (biometricAvailable) ...[
-                  FormFieldBlock(
-                      title: 'Link biometrics (optional)',
-                      help:
-                          'Verify your passphrase once more to allow biometrics to unlock the vault on this device.',
-                      child: TextFormField(
-                          controller: passphrase,
-                          obscureText: true,
-                          decoration:
-                              const InputDecoration(hintText: 'Current passphrase'))),
-                  OutlinedButton.icon(
-                      onPressed: _linkBiometric,
-                      icon: const Icon(Icons.fingerprint),
-                      label: Text(widget.store.vault.hasBiometricStash
-                          ? 'Re-link biometrics'
-                          : 'Link biometrics')),
-                  if (widget.store.vault.hasBiometricStash)
-                    TextButton(
-                        onPressed: () => widget.store.vault.clearBiometricStash(),
-                        child: Text('Remove biometric link',
-                            style: TextStyle(color: LG.adaptive(context,LG.negative)))),
-                ],
+                const SecurityNotice(title:'Biometric unlock unavailable',message:'Use your vault passphrase until secure device-backed biometric protection is supported.'),
                 const SizedBox(height: 10),
                 TextButton(
                     onPressed: _disable,

@@ -52,7 +52,8 @@ class Vault extends ChangeNotifier {
 
   VaultMetadata get metadata => _metadata;
   bool get hasPassphrase => _metadata.mode == LockMode.passphrase;
-  bool get hasBiometricStash => _metadata.biometricWrapped != null;
+  // Legacy wrapping was derived from public metadata, not an OS-protected key.
+  bool get hasBiometricStash => false;
   bool get isUnlocked => !hasPassphrase || _activeKey != null;
   SecretKey? get activeKey => _activeKey;
 
@@ -71,7 +72,11 @@ class Vault extends ChangeNotifier {
       final metadata=VaultMetadata.fromJson(decoded);
       if(metadata.mode==LockMode.passphrase&&(metadata.salt.isEmpty||metadata.fingerprint==null||!prefs.containsKey(encryptedPayloadKey)))throw const FormatException('Incomplete encrypted vault');
       if(metadata.mode==LockMode.none&&prefs.containsKey(encryptedPayloadKey))throw const FormatException('Conflicting vault storage');
-      _metadata=metadata;
+      if(metadata.biometricWrapped!=null||metadata.biometricSalt!=null){
+        final cleaned=VaultMetadata(mode:metadata.mode,salt:metadata.salt,fingerprint:metadata.fingerprint);
+        if(!await prefs.setString(metadataKey,jsonEncode(cleaned.toJson())))throw StateError('Could not remove legacy biometric credential');
+        _metadata=cleaned;
+      }else{_metadata=metadata;}
       _activeKey=null;
     } catch (_) {
       throw const FormatException('Vault metadata could not be read');
@@ -179,12 +184,6 @@ class Vault extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Wraps the user's passphrase under a second device-derived key so that a
-  /// successful biometric prompt can re-derive the actual vault key. The
-  /// 'device secret' is a long random value stored alongside the metadata and
-  /// treated as the stand-in for an OS keystore until a native binding is
-  /// available. This never loosens the AES-GCM protection on the payload —
-  /// a lost device still requires the passphrase.
   Future<bool> verifyPassphrase(String passphrase) async {
     if (!hasPassphrase) return false;
     final key = await VaultCrypto.deriveKey(passphrase, _metadata.salt);
@@ -192,64 +191,20 @@ class Vault extends ChangeNotifier {
     return fingerprint == _metadata.fingerprint;
   }
 
+  /// Disabled until a native authentication-bound keystore implementation
+  /// is available. Never persist the vault passphrase using public metadata.
   Future<void> enableBiometricStash(String passphrase) async {
-    if (!hasPassphrase) {
-      throw StateError('Enable a passphrase before linking biometrics');
-    }
-    if (!await verifyPassphrase(passphrase)) {
-      throw ArgumentError('Passphrase does not match the current vault');
-    }
-    final salt = VaultCrypto.newSalt();
-    final key = await VaultCrypto.deriveKey(_deviceSecret(), salt);
-    final envelope = await VaultCrypto.encryptString(passphrase, key);
-    _metadata = VaultMetadata(
-      mode: _metadata.mode,
-      salt: _metadata.salt,
-      fingerprint: _metadata.fingerprint,
-      biometricWrapped: jsonEncode(envelope),
-      biometricSalt: salt,
-    );
-    await _persist();
-    notifyListeners();
+    throw UnsupportedError('Secure biometric vault unlocking is unavailable');
   }
 
   Future<void> clearBiometricStash() async {
-    if (!hasBiometricStash) return;
-    _metadata = VaultMetadata(
-      mode: _metadata.mode,
-      salt: _metadata.salt,
-      fingerprint: _metadata.fingerprint,
-    );
+    if(_metadata.biometricWrapped==null&&_metadata.biometricSalt==null)return;
+    _metadata=VaultMetadata(mode:_metadata.mode,salt:_metadata.salt,fingerprint:_metadata.fingerprint);
     await _persist();
     notifyListeners();
   }
 
-  Future<String> _unwrapBiometricPassphrase() async {
-    final stash = _metadata.biometricWrapped;
-    final salt = _metadata.biometricSalt;
-    if (stash == null || salt == null) {
-      throw StateError('No biometric stash is configured');
-    }
-    try {
-      final key = await VaultCrypto.deriveKey(_deviceSecret(), salt);
-      final envelope = (jsonDecode(stash) as Map).cast<String, String>();
-      return await VaultCrypto.decryptString(envelope, key);
-    } catch (err) {
-      // Stash is present but corrupted (user swapped device, crypto library
-      // rejects the bytes, etc.). Surface a stable error so the caller can
-      // fall back to the passphrase flow instead of crashing.
-      throw StateError('Biometric stash could not be decrypted: $err');
-    }
-  }
-
   Future<String> unlockWithBiometricStash() async {
-    final passphrase = await _unwrapBiometricPassphrase();
-    return unlock(passphrase);
+    throw UnsupportedError('Use your vault passphrase');
   }
-
-  /// Device-scoped secret derived from the metadata salt. Not as strong as a
-  /// true keystore, but sufficient to force an attacker who has the SharedPrefs
-  /// file to also brute-force PBKDF2.
-  String _deviceSecret() =>
-      'lonyogang-device-${base64Encode(_metadata.salt)}';
 }
