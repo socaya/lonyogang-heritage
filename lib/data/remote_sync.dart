@@ -372,10 +372,9 @@ class RemoteSyncService implements SyncService {
     request.write(jsonEncode({'email': email}));
     final response = await request.close().timeout(requestDeadline);
     await response.drain<void>().timeout(requestDeadline);
-    // 202 is the documented happy path; 429 means rate-limited (still a
-    // non-leaking response from the user's perspective — same UX, just
-    // without a fresh email). We only raise on genuine server errors.
-    if (response.statusCode >= 500) {
+    // Only an accepted request is a success. Rate limits and transport
+    // failures produce a generic retry message without account disclosure.
+    if (response.statusCode != 202) {
       throw HttpException('Reset begin failed: ${response.statusCode}', uri: uri);
     }
   }

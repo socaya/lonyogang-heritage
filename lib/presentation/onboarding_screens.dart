@@ -546,249 +546,107 @@ class _SignInVerificationState extends State<_SignInVerification> {
   ]));
 }
 
-/// Account recovery initiation. Prototype only: never confirms whether an
-/// account actually exists (anti-enumeration language per spec A10).
+/// Email-based account recovery; no account existence is disclosed.
 class RecoverAccountScreen extends StatefulWidget {
   const RecoverAccountScreen({super.key});
-  @override
-  State<RecoverAccountScreen> createState() => _RecoverAccountScreenState();
+  @override State<RecoverAccountScreen> createState()=>_RecoverAccountScreenState();
+}
+class _RecoverAccountScreenState extends State<RecoverAccountScreen>{
+  final form=GlobalKey<FormState>();
+  final destination=TextEditingController();
+  bool busy=false;
+  String? error;
+  @override void dispose(){destination.dispose();super.dispose();}
+  void openReset(){
+    Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>PasswordResetCompleteScreen(initialEmail:destination.text.trim())));
+  }
+  Future<void> submit()async{
+    if(busy||!form.currentState!.validate())return;
+    final remote=OnlineScope.maybeOf(context)?.sync;
+    if(remote==null){setState(()=>error='Online recovery is unavailable on this device.');return;}
+    setState((){busy=true;error=null;});
+    try{
+      await remote.beginPasswordReset(email:destination.text.trim());
+      if(!mounted)return;
+      setState(()=>busy=false);
+      Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder:(_)=>PasswordResetCompleteScreen(initialEmail:destination.text.trim(),requestAccepted:true)));
+    }catch(_){if(mounted)setState(()=>error='Unable to submit the recovery request. Check your connection or try again later.');}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  @override Widget build(BuildContext context){
+    final online=OnlineScope.maybeOf(context)?.sync!=null;
+    return PopScope(canPop:!busy,child:AppPage(appBar:AppHeader(onBack:busy?(){}:null),children:[
+      const PageHeading('Recover access',subtitle:'Enter the email address associated with your online account.'),
+      Form(key:form,child:FormFieldBlock(title:'Account email',required:true,child:TextFormField(
+        controller:destination,enabled:!busy,keyboardType:TextInputType.emailAddress,autofillHints:const [AutofillHints.email],
+        textInputAction:TextInputAction.done,onFieldSubmitted:(_)=>submit(),
+        decoration:const InputDecoration(hintText:'you@example.com'),
+        validator:(v)=>isLikelyEmail(v??'')?null:'Enter a valid email address',
+      ))),
+      const SecurityNotice(title:'Account privacy',message:'If the address belongs to an eligible account, recovery instructions will be sent. We do not disclose whether an account exists.'),
+      const SizedBox(height:20),
+      if(!online)const Text('Online account recovery requires a configured server. This does not reset your local vault passphrase.'),
+      if(error!=null)Semantics(liveRegion:true,child:Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative)))),
+      PrimaryCTA(label:'Send recovery instructions',loading:busy,onPressed:online?submit:null),
+      Center(child:TextButton(onPressed:online&&!busy?openReset:null,child:const Text('I already have a reset code'))),
+    ]));
+  }
 }
 
-class _RecoverAccountScreenState extends State<RecoverAccountScreen> {
-  final form = GlobalKey<FormState>();
-  final destination = TextEditingController();
-  bool _busy = false;
-
-  @override
-  void dispose() {
-    destination.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submit() async {
-    if (!form.currentState!.validate()) return;
-    final scope = OnlineScope.maybeOf(context);
-    final remote = scope?.sync;
-    setState(() => _busy = true);
-    try {
-      // Only email is accepted by /identity/password/reset/begin today;
-      // the phone branch is still spec-only. For either input we respond
-      // with the same privacy-preserving UX so the UI never discloses
-      // which channels the user actually configured.
-      if (remote != null && isLikelyEmail(destination.text.trim())) {
-        await remote.beginPasswordReset(email: destination.text.trim());
-      } else {
-        // Small artificial delay so the preview/no-backend case matches
-        // the wall-clock shape of the real one; prevents the UI from
-        // revealing "backend configured" through a conspicuous timing gap.
-        await Future<void>.delayed(const Duration(milliseconds: 400));
-      }
-    } catch (_) {
-      // Silent failure is the spec-mandated behaviour: never tell the
-      // caller whether an account exists or whether the server reached
-      // the mailer. Any error becomes the same UX as success.
-    }
-    if (!mounted) return;
-    setState(() => _busy = false);
-    Navigator.of(context).pop();
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text(
-            'If an account matches, recovery instructions have been sent.')));
-  }
-
-  @override
-  Widget build(BuildContext context) => AppPage(
-        appBar: const AppHeader(),
-        children: [
-          const Center(child: BrandMark(height: 32)),
-          const SizedBox(height: 28),
-          Text('Recover access',
-              style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 10),
-          Text(
-            'Enter the email or phone number you used when you set up your account. If it matches, we would send recovery instructions there.',
-            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          Form(
-            key: form,
-            child: FormFieldBlock(
-              title: 'Account identifier',
-              child: TextFormField(
-                controller: destination,
-                keyboardType: TextInputType.emailAddress,
-                autofocus: true,
-                decoration: const InputDecoration(
-                    hintText: 'you@example.com or +256 700 123 456'),
-                validator: (v) => (v == null || v.trim().length < 5)
-                    ? 'Enter your email or phone'
-                    : null,
-              ),
-            ),
-          ),
-          const SecurityNotice(
-            title: 'Privacy-preserving response',
-            message:
-                'We do not confirm or deny whether an account exists. If it does, you will receive recovery instructions after backend services are connected.',
-            icon: Icons.shield_moon_outlined,
-          ),
-          const SizedBox(height: 22),
-          PrimaryCTA(
-            label: _busy ? 'Sending…' : 'Send recovery instructions',
-            loading: _busy,
-            onPressed: _submit,
-          ),
-          const SizedBox(height: 10),
-          Center(
-            child: TextButton(
-              onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                  builder: (_) => const PasswordResetCompleteScreen())),
-              child: Text('I already have a reset code',
-                  style: TextStyle(color: LG.adaptive(context,LG.muted))),
-            ),
-          ),
-          const SizedBox(height: 18),
-        ],
-      );
-}
-
-/// Second half of the password-reset flow: the user pastes the code the
-/// server sent to their email (plus the email itself) and picks a new
-/// password. Only functional when an OnlineScope is wired; otherwise the
-/// screen stays as a design preview so the surface area is visible.
 class PasswordResetCompleteScreen extends StatefulWidget {
-  const PasswordResetCompleteScreen({super.key});
-  @override
-  State<PasswordResetCompleteScreen> createState() =>
-      _PasswordResetCompleteScreenState();
+  final String initialEmail;
+  final bool requestAccepted;
+  const PasswordResetCompleteScreen({super.key,this.initialEmail='',this.requestAccepted=false});
+  @override State<PasswordResetCompleteScreen> createState()=>_PasswordResetCompleteScreenState();
 }
-
-class _PasswordResetCompleteScreenState
-    extends State<PasswordResetCompleteScreen> {
-  final form = GlobalKey<FormState>();
-  final email = TextEditingController();
-  final token = TextEditingController();
-  final password = TextEditingController();
-  bool _busy = false;
-  String? _error;
-
-  @override
-  void dispose() {
-    email.dispose();
-    token.dispose();
-    password.dispose();
-    super.dispose();
+class _PasswordResetCompleteScreenState extends State<PasswordResetCompleteScreen>{
+  final form=GlobalKey<FormState>();
+  late final TextEditingController email;
+  final token=TextEditingController(),password=TextEditingController(),confirmation=TextEditingController();
+  bool busy=false,showPassword=false;
+  String? error;
+  @override void initState(){super.initState();email=TextEditingController(text:widget.initialEmail);}
+  @override void dispose(){email.dispose();token.dispose();password.dispose();confirmation.dispose();super.dispose();}
+  Future<void> submit()async{
+    if(busy||!form.currentState!.validate())return;
+    final remote=OnlineScope.maybeOf(context)?.sync;
+    if(remote==null){setState(()=>error='Online password reset is unavailable.');return;}
+    setState((){busy=true;error=null;});
+    try{
+      await remote.completePasswordReset(email:email.text.trim(),token:token.text.trim(),newPassword:password.text);
+      if(!mounted)return;
+      token.clear();password.clear();confirmation.clear();
+      setState(()=>busy=false);
+      Navigator.of(context).pushAndRemoveUntil(MaterialPageRoute<void>(builder:(_)=>const SignInScreen()),(r)=>r.isFirst);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Password updated. Sign in with your new password.')));
+    }catch(_){if(mounted)setState(()=>error='Unable to reset the password. Check the reset code, or request a new one.');}
+    finally{if(mounted)setState(()=>busy=false);}
   }
-
-  Future<void> _submit() async {
-    if (!form.currentState!.validate()) return;
-    final scope = OnlineScope.maybeOf(context);
-    final remote = scope?.sync;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    try {
-      if (remote == null) {
-        await Future<void>.delayed(const Duration(milliseconds: 400));
-        if (!mounted) return;
-        Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-            content: Text(
-                'Preview: password would be reset once the backend is connected.')));
-        return;
-      }
-      await remote.completePasswordReset(
-        email: email.text.trim(),
-        token: token.text.trim(),
-        newPassword: password.text,
-      );
-      if (!mounted) return;
-      Navigator.of(context).popUntil((r) => r.isFirst);
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Password updated. Sign in with the new password.')));
-    } on HttpException catch (err) {
-      setState(() {
-        _busy = false;
-        _error = err.message.contains('token_invalid')
-            ? 'That reset code is not valid or has expired.'
-            : 'Reset failed: ${err.message}';
-      });
-    } catch (err) {
-      setState(() {
-        _busy = false;
-        _error = 'Reset failed: $err';
-      });
-    }
+  @override Widget build(BuildContext context){
+    final online=OnlineScope.maybeOf(context)?.sync!=null;
+    return PopScope(canPop:!busy,child:AppPage(appBar:AppHeader(onBack:busy?(){}:null),children:[
+      const PageHeading('Choose a new password',subtitle:'Use the reset code from your email. Changing your password revokes existing online sessions.'),
+      if(widget.requestAccepted)...[
+        const SecurityNotice(title:'Request accepted',message:'If the account is eligible, an email will contain your reset code. Check your inbox and spam folder.'),
+        const SizedBox(height:16),
+      ],
+      AutofillGroup(child:Form(key:form,child:Column(children:[
+        FormFieldBlock(title:'Email',required:true,child:TextFormField(controller:email,enabled:!busy,keyboardType:TextInputType.emailAddress,autofillHints:const [AutofillHints.email],textInputAction:TextInputAction.next,validator:(v)=>isLikelyEmail(v??'')?null:'Enter the account email')),
+        FormFieldBlock(title:'Reset code',required:true,child:TextFormField(controller:token,enabled:!busy,autocorrect:false,enableSuggestions:false,textInputAction:TextInputAction.next,decoration:const InputDecoration(hintText:'Paste the code from your email'),validator:(v)=>RegExp(r'^[A-Za-z0-9_-]{32}$').hasMatch(v?.trim()??'')?null:'Enter the complete reset code')),
+        FormFieldBlock(title:'New password',required:true,help:'Use at least 10 characters.',child:TextFormField(controller:password,enabled:!busy,obscureText:!showPassword,autofillHints:const [AutofillHints.newPassword],textInputAction:TextInputAction.next,
+          decoration:InputDecoration(suffixIcon:IconButton(tooltip:showPassword?'Hide password':'Show password',onPressed:busy?null:()=>setState(()=>showPassword=!showPassword),icon:Icon(showPassword?Icons.visibility_off:Icons.visibility))),
+          validator:(v)=>v==null||v.length<10||v.length>1024?'Use 10 to 1024 characters':null)),
+        FormFieldBlock(title:'Confirm password',required:true,child:TextFormField(controller:confirmation,enabled:!busy,obscureText:!showPassword,textInputAction:TextInputAction.done,onFieldSubmitted:(_)=>submit(),validator:(v)=>v==password.text?null:'Passwords do not match')),
+      ]))),
+      if(error!=null)Semantics(liveRegion:true,child:Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative)))),
+      if(!online)const Text('Online password reset requires a configured server.'),
+      const SizedBox(height:16),
+      PrimaryCTA(label:'Reset password',loading:busy,onPressed:online?submit:null),
+      Center(child:TextButton(onPressed:busy||!online?null:()=>Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder:(_)=>const RecoverAccountScreen())),child:const Text('Request a new reset code'))),
+      const SizedBox(height:12),
+      Text('This changes your online account password, not your local vault passphrase.',style:Theme.of(context).textTheme.bodySmall),
+    ]));
   }
-
-  @override
-  Widget build(BuildContext context) => AppPage(
-        appBar: const AppHeader(),
-        children: [
-          const Center(child: BrandMark(height: 32)),
-          const SizedBox(height: 28),
-          Text('Choose a new password',
-              style: Theme.of(context).textTheme.headlineMedium),
-          const SizedBox(height: 10),
-          Text(
-            'Paste the reset code from the email the server sent you. All existing sessions are revoked when the password changes.',
-            style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
-          ),
-          const SizedBox(height: 24),
-          Form(
-            key: form,
-            autovalidateMode: AutovalidateMode.onUserInteraction,
-            child: Column(children: [
-              FormFieldBlock(
-                title: 'Email',
-                child: TextFormField(
-                  controller: email,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(hintText: 'you@example.com'),
-                  validator: (v) =>
-                      isLikelyEmail(v ?? '') ? null : 'Enter the account email',
-                ),
-              ),
-              FormFieldBlock(
-                title: 'Reset code',
-                child: TextFormField(
-                  controller: token,
-                  decoration: const InputDecoration(
-                      hintText: 'Paste the code from the reset email'),
-                  validator: (v) => (v == null || v.trim().length < 6)
-                      ? 'Enter the reset code from the email'
-                      : null,
-                ),
-              ),
-              FormFieldBlock(
-                title: 'New password',
-                child: TextFormField(
-                  controller: password,
-                  obscureText: true,
-                  decoration:
-                      const InputDecoration(hintText: 'At least 10 characters'),
-                  validator: (v) => (v == null || v.length < 10)
-                      ? 'At least 10 characters'
-                      : null,
-                ),
-              ),
-              if (_error != null) ...[
-                const SizedBox(height: 4),
-                Text(_error!,
-                    style: TextStyle(color: LG.adaptive(context,LG.negative), fontSize: 12)),
-              ],
-            ]),
-          ),
-          const SizedBox(height: 22),
-          PrimaryCTA(
-            label: _busy ? 'Resetting…' : 'Reset password',
-            loading: _busy,
-            onPressed: _submit,
-          ),
-          const SizedBox(height: 18),
-        ],
-      );
 }
 
 /// Multi-step portfolio setup. This supersedes the single-field Welcome
