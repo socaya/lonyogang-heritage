@@ -8,6 +8,7 @@ import 'screens.dart';
 import 'security_screens.dart';
 import 'onboarding_screens.dart';
 import 'forms.dart';
+import 'online_scope.dart';
 
 class AppRoot extends StatefulWidget {
   final PortfolioStore store;
@@ -66,67 +67,45 @@ void openCreateSheet(BuildContext context,PortfolioStore store) {
       ]))));
 }
 
-class WelcomeScreen extends StatelessWidget {
+class WelcomeScreen extends StatefulWidget {
   final PortfolioStore store;
-  const WelcomeScreen({super.key, required this.store});
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        backgroundColor: LG.adaptive(context,LG.canvas),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: LG.hPad, vertical: 30),
-            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const BrandMark(height: 48),
-              const SizedBox(height: 32),
-              Container(width: 48, height: 3, color: LG.gold),
-              const SizedBox(height: 24),
-              Text('Your wealth.\nYour heritage.',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontSize: 36, height: 1.13)),
-              const SizedBox(height: 18),
-              Text(
-                  'A home for your investments, property, savings and lasting worth.',
-                  style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 16, height: 1.55)),
-              const SizedBox(height: 28),
-              const SecurityNotice(
-                title: 'Local preview mode',
-                message:
-                    'Everything stays on this device. Enable a passphrase from More → Encryption once you have real data worth protecting.',
-              ),
-              const SizedBox(height: 32),
-              PrimaryCTA(
-                label: 'Create local portfolio',
-                onPressed: () async {
-                  await Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => PortfolioSetupScreen(store: store)));
-                },
-              ),
-              const SizedBox(height: 10),
-              Center(
-                child: TextButton(
-                  onPressed: () async => store.loadDemo(),
-                  child: const Text('Explore with sample data'),
-                ),
-              ),
-              const SizedBox(height: 4),
-              Center(
-                child: TextButton(
-                  onPressed: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                      builder: (_) => const CreateAccountStep1Screen())),
-                  child: Text('View account design preview',
-                      style: TextStyle(color: LG.adaptive(context,LG.muted))),
-                ),
-              ),
-              const SizedBox(height: 18),
-              Center(
-                child: Text(
-                  'No real account or cloud sign-in is created in this preview.',
-                  style: TextStyle(fontSize: 12, color: LG.adaptive(context,LG.muted)),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ]),
-          ),
-        ),
-      );
+  const WelcomeScreen({super.key,required this.store});
+  @override State<WelcomeScreen> createState()=>_WelcomeScreenState();
+}
+class _WelcomeScreenState extends State<WelcomeScreen>{
+  bool busy=false;
+  Future<void> demo()async{
+    if(busy)return;
+    final confirmed=await confirmActionSheet(context,title:'Explore sample data?',consequence:'Load an illustrative portfolio instead of starting with empty records. Sample values are not your actual wealth.',confirmLabel:'Load sample portfolio',destructive:false);
+    if(!mounted||!confirmed||busy)return;
+    setState(()=>busy=true);
+    try{await widget.store.loadDemo();}
+    catch(_){if(mounted)ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content:Text('Could not load sample data. Try again.')));}
+    finally{if(mounted)setState(()=>busy=false);}
+  }
+  @override Widget build(BuildContext context){
+    final online=OnlineScope.maybeOf(context)?.sync!=null;
+    return AppPage(children:[
+      const SizedBox(height:28),
+      const BrandMark(height:48),
+      const SizedBox(height:32),
+      const PageHeading('Your wealth.\nYour heritage.',subtitle:'Keep your investments, property, savings and financial obligations in one place.'),
+      const SizedBox(height:8),
+      const SecurityNotice(title:'Your portfolio, your control',message:'Start with records on this device. Set up a vault passphrase in Security to protect your local records.'),
+      const SizedBox(height:28),
+      PrimaryCTA(label:'Create local portfolio',onPressed:busy?null:()async{
+        await Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>PortfolioSetupScreen(store:widget.store)));
+      }),
+      if(online)...[
+        const SizedBox(height:12),
+        OutlinedButton(onPressed:busy?null:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>const CreateAccountStep1Screen())),child:const Text('Create online account')),
+        Center(child:TextButton(onPressed:busy?null:()=>Navigator.of(context).push(MaterialPageRoute<void>(builder:(_)=>const SignInScreen())),child:const Text('Already have an account? Sign in'))),
+      ]else...[
+        const SizedBox(height:12),
+        Text('Online account services are not configured. Local portfolio features remain available.',style:Theme.of(context).textTheme.bodySmall),
+      ],
+      const SizedBox(height:12),
+      Center(child:TextButton(onPressed:busy?null:demo,child:Text(busy?'Loading sample data…':'Explore with sample data'))),
+    ]);
+  }
 }

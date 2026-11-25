@@ -119,7 +119,7 @@ class _CreateAccountStep1ScreenState extends State<CreateAccountStep1Screen> {
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
           Text(
-            'Set up a private LonyoGang owner profile. This is a design preview — no live account is registered yet.',
+            'Enter your details to create a LonyoGang Heritage account. You will verify your contact details before signing in.',
             style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
@@ -159,7 +159,7 @@ class _CreateAccountStep1ScreenState extends State<CreateAccountStep1Screen> {
               FormFieldBlock(
                 title: 'Mobile number',
                 help:
-                    'We store this locally only. No SMS or verification is sent in preview mode.',
+                    'Use a number you can access for account verification.',
                 child: PhoneField(
                   controller: phone,
                   onChanged: (composed) => composedPhone = composed,
@@ -175,7 +175,7 @@ class _CreateAccountStep1ScreenState extends State<CreateAccountStep1Screen> {
           const SecurityNotice(
             title: 'Private by design',
             message:
-                'Your draft stays on this device. There are no servers to leak it to and no third-party analytics until account services are connected.',
+                'Your details are submitted to the configured account service when you create your account.',
           ),
           const SizedBox(height: 22),
           PrimaryCTA(
@@ -184,7 +184,7 @@ class _CreateAccountStep1ScreenState extends State<CreateAccountStep1Screen> {
               if (!form.currentState!.validate()) return;
               if (!acceptedTerms) {
                 ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Accept the terms to continue')));
+                    const SnackBar(content: Text('Acknowledge the data-handling notice to continue')));
                 return;
               }
               if (!isLikelyPhone(composedPhone)) {
@@ -225,7 +225,6 @@ class _CreateAccountStep1ScreenState extends State<CreateAccountStep1Screen> {
             ),
           ),
           const SizedBox(height: 18),
-          const _PrototypeDisclaimer(),
         ],
       );
 }
@@ -268,16 +267,15 @@ class CreateAccountStep2Screen extends StatefulWidget {
 }
 
 class _CreateAccountStep2ScreenState extends State<CreateAccountStep2Screen> {
-  bool enablePasskey = true;
-  bool enableBiometric = true;
-  final recovery = TextEditingController();
+  bool showPassword=false;
+  final confirmPassword=TextEditingController();
   final password = TextEditingController();
   bool _busy = false;
   String? _error;
 
   @override
   void dispose() {
-    recovery.dispose();
+    confirmPassword.dispose();
     password.dispose();
     super.dispose();
   }
@@ -287,12 +285,14 @@ class _CreateAccountStep2ScreenState extends State<CreateAccountStep2Screen> {
     final remote=OnlineScope.maybeOf(context)?.sync;
     if(remote==null){setState(()=>_error='Account registration requires a configured server.');return;}
     if(password.text.length<10){setState(()=>_error='Password must be at least 10 characters.');return;}
+    if(password.text!=confirmPassword.text){setState(()=>_error='Passwords do not match.');return;}
     setState((){_busy=true;_error=null;});
     try{
       final account=await remote.signUp(email:widget.draft.email,password:password.text,
         phone:widget.draft.phone.isEmpty?null:widget.draft.phone,displayName:widget.draft.fullName);
       if(!mounted)return;
       password.clear();
+      confirmPassword.clear();
       final draft=CreateAccountDraft(fullName:widget.draft.fullName,email:widget.draft.email,phone:widget.draft.phone,accountId:account.accountId);
       await Navigator.of(context).pushReplacement(MaterialPageRoute<void>(builder:(_)=>OtpVerificationScreen(channel:draft.email,draft:draft)));
     }catch(_){if(mounted)setState(()=>_error='Could not create account. Check your details and connection.');}
@@ -309,52 +309,18 @@ class _CreateAccountStep2ScreenState extends State<CreateAccountStep2Screen> {
               style: Theme.of(context).textTheme.headlineMedium),
           const SizedBox(height: 10),
           Text(
-            'Choose how you want to unlock your device copy. Server-backed passkey enrolment is not available yet; this preview protects data on-device only.',
+            'Choose a password for your online account. Contact verification follows.',
             style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5),
           ),
           const SizedBox(height: 24),
           const StepProgress(
               currentStep: 2, totalSteps: 2, eyebrow: 'Security'),
           const SizedBox(height: 22),
-          _OptionTile(
-            title: 'Passkey (device demonstration)',
-            subtitle:
-                'Simulates a WebAuthn-style credential tied to this device. No real server credential is created in the preview.',
-            value: enablePasskey,
-            onChanged: (v) => setState(() => enablePasskey = v),
-            icon: Icons.vpn_key_outlined,
-          ),
-          const SizedBox(height: 12),
-          _OptionTile(
-            title: 'Biometric unlock',
-            subtitle:
-                'Uses this device\'s fingerprint or face check once encryption is enabled under More → Encryption.',
-            value: enableBiometric,
-            onChanged: (v) => setState(() => enableBiometric = v),
-            icon: Icons.fingerprint,
-          ),
-          const SizedBox(height: 20),
-          FormFieldBlock(
-            title: 'Password',
-            help:
-                'At least 10 characters. The backend stores only a peppered Argon2 hash; losing this password requires either recovery shares or an unencrypted JSON export.',
-            child: TextFormField(
-              controller: password,
-              obscureText: true,
-              decoration:
-                  const InputDecoration(hintText: 'Choose a strong passphrase'),
-            ),
-          ),
-          FormFieldBlock(
-            title: 'Recovery contact (optional)',
-            help:
-                'Reminds you who to call if you lose access. Stored locally; no message is sent.',
-            child: TextFormField(
-              controller: recovery,
-              decoration: const InputDecoration(
-                  hintText: 'Phone number or email of a trusted contact'),
-            ),
-          ),
+          FormFieldBlock(title:'Password',required:true,help:'Use at least 10 characters.',child:TextFormField(
+            controller:password,enabled:!_busy,obscureText:!showPassword,autofillHints:const [AutofillHints.newPassword],
+            decoration:InputDecoration(hintText:'Choose a strong password',suffixIcon:IconButton(tooltip:showPassword?'Hide password':'Show password',onPressed:()=>setState(()=>showPassword=!showPassword),icon:Icon(showPassword?Icons.visibility_off:Icons.visibility))),
+          )),
+          FormFieldBlock(title:'Confirm password',required:true,child:TextFormField(controller:confirmPassword,enabled:!_busy,obscureText:!showPassword,autofillHints:const [AutofillHints.newPassword])),
           if (_error != null) ...[
             const SizedBox(height: 4),
             Text(_error!,
@@ -362,9 +328,9 @@ class _CreateAccountStep2ScreenState extends State<CreateAccountStep2Screen> {
           ],
           const SizedBox(height: 10),
           const SecurityNotice(
-            title: 'No server recovery yet',
+            title: 'Account and vault security',
             message:
-                'If you forget a passphrase set later, data on this device cannot be restored without an unencrypted JSON export. A cloud recovery option will arrive with the server implementation.',
+                'Your online password is separate from the local vault passphrase. You can configure device encryption and biometric unlock after setup.',
             icon: Icons.info_outline,
           ),
           const SizedBox(height: 22),
@@ -374,59 +340,11 @@ class _CreateAccountStep2ScreenState extends State<CreateAccountStep2Screen> {
             onPressed: _continue,
           ),
           const SizedBox(height: 18),
-          const _PrototypeDisclaimer(),
         ],
       );
 }
 
-class _OptionTile extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  final IconData icon;
-  const _OptionTile({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-    required this.onChanged,
-    required this.icon,
-  });
-  @override
-  Widget build(BuildContext context) => SoftCard(
-        onTap: () => onChanged(!value),
-        child: Row(children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-                color: LG.adaptive(context,LG.sageSoft), borderRadius: BorderRadius.circular(12)),
-            child: Icon(icon, color: LG.adaptive(context,LG.sage)),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-              child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                Text(title,
-                    style: const TextStyle(
-                        fontWeight: FontWeight.w800, fontSize: 14)),
-                const SizedBox(height: 4),
-                Text(subtitle,
-                    style:
-                        TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12, height: 1.4)),
-              ])),
-          const SizedBox(width: 8),
-          Switch.adaptive(
-              value: value,
-              activeTrackColor: LG.adaptive(context,LG.sageSoft),
-              onChanged: onChanged),
-        ]),
-      );
-}
-
-/// Six-digit OTP entry screen. Purely a design preview: no verification is
-/// performed because no OTP is sent in this environment.
+/// Registration contact verification, separate from sign-in challenges.
 class OtpVerificationScreen extends StatefulWidget {
   final String channel;
   final CreateAccountDraft? draft;
@@ -725,7 +643,6 @@ class _RecoverAccountScreenState extends State<RecoverAccountScreen> {
             ),
           ),
           const SizedBox(height: 18),
-          const _PrototypeDisclaimer(),
         ],
       );
 }
@@ -865,7 +782,6 @@ class _PasswordResetCompleteScreenState
             onPressed: _submit,
           ),
           const SizedBox(height: 18),
-          const _PrototypeDisclaimer(),
         ],
       );
 }
@@ -1034,11 +950,11 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
           InfoLabel(label: 'Currency', value: 'UGX'),
           InfoLabel(label: 'Tracked categories', value: picks.join(', ')),
           const InfoLabel(label: 'Storage', value: 'On this device only'),
-          const InfoLabel(label: 'Account type', value: 'Local preview'),
+          const InfoLabel(label: 'Account type', value: 'Local portfolio'),
         ])),
         const SizedBox(height: 14),
         const SecurityNotice(
-          title: 'No fake balances will be loaded',
+          title: 'Start with an empty portfolio',
           message:
               'We create an empty portfolio. You can optionally load the SRS demonstration data from Settings later.',
         ),
@@ -1115,19 +1031,19 @@ class _TermsCheckbox extends StatelessWidget {
             Expanded(
               child: Text.rich(
                 TextSpan(
-                  text: 'I agree to the ',
+                  text: 'I understand the ',
                   style:
                       TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 13, height: 1.45),
                   children: [
                     TextSpan(
-                      text: 'LonyoGang Preview Terms',
+                      text: 'account data-handling notice',
                       style: TextStyle(
                           color: LG.adaptive(context,LG.navy),
                           fontWeight: FontWeight.w700,
                           decoration: TextDecoration.underline,
                           decorationColor: LG.adaptive(context,LG.navy).withValues(alpha: 0.3)),
                     ),
-                    const TextSpan(text: ' and the data-handling notice.'),
+                    const TextSpan(text: ''),
                   ],
                 ),
               ),
@@ -1137,14 +1053,3 @@ class _TermsCheckbox extends StatelessWidget {
       );
 }
 
-class _PrototypeDisclaimer extends StatelessWidget {
-  const _PrototypeDisclaimer();
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Text(
-          'Design preview · No real account is created or verified.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 11),
-        ),
-      );
-}
