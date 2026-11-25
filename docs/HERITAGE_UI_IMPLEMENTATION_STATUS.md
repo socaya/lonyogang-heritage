@@ -72,3 +72,7 @@ This is an incremental implementation, not a 100% completion or production readi
 ## Batch 13 — Native appearance
 - Explicit light/dark palettes, locally persisted System/Light/Dark preference, Settings appearance route, adaptive shared and screen-specific colour migration across finance, heritage, forms, onboarding, identity, sessions, privacy and supporting screens.
 - Added appearance persistence, contrast, switching and shared-component widget test cases in test/appearance_test.dart. Tests are not executed in the connector-only environment. Remaining hardcoded colours, actual native contrast, visual regressions and compilation must be checked before marking this milestone verified. Overall 104-screen functional completion remains unquantified.
+
+## Batch 14 — Typography
+- Bundled upstream Manrope and Inter variable fonts and SIL OFL licence texts, registered fonts in pubspec, centralized theme hierarchy and financial numeral features, migrated primary financial summaries and shared label/value rows; reduced excessive font weights in affected screens and removed selected FittedBox wrappers.
+- Added font asset, theme hierarchy and nine viewport/text-scale regression cases in test/typography_test.dart. Native test execution and full screen-level typography audit remain outstanding. Overall functional coverage is not established by these source changes.
