@@ -583,86 +583,76 @@ export class IdentityService {
    *  avoid confirming which emails exist. Dispatches the token to the
    *  configured email provider; the HTTP response never includes it. */
   async beginPasswordReset(email: string): Promise<void> {
-    const normalised = email.trim().toLowerCase();
-    const account = await queryOne<AccountRow>(
-      this.db,
-      'select id, email from accounts where email = $1 and status = $2',
-      [normalised, 'active'],
-    );
-    if (!account) return;
     const token = randomBytes(24).toString('base64url');
-    await this.db.query(
-      `insert into account_verifications (account_id, channel, code_hash, expires_at)
-       values ($1, 'email', $2, now() + interval '30 minutes')`,
-      [account.id, this.hashCode(token)],
-    );
-    await this.dispatcher.send({
-      accountId: account.id,
-      channel: 'email',
-      code: token,
-      destination: account.email,
-      purpose: 'password_reset',
+    const tokenHash = this.hashCode(token);
+    const account = await withTx(this.db, async client => {
+      const row = (await client.query<AccountRow>(
+        "select id, email, status from accounts where email = $1 for update",
+        [email.trim().toLowerCase()],
+      )).rows[0];
+      if (!row || !['active', 'locked'].includes(row.status)) return null;
+      const recent = (await client.query<{count: string}>(
+        "select count(*)::text as count from password_reset_tokens where account_id = $1 and created_at > now() - interval '15 minutes'",
+        [row.id],
+      )).rows[0]!;
+      if (Number(recent.count) >= 3) return null;
+      const cooldown = await client.query(
+        "select 1 from password_reset_tokens where account_id = $1 and created_at > now() - interval '60 seconds'",
+        [row.id],
+      );
+      if (cooldown.rowCount) return null;
+      await client.query("update password_reset_tokens set consumed_at = now() where account_id = $1 and consumed_at is null", [row.id]);
+      await client.query(
+        "insert into password_reset_tokens(account_id, token_hash, expires_at) values ($1,$2,now() + interval '30 minutes')",
+        [row.id, tokenHash],
+      );
+      return row;
     });
-    await this.audit.record({
-      accountId: account.id,
-      actor: { kind: 'user', id: account.id },
-      action: 'password.reset_requested',
-      resource: `account:${account.id}`,
-    });
+    if (!account) return;
+    try {
+      await this.dispatcher.send({accountId: account.id, channel: 'email', code: token,
+        destination: account.email, purpose: 'password_reset'});
+    } catch {
+      // Preserve the same accepted response for delivery failures and unknown accounts.
+      await this.db.query("update password_reset_tokens set consumed_at = now() where token_hash = $1 and consumed_at is null", [tokenHash]);
+      return;
+    }
+    await this.audit.record({accountId: account.id, actor: {kind: 'user', id: account.id},
+      action: 'password.reset_requested', resource: `account:${account.id}`});
   }
 
-  async completePasswordReset(input: {
-    email: string;
-    token: string;
-    newPassword: string;
-  }): Promise<void> {
-    if (input.newPassword.length < 10) {
-      throw new ClientError('weak_password', 'Password must be at least 10 characters');
+  async completePasswordReset(input: {email: string; token: string; newPassword: string}): Promise<void> {
+    if (input.newPassword.length < 10 || input.newPassword.length > 1024) {
+      throw new ClientError('weak_password', 'Password must be 10 to 1024 characters');
     }
-    const account = await queryOne<AccountRow>(
-      this.db,
-      'select id from accounts where email = $1',
-      [input.email.trim().toLowerCase()],
-    );
-    if (!account) throw new ClientError('not_found', 'Account not found');
-    const pending = await queryOne<{ id: string; code_hash: Buffer; expires_at: Date }>(
-      this.db,
-      `select id, code_hash, expires_at from account_verifications
-         where account_id = $1 and channel = 'email' and consumed_at is null
-         order by created_at desc limit 1`,
-      [account.id],
-    );
-    if (!pending || pending.expires_at.getTime() < Date.now()) {
-      throw new ClientError('token_invalid', 'Reset token has expired');
-    }
+    const invalid = () => new ClientError('token_invalid', 'Reset token is invalid or expired');
+    if (!/^[A-Za-z0-9_-]{32}$/.test(input.token)) throw invalid();
     const supplied = this.hashCode(input.token);
-    if (!timingSafeEqual(supplied, pending.code_hash)) {
-      throw new ClientError('token_invalid', 'Reset token is not valid');
-    }
+    // Preflight prevents arbitrary invalid requests from invoking expensive password hashing.
+    const candidate = await queryOne<{account_id: string}>(this.db,
+      `select t.account_id from password_reset_tokens t join accounts a on a.id = t.account_id
+       where a.email = $1 and a.status in ('active','locked') and t.token_hash = $2
+       and t.consumed_at is null and t.expires_at > now()`, [input.email.trim().toLowerCase(), supplied]);
+    if (!candidate) throw invalid();
     const hash = await argon2.hash(this.pepper(input.newPassword), {
-      type: argon2.argon2id,
-      memoryCost: 64 * 1024,
-      timeCost: 3,
-      parallelism: 1,
+      type: argon2.argon2id, memoryCost: 64 * 1024, timeCost: 3, parallelism: 1,
     });
-    await withTx(this.db, async (client) => {
-      await client.query(
-        'update account_verifications set consumed_at = now() where id = $1',
-        [pending.id],
+    await withTx(this.db, async client => {
+      const account = (await client.query<AccountRow>("select id, status from accounts where id = $1 and email = $2 for update",
+        [candidate.account_id, input.email.trim().toLowerCase()])).rows[0];
+      if (!account || !['active','locked'].includes(account.status)) throw invalid();
+      const consumed = await client.query(
+        "update password_reset_tokens set consumed_at = now() where account_id = $1 and token_hash = $2 and consumed_at is null and expires_at > now() returning account_id",
+        [account.id, supplied],
       );
-      await client.query('update accounts set password_hash = $1 where id = $2', [hash, account.id]);
-      await client.query(
-        `update sessions set revoked_at = now()
-           where account_id = $1 and revoked_at is null`,
-        [account.id],
-      );
+      if (consumed.rowCount !== 1) throw invalid();
+      await client.query("update accounts set password_hash = $1, status = 'active', failed_login_count = 0, locked_until = null where id = $2", [hash, account.id]);
+      await client.query("update password_reset_tokens set consumed_at = now() where account_id = $1 and consumed_at is null", [account.id]);
+      await client.query("update sessions set revoked_at = now() where account_id = $1 and revoked_at is null", [account.id]);
+      await client.query("update signin_challenges set consumed_at = now() where account_id = $1 and consumed_at is null", [account.id]);
     });
-    await this.audit.record({
-      accountId: account.id,
-      actor: { kind: 'user', id: account.id },
-      action: 'password.reset_completed',
-      resource: `account:${account.id}`,
-    });
+    await this.audit.record({accountId: candidate.account_id, actor: {kind: 'user', id: candidate.account_id},
+      action: 'password.reset_completed', resource: `account:${candidate.account_id}`});
   }
 
   // ---------- Helpers ----------
