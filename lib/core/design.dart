@@ -18,33 +18,31 @@ class LG {
   static const negative = Color(0xFFAB4E46);
   static const r = 12.0;
   static const hPad = 20.0;
+  static const displayFont='Manrope';
+  static const uiFont='Inter';
+  static const financialFeatures=[FontFeature.tabularFigures()];
+  static const buttonText=TextStyle(fontFamily:uiFont,fontSize:15,fontWeight:FontWeight.w600,height:1.33);
+  static TextStyle financialStyle(BuildContext context,{double size=34,Color? color})=>TextStyle(fontFamily:displayFont,fontFeatures:financialFeatures,fontSize:size,fontWeight:FontWeight.w700,height:1.18,color:color??Theme.of(context).colorScheme.onSurface,letterSpacing:-.4);
 
   static ThemeData get theme {
-    final base = ThemeData(useMaterial3: true, brightness: Brightness.light);
+    final base = ThemeData(useMaterial3: true, brightness: Brightness.light,fontFamily:uiFont);
     return base.copyWith(
       scaffoldBackgroundColor: canvas,
       colorScheme: ColorScheme.fromSeed(
           seedColor: navy, primary: navy, secondary: gold, surface: white),
-      textTheme: base.textTheme.apply(bodyColor: navy, displayColor: navy).copyWith(
+      textTheme: base.textTheme.apply(bodyColor: navy, displayColor: navy,fontFamily:uiFont).copyWith(
             // Modern & professional scale: bigger hierarchy, generous
             // line-height, tightened tracking on display styles.
-            displaySmall: const TextStyle(
-                fontSize: 34, fontFeatures: [FontFeature.tabularFigures()], fontWeight: FontWeight.w700, height: 1.1, letterSpacing: -1.0, color: navy),
-            headlineMedium: const TextStyle(
-                fontSize: 28, fontWeight: FontWeight.w700, height: 1.14, letterSpacing: -.8, color: navy),
-            headlineSmall: const TextStyle(
-                fontSize: 24, fontWeight: FontWeight.w700, height: 1.2, letterSpacing: -.4, color: navy),
-            titleLarge: const TextStyle(
-                fontSize: 22, fontWeight: FontWeight.w700, letterSpacing: -.3, color: navy),
-            titleMedium: const TextStyle(
-                fontSize: 19, fontWeight: FontWeight.w600, color: navy),
-            titleSmall: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w700, color: navy),
-            bodyLarge: const TextStyle(fontSize: 16, color: navy, height: 1.5),
-            bodyMedium: const TextStyle(fontSize: 15, color: navy, height: 1.5),
-            bodySmall: const TextStyle(fontSize: 13, color: muted, height: 1.5),
-            labelLarge: const TextStyle(
-                fontSize: 15, fontWeight: FontWeight.w700, color: navy),
+            displaySmall: const TextStyle(fontFamily:displayFont,fontSize:34,fontWeight:FontWeight.w700,height:1.18,color:navy,fontFeatures:financialFeatures,letterSpacing:-.4),
+            headlineMedium: const TextStyle(fontFamily:displayFont,fontSize:28,fontWeight:FontWeight.w700,height:1.21,color:navy),
+            headlineSmall: const TextStyle(fontFamily:displayFont,fontSize:24,fontWeight:FontWeight.w700,height:1.25,color:navy),
+            titleLarge: const TextStyle(fontFamily:displayFont,fontSize:22,fontWeight:FontWeight.w700,height:1.27,color:navy),
+            titleMedium: const TextStyle(fontFamily:displayFont,fontSize:19,fontWeight:FontWeight.w600,height:1.32,color:navy),
+            titleSmall: const TextStyle(fontFamily:uiFont,fontSize:16,fontWeight:FontWeight.w600,height:1.375,color:navy),
+            bodyLarge: const TextStyle(fontFamily:uiFont,fontSize:16,fontWeight:FontWeight.w400,height:1.5,color:navy),
+            bodyMedium: const TextStyle(fontFamily:uiFont,fontSize:15,fontWeight:FontWeight.w400,height:1.47,color:navy),
+            bodySmall: const TextStyle(fontFamily:uiFont,fontSize:13,fontWeight:FontWeight.w400,height:1.46,color:muted),
+            labelLarge: const TextStyle(fontFamily:uiFont,fontSize:15,fontWeight:FontWeight.w600,height:1.33,color:navy),
           ),
       appBarTheme: const AppBarTheme(
           backgroundColor: canvas,
@@ -53,8 +51,9 @@ class LG {
           elevation: 0,
           scrolledUnderElevation: 0,
           titleTextStyle: TextStyle(
+              fontFamily: displayFont,
               fontSize: 19,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: navy,
               letterSpacing: -.3)),
       cardTheme: const CardThemeData(
@@ -98,9 +97,9 @@ class LG {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
               textStyle: const TextStyle(
-                  fontFamily: 'Roboto',
+                  fontFamily: uiFont,
                   fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontWeight: FontWeight.w600,
                   letterSpacing: .1))),
       outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
@@ -110,7 +109,7 @@ class LG {
               shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(8)),
               textStyle: const TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w700))),
+                  fontFamily:uiFont,fontSize: 15, fontWeight: FontWeight.w600))),
       textButtonTheme: TextButtonThemeData(
           style: TextButton.styleFrom(
               foregroundColor: navy,
@@ -126,9 +125,9 @@ class LG {
             size: 24,
           )),
           labelTextStyle: WidgetStateProperty.all(const TextStyle(
-              fontFamily: 'Roboto',
+              fontFamily: uiFont,
               fontSize: 12,
-              fontWeight: FontWeight.w700,
+              fontWeight: FontWeight.w600,
               color: white))),
       dividerTheme: const DividerThemeData(color: line, space: 1, thickness: 1),
       snackBarTheme: SnackBarThemeData(
@@ -172,7 +171,7 @@ class LG {
       color==navy||color==navyDark ? color : adaptive(context,color);
   static ThemeData get darkTheme {
     final light=theme;
-    final base=ThemeData(useMaterial3:true,brightness:Brightness.dark);
+    final base=ThemeData(useMaterial3:true,brightness:Brightness.dark,fontFamily:uiFont);
     final scheme=ColorScheme.fromSeed(seedColor:navy,brightness:Brightness.dark,
       primary:darkGold,onPrimary:navy,secondary:darkSage,onSecondary:navyDark,
       surface:darkSurface,onSurface:darkInk,onSurfaceVariant:darkMuted,
@@ -191,9 +190,9 @@ class LG {
         focusedBorder:OutlineInputBorder(borderSide:const BorderSide(color:darkGold,width:1.6),borderRadius:BorderRadius.circular(8)),
         errorBorder:OutlineInputBorder(borderSide:const BorderSide(color:darkNegative),borderRadius:BorderRadius.circular(8)),
         focusedErrorBorder:OutlineInputBorder(borderSide:const BorderSide(color:darkNegative,width:1.6),borderRadius:BorderRadius.circular(8))),
-      elevatedButtonTheme:ElevatedButtonThemeData(style:ElevatedButton.styleFrom(backgroundColor:darkGold,foregroundColor:navy,minimumSize:const Size.fromHeight(52),elevation:0,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(8)))),
-      outlinedButtonTheme:OutlinedButtonThemeData(style:OutlinedButton.styleFrom(foregroundColor:darkInk,side:const BorderSide(color:darkLine),minimumSize:const Size.fromHeight(52),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(8)))),
-      textButtonTheme:TextButtonThemeData(style:TextButton.styleFrom(foregroundColor:darkGold)),
+      elevatedButtonTheme:ElevatedButtonThemeData(style:ElevatedButton.styleFrom(backgroundColor:darkGold,foregroundColor:navy,textStyle:buttonText,minimumSize:const Size.fromHeight(52),elevation:0,shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(8)))),
+      outlinedButtonTheme:OutlinedButtonThemeData(style:OutlinedButton.styleFrom(foregroundColor:darkInk,textStyle:buttonText,side:const BorderSide(color:darkLine),minimumSize:const Size.fromHeight(52),shape:RoundedRectangleBorder(borderRadius:BorderRadius.circular(8)))),
+      textButtonTheme:TextButtonThemeData(style:TextButton.styleFrom(foregroundColor:darkGold,textStyle:buttonText)),
       navigationBarTheme:light.navigationBarTheme.copyWith(backgroundColor:navyDark),
       dividerTheme:const DividerThemeData(color:darkLine,space:1,thickness:1),
       snackBarTheme:light.snackBarTheme,
