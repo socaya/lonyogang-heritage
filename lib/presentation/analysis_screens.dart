@@ -49,7 +49,7 @@ class AllocationScreen extends StatelessWidget {
                           Expanded(
                               child: Text(d.name,
                                   style: const TextStyle(
-                                      fontWeight: FontWeight.w800))),
+                                      fontWeight: FontWeight.w700))),
                           Text('${driftPct >= 0 ? '+' : ''}${driftPct.toStringAsFixed(1)}%',
                               style: TextStyle(
                                   color: LG.adaptive(context,color), fontWeight: FontWeight.w700))
@@ -258,7 +258,7 @@ class _FxRatesScreenState extends State<FxRatesScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                           Text('${r.currency} · UGX ${LG.money(r.ugxPerUnit)}',
-                              style: const TextStyle(fontWeight: FontWeight.w800)),
+                              style: const TextStyle(fontWeight: FontWeight.w700)),
                           Text(
                               '${LG.date(r.asOf)}${r.source.isEmpty ? '' : ' · ${r.source}'}',
                               style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12)),
@@ -302,7 +302,7 @@ class ScheduledContributionsScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                 Text(s.name,
-                                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                                    style: const TextStyle(fontWeight: FontWeight.w700)),
                                 Text(
                                     '${LG.money(s.amountUgx, compact: true)} · ${s.frequency.name}',
                                     style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12))
@@ -344,7 +344,7 @@ class ScheduledContributionsScreen extends StatelessWidget {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                 Text(s.name,
-                                    style: const TextStyle(fontWeight: FontWeight.w800)),
+                                    style: const TextStyle(fontWeight: FontWeight.w700)),
                                 Text(
                                     '${LG.money(s.amountUgx, compact: true)} · ${s.frequency.name} · next ${LG.date(s.nextFire)}',
                                     style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12)),
@@ -565,7 +565,7 @@ class _HistoricalTrendScreenState extends State<HistoricalTrendScreen> {
                               color: Colors.white70,
                               fontSize: 11,
                               letterSpacing: 1.4,
-                              fontWeight: FontWeight.w800)),
+                              fontWeight: FontWeight.w700)),
                       const SizedBox(height: 12),
                       SizedBox(
                           height: 120,
@@ -579,8 +579,7 @@ class _HistoricalTrendScreenState extends State<HistoricalTrendScreen> {
                       const SizedBox(height: 10),
                       Text(
                           '${LG.money(snapshots.first.netWorthUgx, compact: true)} → ${LG.money(snapshots.last.netWorthUgx, compact: true)}',
-                          style: const TextStyle(
-                              color: Colors.white, fontWeight: FontWeight.w800)),
+                          style:LG.financialStyle(context,size:18,color:Colors.white)),
                     ])),
                 const SizedBox(height: 18),
                 const SectionTitle('Snapshots'),
@@ -654,13 +653,10 @@ class AssetPerformanceScreen extends StatelessWidget {
                             color: Colors.white70,
                             fontSize: 11,
                             letterSpacing: 1.3,
-                            fontWeight: FontWeight.w800)),
+                            fontWeight: FontWeight.w700)),
                     const SizedBox(height: 10),
                     Text(LG.money(current.attributableUgx),
-                        style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800)),
+                        style:LG.financialStyle(context,color:Colors.white)),
                     const SizedBox(height: 10),
                     Text(
                         'Valued ${LG.date(current.valuedAt)} · ${current.status.name}',

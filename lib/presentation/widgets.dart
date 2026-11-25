@@ -91,7 +91,7 @@ class InfoLabel extends StatelessWidget {
     padding:const EdgeInsets.symmetric(vertical:10),
     child:LayoutBuilder(builder:(context,c){
       final name=Text(label,style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:14,height:1.3));
-      final detail=Text(value,style:TextStyle(color:LG.adaptive(context,valueColor??LG.navy),fontWeight:FontWeight.w700,fontSize:14),textAlign:stackedLayout(context,c.maxWidth)?TextAlign.start:TextAlign.end);
+      final detail=Text(value,style:TextStyle(color:LG.adaptive(context,valueColor??LG.navy),fontWeight:FontWeight.w600,fontSize:14,fontFamily:LG.uiFont,fontFeatures:LG.financialFeatures),textAlign:stackedLayout(context,c.maxWidth)?TextAlign.start:TextAlign.end);
       if(stackedLayout(context,c.maxWidth))return Column(crossAxisAlignment:CrossAxisAlignment.start,children:[name,const SizedBox(height:4),detail]);
       return Row(crossAxisAlignment:CrossAxisAlignment.start,children:[Expanded(child:name),const SizedBox(width:12),Expanded(child:detail)]);
     }),

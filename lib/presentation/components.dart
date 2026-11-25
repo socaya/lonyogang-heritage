@@ -198,7 +198,7 @@ class PrimaryCTA extends StatelessWidget {
                         child: Text(label,
                             textAlign: TextAlign.center,
                             style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.w700)),
+                                fontSize: 15, fontWeight: FontWeight.w600)),
                       ),
                       if (showArrow) ...[
                         const SizedBox(width: 10),

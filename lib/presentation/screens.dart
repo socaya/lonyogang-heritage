@@ -217,16 +217,7 @@ class _NetWorthHero extends StatelessWidget {
               ),
             ]),
             const SizedBox(height: 14),
-            FittedBox(
-              fit: BoxFit.scaleDown,
-              alignment: Alignment.centerLeft,
-              child: Text(netWorth,
-                  style: const TextStyle(
-                      fontSize: 36,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                      letterSpacing: -.6)),
-            ),
+            Text(netWorth, style: LG.financialStyle(context,color:Colors.white), softWrap:true),
             const SizedBox(height: 10),
             Row(children: [
               Container(
@@ -297,14 +288,7 @@ class _StatCard extends StatelessWidget {
                 style:
                     TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 12.5)),
             const SizedBox(height: 6),
-            FittedBox(
-              alignment: Alignment.centerLeft,
-              child: Text(value,
-                  style: const TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: -.3)),
-            ),
+            Text(value,style:LG.financialStyle(context,size:20),softWrap:true),
           ],
         ),
       );
@@ -425,7 +409,7 @@ class _PortfolioScreenState extends State<PortfolioScreen> {
           children: [
             const Text('TOTAL ASSET VALUE', style: TextStyle(color: LG.ivory, fontSize: 12, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text(LG.money(widget.store.totals.grossAssets), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
+            Text(LG.money(widget.store.totals.grossAssets),style:LG.financialStyle(context,color:Colors.white)),
             const SizedBox(height: 6),
             const Text('Ownership-adjusted holdings before debt', style: TextStyle(color: LG.ivory, fontSize: 13)),
           ],

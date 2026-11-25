@@ -35,7 +35,7 @@ class WealthStatementScreen extends StatelessWidget {
     return WealthPage(title:'Financial position',subtitle:'The wealth you own, the amounts you owe, and your net worth.',children:[
       SoftCard(color:LG.navy,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('CURRENT NET WORTH',style:TextStyle(color:Colors.white70,fontSize:11,letterSpacing:1.4,fontWeight:FontWeight.w700)),
-        const SizedBox(height:12),Text(LG.money(t.netWorth),style:const TextStyle(color:LG.white,fontSize:30,fontWeight:FontWeight.w700)),
+        const SizedBox(height:12),Text(LG.money(t.netWorth),style:LG.financialStyle(context,color:Colors.white)),
         const SizedBox(height:10),const Text('Based on recorded balances and estimates',style:TextStyle(color:Colors.white70,fontSize:12)),
       ])),const SizedBox(height:24),
       const SectionTitle('Statement of position'),
@@ -73,11 +73,11 @@ class InvestmentOverviewScreen extends StatelessWidget {
       Row(children:[
         Expanded(child:SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('Investments',style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:12)),
-          const SizedBox(height:8),FittedBox(child:Text(LG.money(invested,compact:true),style:const TextStyle(fontSize:20,fontWeight:FontWeight.w700)))]))),
+          const SizedBox(height:8),Text(LG.money(invested,compact:true),style:LG.financialStyle(context,size:20),softWrap:true)]))),
         const SizedBox(width:12),
         Expanded(child:SoftCard(child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
           Text('Savings',style:TextStyle(color:LG.adaptive(context,LG.muted),fontSize:12)),
-          const SizedBox(height:8),FittedBox(child:Text(LG.money(saved,compact:true),style:const TextStyle(fontSize:20,fontWeight:FontWeight.w700)))]))),
+          const SizedBox(height:8),Text(LG.money(saved,compact:true),style:LG.financialStyle(context,size:20),softWrap:true)]))),
       ]),const SizedBox(height:22),const SectionTitle('Holdings'),
       if(assets.isEmpty)const EmptySection(title:'No holdings yet',detail:'Record an investment or savings balance to get started.')
       else ...assets.map((a)=>Padding(padding:const EdgeInsets.only(bottom:10),child:AssetTile(asset:a,onTap:()=>openWealthPage(context,AssetDetails(store:store,asset:a))))),
@@ -174,7 +174,7 @@ class _CashFlowScreenState extends State<CashFlowScreen> {
           backgroundColor:LG.adaptive(context,LG.white),selectedColor:LG.adaptive(context,LG.sageSoft),side:BorderSide.none)]),
       const SizedBox(height:20),SoftCard(color:LG.navy,child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[
         const Text('RECORDED NET INCOME',style:TextStyle(color:Colors.white70,fontSize:11,letterSpacing:1.2)),
-        const SizedBox(height:10),Text(LG.money(income-costs),style:const TextStyle(color:Colors.white,fontSize:26,fontWeight:FontWeight.w700)),
+        const SizedBox(height:10),Text(LG.money(income-costs),style:LG.financialStyle(context,color:Colors.white)),
       ])),const SizedBox(height:14),
       SoftCard(child:Column(children:[
         InfoLabel(label:'Dividends, interest and rent',value:LG.money(income)),
@@ -255,7 +255,7 @@ class _RentalIncomeScreenState extends State<RentalIncomeScreen> {
         SoftCard(color: LG.navy, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('NET RENTAL INCOME', style: TextStyle(color: LG.ivory, fontSize: 12)),
           const SizedBox(height: 8),
-          Text(LG.money(rent - costs), style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.w700)),
+          Text(LG.money(rent - costs), style:LG.financialStyle(context,color:Colors.white)),
         ])),
         const SizedBox(height: 12),
         SoftCard(child: Column(children: [
