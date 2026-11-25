@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:cryptography/cryptography.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/crypto.dart';
@@ -52,8 +53,15 @@ class Vault extends ChangeNotifier {
 
   VaultMetadata get metadata => _metadata;
   bool get hasPassphrase => _metadata.mode == LockMode.passphrase;
-  // Legacy wrapping was derived from public metadata, not an OS-protected key.
-  bool get hasBiometricStash => false;
+  static const _biometric=MethodChannel('lonyogang/biometric_vault');
+  bool _linked=false;
+  bool get hasBiometricStash=>hasPassphrase&&_linked;
+  Future<bool> biometricAvailable() async {
+    try{return await _biometric.invokeMethod<bool>('available')??false;}catch(_){return false;}
+  }
+  Future<void> refreshBiometricLink() async {
+    try{_linked=hasPassphrase&&(await _biometric.invokeMethod<bool>('linked')??false);}catch(_){_linked=false;}
+  }
   bool get isUnlocked => !hasPassphrase || _activeKey != null;
   SecretKey? get activeKey => _activeKey;
 
@@ -64,6 +72,7 @@ class Vault extends ChangeNotifier {
       if(prefs.containsKey(encryptedPayloadKey))throw const FormatException('Encrypted vault metadata is missing');
       _metadata=const VaultMetadata(mode:LockMode.none,salt:[]);
       _activeKey=null;
+      _linked=false;
       return;
     }
     try {
@@ -78,6 +87,7 @@ class Vault extends ChangeNotifier {
         _metadata=cleaned;
       }else{_metadata=metadata;}
       _activeKey=null;
+      await refreshBiometricLink();
     } catch (_) {
       throw const FormatException('Vault metadata could not be read');
     }
@@ -95,6 +105,7 @@ class Vault extends ChangeNotifier {
     if (passphrase.length < 8) {
       throw ArgumentError('Passphrase must be at least 8 characters');
     }
+    await clearBiometricStash();
     final salt = VaultCrypto.newSalt();
     final key = await VaultCrypto.deriveKey(passphrase, salt);
     final fingerprint = await VaultCrypto.keyFingerprint(key);
@@ -115,6 +126,7 @@ class Vault extends ChangeNotifier {
 
   /// Removes the passphrase and writes the payload back as cleartext.
   Future<void> disablePassphrase({required String currentCleartext}) async {
+    await clearBiometricStash();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(legacyKey, currentCleartext);
     await prefs.remove(encryptedPayloadKey);
@@ -191,20 +203,22 @@ class Vault extends ChangeNotifier {
     return fingerprint == _metadata.fingerprint;
   }
 
-  /// Disabled until a native authentication-bound keystore implementation
-  /// is available. Never persist the vault passphrase using public metadata.
   Future<void> enableBiometricStash(String passphrase) async {
-    throw UnsupportedError('Secure biometric vault unlocking is unavailable');
+    if(!isUnlocked||!await verifyPassphrase(passphrase))throw ArgumentError('Incorrect vault passphrase');
+    if(!await biometricAvailable())throw UnsupportedError('Secure biometric authentication unavailable');
+    try{await _biometric.invokeMethod<void>('enroll',{'passphrase':passphrase});}
+    finally{await refreshBiometricLink();notifyListeners();}
+    if(!_linked)throw StateError('Biometric enrollment incomplete');
   }
-
   Future<void> clearBiometricStash() async {
-    if(_metadata.biometricWrapped==null&&_metadata.biometricSalt==null)return;
-    _metadata=VaultMetadata(mode:_metadata.mode,salt:_metadata.salt,fingerprint:_metadata.fingerprint);
-    await _persist();
+    try{await _biometric.invokeMethod<void>('clear');}on MissingPluginException{}
+    _linked=false;
     notifyListeners();
   }
-
   Future<String> unlockWithBiometricStash() async {
-    throw UnsupportedError('Use your vault passphrase');
+    if(!hasBiometricStash)throw StateError('Biometric vault unlock unavailable');
+    final passphrase=await _biometric.invokeMethod<String>('unlock');
+    if(passphrase==null||passphrase.isEmpty)throw StateError('Biometric authentication incomplete');
+    return unlock(passphrase);
   }
 }

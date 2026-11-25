@@ -21,6 +21,15 @@ class _UnlockScreenState extends State<UnlockScreen>{
   final form=GlobalKey<FormState>();
   bool working=false,showPassphrase=false;
   String? error;
+  bool available=false;
+  @override void initState(){super.initState();widget.store.vault.biometricAvailable().then((v){if(mounted)setState(()=>available=v);});}
+  Future<void> biometricUnlock()async{
+    if(working)return;
+    setState((){working=true;error=null;});
+    try{await widget.store.unlockWithBiometrics();}
+    catch(_){if(mounted)setState(()=>error='Biometric unlock was not completed. Use your vault passphrase.');}
+    finally{if(mounted)setState(()=>working=false);}
+  }
   @override void dispose(){passphrase.dispose();super.dispose();}
   Future<void> submit()async{
     if(working||!form.currentState!.validate())return;
@@ -51,7 +60,8 @@ class _UnlockScreenState extends State<UnlockScreen>{
     const SizedBox(height:16),
     PrimaryCTA(label:'Unlock portfolio',loading:working,onPressed:submit,showArrow:false),
     const SizedBox(height:20),
-    const SecurityNotice(title:'Passphrase required',message:'Biometric vault unlock is unavailable. Your online account password cannot unlock this device’s encrypted records. Keep your vault passphrase safe.'),
+    if(available&&widget.store.vault.hasBiometricStash)OutlinedButton.icon(onPressed:working?null:biometricUnlock,icon:const Icon(Icons.fingerprint),label:const Text('Unlock with biometrics')),
+    const SecurityNotice(title:'Keep your passphrase safe',message:'Your vault passphrase remains the fallback. Your online account password cannot unlock this device’s encrypted records.'),
   ]);
 }
 
@@ -68,6 +78,22 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
   final form = GlobalKey<FormState>();
   bool working = false;
   String? message;
+  bool available=false;
+  @override void initState(){super.initState();widget.store.vault.biometricAvailable().then((v){if(mounted)setState(()=>available=v);});}
+  Future<void> link()async{
+    if(working)return;
+    setState((){working=true;message=null;});
+    try{await widget.store.vault.enableBiometricStash(passphrase.text);if(mounted)setState(()=>message='Biometrics linked.');}
+    catch(_){if(mounted)setState(()=>message='Could not link biometrics. Check your passphrase and device support.');}
+    finally{if(mounted){passphrase.clear();setState(()=>working=false);}}
+  }
+  Future<void> unlink()async{
+    if(working)return;
+    setState(()=>working=true);
+    try{await widget.store.vault.clearBiometricStash();if(mounted)setState(()=>message='Biometric link removed.');}
+    catch(_){if(mounted)setState(()=>message='Unable to remove biometric link. Try again.');}
+    finally{if(mounted)setState(()=>working=false);}
+  }
 
   @override
   void dispose() {
@@ -169,10 +195,14 @@ class _EncryptionSetupScreenState extends State<EncryptionSetupScreen> {
                               working ? 'Encrypting…' : 'Enable encryption')),
                     ])),
               ] else ...[
-                const SecurityNotice(title:'Biometric unlock unavailable',message:'Use your vault passphrase until secure device-backed biometric protection is supported.'),
+                if(available)...[
+                  FormFieldBlock(title:'Current vault passphrase',required:true,child:TextField(controller:passphrase,enabled:!working,obscureText:true)),
+                  OutlinedButton.icon(onPressed:working?null:link,icon:const Icon(Icons.fingerprint),label:Text(widget.store.vault.hasBiometricStash?'Re-link biometrics':'Link biometrics')),
+                ]else const SecurityNotice(title:'Biometric unlock unavailable',message:'This device does not support the required secure biometric protection. Use your vault passphrase.'),
+                if(widget.store.vault.hasBiometricStash)TextButton(onPressed:working?null:unlink,child:const Text('Remove biometric link')),
                 const SizedBox(height: 10),
                 TextButton(
-                    onPressed: _disable,
+                    onPressed: working?null:_disable,
                     child: Text('Remove passphrase',
                         style: TextStyle(color: LG.adaptive(context,LG.negative)))),
               ],
