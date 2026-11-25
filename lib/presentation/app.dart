@@ -48,24 +48,33 @@ class _AppRootState extends State<AppRoot> {
 }
 
 void openCreateSheet(BuildContext context,PortfolioStore store) {
+  final items=[
+    ('Investments',Icons.trending_up_rounded,'Investment',()=>AssetForm(store:store,kind:AssetKind.investment)),
+    ('Property',Icons.home_outlined,'Property',()=>AssetForm(store:store,kind:AssetKind.property)),
+    ('Savings',Icons.savings_outlined,'Savings',()=>AssetForm(store:store,kind:AssetKind.savings)),
+    ('Other assets',Icons.inventory_2_outlined,'Other asset',()=>AssetForm(store:store,kind:AssetKind.other)),
+    ('Liabilities',Icons.account_balance_outlined,'Liability / loan',()=>LiabilityForm(store:store)),
+  ];
+  final preferred=items.where((item)=>store.state.preferredCategories.contains(item.$1));
+  final others=items.where((item)=>!store.state.preferredCategories.contains(item.$1));
   showModalBottomSheet<void>(context:context,showDragHandle:true,backgroundColor:LG.adaptive(context,LG.canvas),
-    isScrollControlled:true,builder:(sheetContext)=>SafeArea(child:Padding(padding:const EdgeInsets.fromLTRB(20,8,20,24),child:
+    isScrollControlled:true,builder:(sheetContext)=>SafeArea(child:SingleChildScrollView(padding:const EdgeInsets.fromLTRB(20,8,20,24),child:
       Column(mainAxisSize:MainAxisSize.min,crossAxisAlignment:CrossAxisAlignment.start,children:[
         Text('Add to your wealth',style:Theme.of(context).textTheme.titleLarge),const SizedBox(height:16),
-        ...[
-          (Icons.trending_up_rounded,'Investment',()=>AssetForm(store:store,kind:AssetKind.investment)),
-          (Icons.home_outlined,'Property',()=>AssetForm(store:store,kind:AssetKind.property)),
-          (Icons.savings_outlined,'Savings',()=>AssetForm(store:store,kind:AssetKind.savings)),
-          (Icons.inventory_2_outlined,'Other asset',()=>AssetForm(store:store,kind:AssetKind.other)),
-          (Icons.account_balance_outlined,'Liability / loan',()=>LiabilityForm(store:store)),
-          (Icons.receipt_long_outlined,'Transaction',()=>EventForm(store:store)),
-        ].map((item)=>ListTile(leading:Icon(item.$1,color:LG.adaptive(context,LG.sage)),title:Text(item.$2),
-          trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),onTap:(){
-            Navigator.pop(sheetContext);
-            Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>item.$3()));
-          })),
+        if(preferred.isNotEmpty)Text('Preferred record types',style:Theme.of(context).textTheme.bodySmall),
+        for(final item in preferred) _createTile(context,sheetContext,item.$2,item.$3,item.$4),
+        if(others.isNotEmpty)...[
+          const SizedBox(height:12),
+          Text('Other record types',style:Theme.of(context).textTheme.bodySmall),
+          for(final item in others)_createTile(context,sheetContext,item.$2,item.$3,item.$4),
+        ],
+        _createTile(context,sheetContext,Icons.receipt_long_outlined,'Transaction',()=>EventForm(store:store)),
       ]))));
 }
+Widget _createTile(BuildContext context,BuildContext sheetContext,IconData icon,String title,Widget Function() page)=>ListTile(
+  leading:Icon(icon,color:LG.adaptive(context,LG.sage)),title:Text(title),trailing:Icon(Icons.chevron_right,color:LG.adaptive(context,LG.muted)),
+  onTap:(){Navigator.pop(sheetContext);Navigator.push(context,MaterialPageRoute<void>(builder:(_)=>page()));});
+
 
 class WelcomeScreen extends StatefulWidget {
   final PortfolioStore store;

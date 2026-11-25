@@ -649,6 +649,8 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
   final name = TextEditingController();
   final Set<String> picks = {'Investments', 'Savings', 'Property'};
   bool saving = false;
+  String? error;
+  @override void initState(){super.initState();name.text=widget.store.state.ownerName;}
 
   @override
   void dispose() {
@@ -657,22 +659,21 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
   }
 
   Future<void> _finish() async {
-    if (name.text.trim().length < 2) return;
-    setState(() => saving = true);
+    if (saving||name.text.trim().length<2||name.text.trim().length>100||picks.isEmpty)return;
+    setState(() {saving=true;error=null;});
     try {
-      await widget.store.setOwner(name.text);
+      await widget.store.initializePortfolio(name.text,picks);
       if (!mounted) return;
       Navigator.of(context).popUntil((r) => r.isFirst);
-    } finally {
+    } catch(_){if(mounted)setState(()=>error='Could not save your portfolio. Check local storage and try again.');} finally {
       if (mounted) setState(() => saving = false);
     }
   }
 
   @override
-  Widget build(BuildContext context) => AppPage(
-        appBar: AppHeader(step: step + 1, totalSteps: 3),
+  Widget build(BuildContext context) => PopScope(canPop:!saving,child:AppPage(
+        appBar: AppHeader(step: step + 1, totalSteps: 3,onBack:saving?(){}:step>0?()=>setState(()=>step--):null),
         children: [
-          const Center(child: BrandMark(height: 32)),
           const SizedBox(height: 24),
           StepProgress(
               currentStep: step + 1,
@@ -683,29 +684,30 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
           if (step == 1) ..._stepPicks(context),
           if (step == 2) ..._stepConfirm(context),
         ],
-      );
+      ));
 
   List<Widget> _stepName(BuildContext context) => [
         Text('What should we call your portfolio?',
             style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 10),
         Text(
-            'This is a label you will see at the top of every screen. It never leaves this device.',
+            'Give your portfolio a recognizable name.',
             style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5)),
         const SizedBox(height: 22),
         FormFieldBlock(
-          title: 'Portfolio name',
+          title: 'Portfolio name',required:true,
           child: TextFormField(
             controller: name,
             textCapitalization: TextCapitalization.words,
-            autofocus: true,
+            maxLength:100,
+            textInputAction:TextInputAction.next,
             decoration: const InputDecoration(hintText: 'e.g. My family wealth'),
             onChanged: (_) => setState(() {}),
           ),
         ),
         PrimaryCTA(
             label: 'Continue',
-            onPressed: isLikelyName(name.text)
+            onPressed: isLikelyName(name.text)&&name.text.trim().length<=100
                 ? () async => setState(() => step = 1)
                 : null),
       ];
@@ -715,7 +717,7 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
             style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 10),
         Text(
-            'Choose any combination. You can enable more categories later; we will not add things you did not choose.',
+            'Choose your preferred record types. They will appear first in the Add record menu; all categories remain available.',
             style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5)),
         const SizedBox(height: 22),
         for (final category in const [
@@ -756,7 +758,7 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
                         children: [
                       Text(category.$1,
                           style: const TextStyle(
-                              fontWeight: FontWeight.w800, fontSize: 14)),
+                              fontWeight: FontWeight.w600, fontSize: 14)),
                       const SizedBox(height: 4),
                       Text(category.$3,
                           style: TextStyle(
@@ -789,24 +791,25 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
             style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 10),
         Text(
-            'Here is what we will set up on this device. You can change everything later.',
+            'Review your setup before creating your portfolio.',
             style: TextStyle(color: LG.adaptive(context,LG.muted), fontSize: 14, height: 1.5)),
         const SizedBox(height: 22),
         SoftCard(
             child: Column(children: [
           InfoLabel(label: 'Portfolio name', value: name.text.trim()),
           InfoLabel(label: 'Currency', value: 'UGX'),
-          InfoLabel(label: 'Tracked categories', value: picks.join(', ')),
-          const InfoLabel(label: 'Storage', value: 'On this device only'),
+          InfoLabel(label: 'Preferred categories', value: picks.join(', ')),
+          const InfoLabel(label: 'Storage', value: 'Local portfolio'),
           const InfoLabel(label: 'Account type', value: 'Local portfolio'),
         ])),
         const SizedBox(height: 14),
         const SecurityNotice(
           title: 'Start with an empty portfolio',
           message:
-              'We create an empty portfolio. You can optionally load the SRS demonstration data from Settings later.',
+              'No sample balances or financial records will be created.',
         ),
         const SizedBox(height: 22),
+        if(error!=null)Semantics(liveRegion:true,child:Text(error!,style:TextStyle(color:LG.adaptive(context,LG.negative)))),
         PrimaryCTA(
           label: saving ? 'Creating…' : 'Create portfolio',
           loading: saving,
@@ -815,7 +818,7 @@ class _PortfolioSetupScreenState extends State<PortfolioSetupScreen> {
         const SizedBox(height: 8),
         Center(
           child: TextButton(
-              onPressed: () => setState(() => step = 1),
+              onPressed: saving?null:() => setState(() => step = 1),
               child: Text('Back', style: TextStyle(color: LG.adaptive(context,LG.muted)))),
         ),
       ];

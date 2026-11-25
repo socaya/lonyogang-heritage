@@ -206,6 +206,17 @@ class PortfolioStore extends ChangeNotifier {
     await _save();
   }
 
+  Future<void> initializePortfolio(String name,Set<String> categories) async {
+    if(!_loaded||!isUnlocked||loadError!=null||_state.onboardingDone)throw StateError('Portfolio setup is unavailable');
+    final title=name.trim();
+    if(title.length<2||title.length>100||categories.isEmpty||!PortfolioState.supportedCategories.containsAll(categories))throw ArgumentError('Invalid portfolio setup');
+    final next=_replace(ownerName:title,onboardingDone:true,preferredCategories:Set.unmodifiable(categories));
+    await vault.writePayload(next.encode());
+    _state=next;
+    _lastSavedAt=DateTime.now();
+    notifyListeners();
+  }
+
   Future<void> setOwner(String name) async {
     _state = _replace(ownerName: name.trim(), onboardingDone: true);
     await _save();
@@ -1003,6 +1014,7 @@ class PortfolioStore extends ChangeNotifier {
 
   PortfolioState _replace({
     String? ownerName,
+    Set<String>? preferredCategories,
     bool? onboardingDone,
     List<WealthAsset>? assets,
     List<Liability>? liabilities,
@@ -1023,6 +1035,7 @@ class PortfolioStore extends ChangeNotifier {
   }) =>
       PortfolioState(
           ownerName: ownerName ?? _state.ownerName,
+          preferredCategories:preferredCategories??_state.preferredCategories,
           onboardingDone: onboardingDone ?? _state.onboardingDone,
           assets: assets ?? _state.assets,
           liabilities: liabilities ?? _state.liabilities,

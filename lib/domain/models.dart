@@ -299,6 +299,8 @@ class ReminderRecord {
 }
 
 class PortfolioState {
+  static const supportedCategories=<String>{'Investments','Savings','Property','Other assets','Liabilities'};
+  final Set<String> preferredCategories;
   final String ownerName;
   final bool onboardingDone;
   final List<WealthAsset> assets;
@@ -324,7 +326,7 @@ class PortfolioState {
   /// forms show them as a dropdown so the second write is a tap instead
   /// of a re-type, while still accepting a new "Other..." entry.
   final Set<String> knownInstitutions;
-  const PortfolioState({this.ownerName='',this.onboardingDone=false,this.assets=const [],this.liabilities=const [],
+  const PortfolioState({this.preferredCategories=supportedCategories,this.ownerName='',this.onboardingDone=false,this.assets=const [],this.liabilities=const [],
     this.events=const [],this.goals=const [],this.contacts=const [],this.reminders=const [],
     this.documents=const [],this.beneficiaries=const [],this.valuations=const [],
     this.expenses=const [],
@@ -333,7 +335,7 @@ class PortfolioState {
     this.targetWeightsBps=const <String,int>{},
     this.dismissedAlertKeys=const <String>{},
     this.knownInstitutions=const <String>{}});
-  Json toJson()=>{'schemaVersion':2,'ownerName':ownerName,'onboardingDone':onboardingDone,
+  Json toJson()=>{'schemaVersion':2,'ownerName':ownerName,'onboardingDone':onboardingDone,'preferredCategories':preferredCategories.toList(),
     'assets':assets.map((x)=>x.toJson()).toList(),'liabilities':liabilities.map((x)=>x.toJson()).toList(),
     'events':events.map((x)=>x.toJson()).toList(),'goals':goals.map((x)=>x.toJson()).toList(),
     'contacts':contacts.map((x)=>x.toJson()).toList(),'reminders':reminders.map((x)=>x.toJson()).toList(),
@@ -357,7 +359,7 @@ class PortfolioState {
     if (weightsRaw is Map) {
       weightsRaw.forEach((k,x){weights[k.toString()]=asInt(x).clamp(0,10000).toInt();});
     }
-    return PortfolioState(ownerName:asString(j['ownerName']),onboardingDone:j['onboardingDone']==true,
+    return PortfolioState(preferredCategories:j['preferredCategories'] is List ? (j['preferredCategories'] as List).whereType<String>().where(supportedCategories.contains).toSet() : supportedCategories,ownerName:asString(j['ownerName']),onboardingDone:j['onboardingDone']==true,
       assets:read('assets',WealthAsset.fromJson),liabilities:read('liabilities',Liability.fromJson),
       events:read('events',LedgerEvent.fromJson),goals:read('goals',WealthGoal.fromJson),
       contacts:read('contacts',LegacyContact.fromJson),reminders:read('reminders',ReminderRecord.fromJson),
