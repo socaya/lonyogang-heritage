@@ -2,14 +2,13 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/services.dart';
 
 import 'remote_sync.dart';
 
-/// Persists [RemoteSyncCredentials] in SharedPreferences. In a hardened
-/// build this would be replaced by the OS keystore, but the token payload
-/// is short-lived enough (15 min access, 30 day refresh) that SharedPrefs
-/// is acceptable so long as the device itself is protected by the vault.
+/// Session secrets are persisted only through the native secure storage channel.
 class CredentialsStore {
+  static const _secure=MethodChannel('lonyogang/secure_session');
   static const _prefsKey = 'lonyogang_sync_credentials_v1';
 
   static const _deviceKey = 'lonyogang_installation_device_v2';
@@ -28,23 +27,31 @@ class CredentialsStore {
   }
 
   Future<RemoteSyncCredentials?> load() async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString(_prefsKey);
-    if (raw == null || raw.isEmpty) return null;
-    try {
-      return RemoteSyncCredentials.fromJson(jsonDecode(raw) as Map<String, dynamic>);
-    } catch (_) {
-      return null;
+    final prefs=await SharedPreferences.getInstance();
+    // Do not migrate previously exposed refresh tokens: require fresh sign-in.
+    if(prefs.containsKey(_prefsKey)&&!await prefs.remove(_prefsKey)){
+      throw StateError('Could not remove legacy session credentials');
     }
+    try{
+      final raw=await _secure.invokeMethod<String>('read');
+      if(raw==null)return null;
+      return RemoteSyncCredentials.fromJson(jsonDecode(raw) as Map<String,dynamic>);
+    }on MissingPluginException{return null;}
   }
 
   Future<void> save(RemoteSyncCredentials credentials) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefsKey, jsonEncode(credentials.toJson()));
+    final prefs=await SharedPreferences.getInstance();
+    if(prefs.containsKey(_prefsKey)&&!await prefs.remove(_prefsKey)){
+      throw StateError('Could not remove legacy session credentials');
+    }
+    await _secure.invokeMethod<void>('write',{'value':jsonEncode(credentials.toJson())});
   }
 
   Future<void> clear() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_prefsKey);
+    final prefs=await SharedPreferences.getInstance();
+    if(prefs.containsKey(_prefsKey)&&!await prefs.remove(_prefsKey)){
+      throw StateError('Could not remove legacy session credentials');
+    }
+    try{await _secure.invokeMethod<void>('clear');}on MissingPluginException{ }
   }
 }
