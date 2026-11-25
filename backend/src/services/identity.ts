@@ -145,115 +145,54 @@ export class IdentityService {
    *  code. Rate-limited coarsely through the global 180/min limit; a
    *  per-account cooldown is enforced here by refusing if the newest
    *  outstanding code was issued less than 60 seconds ago. */
-  async resendVerification(input: {
-    accountId: string;
-    channel: 'email' | 'phone';
-  }): Promise<void> {
-    const account = await queryOne<AccountRow>(
-      this.db,
-      'select id, email, phone, status from accounts where id = $1',
-      [input.accountId],
-    );
-    if (!account) throw new ClientError('not_found', 'Account not found');
-    if (account.status === 'active') {
-      throw new ClientError('already_verified', 'Account is already active');
-    }
-    const destination =
-      input.channel === 'email' ? account.email : account.phone;
-    if (!destination) {
-      throw new ClientError(
-          'channel_unavailable',
-          `No ${input.channel} on file`);
-    }
-    const latest = await queryOne<{ created_at: Date }>(
-      this.db,
-      `select created_at from account_verifications
-         where account_id = $1 and channel = $2 and consumed_at is null
-         order by created_at desc limit 1`,
-      [input.accountId, input.channel],
-    );
-    if (
-      latest &&
-      Date.now() - latest.created_at.getTime() < 60_000
-    ) {
-      throw new ClientError('cooldown', 'Please wait before requesting another code');
-    }
+  async resendVerification(input: {accountId: string; channel: 'email' | 'phone'}): Promise<void> {
     const code = this.generateOtp();
-    await this.db.query(
-      `insert into account_verifications (account_id, channel, code_hash, expires_at)
-       values ($1, $2, $3, now() + interval '15 minutes')`,
-      [input.accountId, input.channel, this.hashCode(code)],
-    );
-    await this.dispatcher.send({
-      accountId: input.accountId,
-      channel: input.channel,
-      code,
-      destination,
-      purpose: 'signup',
+    const destination = await withTx(this.db, async client => {
+      const account = (await client.query<AccountRow>(
+        "select id, email, phone, status from accounts where id = $1 for update", [input.accountId],
+      )).rows[0];
+      if (!account || account.status !== 'pending') throw new ClientError('verification_unavailable', 'Registration verification is unavailable');
+      const dest = input.channel === 'email' ? account.email : account.phone;
+      if (!dest) throw new ClientError('channel_unavailable', 'Verification channel is unavailable');
+      const already = await client.query("select 1 from account_verifications where account_id=$1 and channel=$2 and verified_at is not null", [input.accountId,input.channel]);
+      if (already.rowCount) throw new ClientError('already_verified', 'This channel is already verified');
+      const recent = (await client.query<{count:string}>("select count(*)::text as count from account_verifications where account_id=$1 and channel=$2 and created_at > now() - interval '15 minutes'", [input.accountId,input.channel])).rows[0]!;
+      const cooldown = await client.query("select 1 from account_verifications where account_id=$1 and channel=$2 and created_at > now() - interval '60 seconds'", [input.accountId,input.channel]);
+      if (cooldown.rowCount || Number(recent.count)>=4) throw new ClientError('cooldown','Please wait before requesting another code');
+      await client.query("update account_verifications set consumed_at=now() where account_id=$1 and channel=$2 and consumed_at is null",[input.accountId,input.channel]);
+      await client.query("insert into account_verifications(account_id,channel,code_hash,expires_at) values ($1,$2,$3,now() + interval '15 minutes')",[input.accountId,input.channel,this.hashCode(code)]);
+      return dest;
     });
-    await this.audit.record({
-      accountId: input.accountId,
-      actor: { kind: 'user', id: input.accountId },
-      action: 'verification.resent',
-      resource: `account:${input.accountId}`,
-      context: { channel: input.channel },
-    });
+    await this.dispatcher.send({accountId:input.accountId,channel:input.channel,code,destination,purpose:'signup'});
+    await this.audit.record({accountId:input.accountId,actor:{kind:'user',id:input.accountId},action:'verification.resent',resource:`account:${input.accountId}`,context:{channel:input.channel}});
   }
 
-  /** Verifies one channel. When all pending verifications are consumed the
-   *  account flips to `active`. */
-  async verify(input: {
-    accountId: string;
-    channel: 'email' | 'phone';
-    code: string;
-  }): Promise<{ status: AccountRow['status'] }> {
-    const pending = await queryOne<{ id: string; code_hash: Buffer; expires_at: Date }>(
-      this.db,
-      `select id, code_hash, expires_at
-         from account_verifications
-         where account_id = $1 and channel = $2 and consumed_at is null
-         order by created_at desc
-         limit 1`,
-      [input.accountId, input.channel],
-    );
-    if (!pending) throw new ClientError('verification_not_found', 'No pending verification');
-    if (pending.expires_at.getTime() < Date.now()) {
-      throw new ClientError('verification_expired', 'Verification code has expired');
-    }
-    const supplied = this.hashCode(input.code);
-    if (
-      supplied.length !== pending.code_hash.length ||
-      !timingSafeEqual(supplied, pending.code_hash)
-    ) {
-      throw new ClientError('verification_failed', 'Code did not match');
-    }
-    return await withTx(this.db, async (client) => {
-      await client.query(
-        'update account_verifications set consumed_at = now() where id = $1',
-        [pending.id],
-      );
-      const remaining = await client.query<{ channel: string }>(
-        `select channel from account_verifications
-          where account_id = $1 and consumed_at is null and expires_at > now()`,
-        [input.accountId],
-      );
-      let status: AccountRow['status'] = 'pending';
-      if (remaining.rowCount === 0) {
-        const updated = await client.query<{ status: AccountRow['status'] }>(
-          `update accounts set status = 'active', verified_at = now()
-            where id = $1 returning status`,
-          [input.accountId],
-        );
-        status = updated.rows[0]!.status;
-        await this.audit.record({
-          accountId: input.accountId,
-          actor: { kind: 'user', id: input.accountId },
-          action: 'account.activated',
-          resource: `account:${input.accountId}`,
-        });
+  /** Activation requires explicit proof for every required channel, not merely absence of unexpired codes. */
+  async verify(input: {accountId:string;channel:'email'|'phone';code:string}): Promise<{status:AccountRow['status']}> {
+    const result = await withTx(this.db, async client => {
+      const account = (await client.query<AccountRow>("select id,status,phone from accounts where id=$1 for update",[input.accountId])).rows[0];
+      if (!account || account.status!=='pending') return {error:'verification_unavailable' as const};
+      const pending = (await client.query<{id:string;code_hash:Buffer;expires_at:Date;attempts:number}>(
+        "select id,code_hash,expires_at,attempts from account_verifications where account_id=$1 and channel=$2 and consumed_at is null order by created_at desc limit 1 for update",[input.accountId,input.channel])).rows[0];
+      if(!pending || pending.expires_at.getTime()<=Date.now() || pending.attempts>=5) return {error:'verification_expired' as const};
+      const supplied=this.hashCode(input.code);
+      if(!/^\d{6}$/.test(input.code)||supplied.length!==pending.code_hash.length||!timingSafeEqual(supplied,pending.code_hash)){
+        await client.query("update account_verifications set attempts=attempts+1 where id=$1",[pending.id]);
+        return {error:'verification_failed' as const};
       }
-      return { status };
+      await client.query("update account_verifications set consumed_at=now(),verified_at=now() where id=$1",[pending.id]);
+      await client.query("update account_verifications set consumed_at=now() where account_id=$1 and channel=$2 and consumed_at is null",[input.accountId,input.channel]);
+      const verified=await client.query<{channel:string}>("select distinct channel from account_verifications where account_id=$1 and verified_at is not null",[input.accountId]);
+      const channels=new Set(verified.rows.map(row=>row.channel));
+      if(channels.has('email')&&(!account.phone||channels.has('phone'))){
+        await client.query("update accounts set status='active',verified_at=now() where id=$1",[input.accountId]);
+        return {status:'active' as const};
+      }
+      return {status:'pending' as const};
     });
+    if('error' in result && result.error) throw new ClientError(result.error,'Verification code is invalid, expired or unavailable');
+    if(result.status==='active') await this.audit.record({accountId:input.accountId,actor:{kind:'user',id:input.accountId},action:'account.activated',resource:`account:${input.accountId}`});
+    return {status:result.status!};
   }
 
   // ---------- Sign-in ----------
